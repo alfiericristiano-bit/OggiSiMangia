@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-  <meta name="theme-color" content="#21533a">
+  <meta name="theme-color" content="#147d72">
   <meta name="description" content="Anteprima interattiva di OggiSiMangia...: calendario pasti e ricettario personale.">
   <title>OggiSiMangia... · Anteprima web</title>
   <link rel="icon" href="./icon.svg" type="image/svg+xml">
@@ -17,18 +17,19 @@
       <div class="brand">
         <div class="brand-icon" aria-hidden="true">🍝</div>
         <div class="brand-text"><strong>OggiSiMangia...</strong><span>Il tuo menu, ogni giorno</span></div>
+        <button class="brand-theme" id="theme-toggle" type="button" aria-label="Alterna tema chiaro o scuro" title="Cambia tema">◐</button>
       </div>
       <div class="preview-ribbon">ANTEPRIMA WEB INTERATTIVA</div>
       <nav id="main-nav" aria-label="Sezioni">
-        <button class="nav-link active" data-view="calendar"><span>▦</span> Calendario</button>
-        <button class="nav-link" data-view="archive"><span>▤</span> Ricettario</button>
-        <button class="nav-link" data-view="editor"><span>＋</span> Scrivi ricetta</button>
-        <button class="nav-link" data-view="sources"><span>◎</span> Fonti di ricerca</button>
-        <button class="nav-link" data-view="about"><span>ⓘ</span> Informazioni</button>
+        <button class="nav-link active" data-view="calendar"><span>📅</span> Calendario</button>
+        <button class="nav-link" data-view="archive"><span>📚</span> Ricettario</button>
+        <button class="nav-link" data-view="editor"><span>➕</span> Nuova ricetta</button>
+        <button class="nav-link" data-view="sources"><span>🔎</span> Fonti</button>
+        <button class="nav-link" data-view="about"><span>⚙️</span> Info</button>
       </nav>
       <div class="sidebar-bottom">
         <p>Le ricette create qui rimangono nel browser. Non modificano l'app Android.</p>
-        <button class="plain-action" id="theme-toggle" type="button">◐ Cambia tema</button>
+        <p>Stile FamilyChat · Tema chiaro e scuro</p>
       </div>
     </aside>
     <div class="main-wrap">
