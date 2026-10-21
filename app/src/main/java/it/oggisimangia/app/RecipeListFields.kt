@@ -31,6 +31,11 @@ class RecipeListFields(context: Context, initial: String, private val steps: Boo
     private val addButton = Button(context).apply {
         isAllCaps = false
         text = if (steps) "＋ Aggiungi passaggio" else "＋ Aggiungi ingrediente"
+        setTextColor(android.graphics.Color.rgb(21,103,91))
+        background = android.graphics.drawable.GradientDrawable().apply {
+            setColor(android.graphics.Color.rgb(234,244,241))
+            cornerRadius = dp(12).toFloat()
+        }
         setOnClickListener { addRow("") }
     }
 
@@ -58,6 +63,12 @@ class RecipeListFields(context: Context, initial: String, private val steps: Boo
             contentDescription = if (steps) "Passaggio " + (fields.size + 1) else "Ingrediente " + (fields.size + 1)
             setText(value)
             textSize = 15f
+            setTextColor(android.graphics.Color.rgb(35,61,57))
+            background = android.graphics.drawable.GradientDrawable().apply {
+                setColor(android.graphics.Color.WHITE)
+                cornerRadius = dp(11).toFloat()
+                setStroke(dp(1), android.graphics.Color.rgb(199,216,210))
+            }
             inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_SENTENCES or
                 InputType.TYPE_TEXT_FLAG_MULTI_LINE
             minLines = if (steps) 2 else 1
@@ -77,6 +88,11 @@ class RecipeListFields(context: Context, initial: String, private val steps: Boo
             text = "✕"
             isAllCaps = false
             contentDescription = if (steps) "Elimina passaggio" else "Elimina ingrediente"
+            setTextColor(android.graphics.Color.rgb(21,103,91))
+            background = android.graphics.drawable.GradientDrawable().apply {
+                setColor(android.graphics.Color.rgb(234,244,241))
+                cornerRadius = dp(10).toFloat()
+            }
             setOnClickListener {
                 (context.getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager)
                     .hideSoftInputFromWindow(field.windowToken, 0)

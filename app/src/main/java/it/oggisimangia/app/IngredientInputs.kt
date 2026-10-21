@@ -36,7 +36,12 @@ class IngredientInputs(context: Context, initial: String, private val changed: (
             inputType = android.text.InputType.TYPE_CLASS_TEXT
             setText(value)
             setPadding(dp(8),dp(8),dp(8),dp(8))
-            setBackgroundColor(android.graphics.Color.WHITE)
+            background = android.graphics.drawable.GradientDrawable().apply {
+                setColor(android.graphics.Color.WHITE)
+                cornerRadius = dp(11).toFloat()
+                setStroke(dp(1), android.graphics.Color.rgb(199,216,210))
+            }
+            setTextColor(android.graphics.Color.rgb(35,61,57))
             addTextChangedListener(object : TextWatcher {
                 override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) { }
                 override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) { }
@@ -45,6 +50,11 @@ class IngredientInputs(context: Context, initial: String, private val changed: (
         }
         val add = Button(context).apply {
             text = "Aggiungi ingrediente"; isAllCaps = false; textSize = 12f
+            setTextColor(android.graphics.Color.rgb(21,103,91))
+            background = android.graphics.drawable.GradientDrawable().apply {
+                setColor(android.graphics.Color.rgb(234,244,241))
+                cornerRadius = dp(10).toFloat()
+            }
             setOnClickListener {
                 (context.getSystemService(Context.INPUT_METHOD_SERVICE) as
                     android.view.inputmethod.InputMethodManager)

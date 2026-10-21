@@ -55,7 +55,7 @@ assert any('Pranzo e Cena' in n.attrib.get('content-desc','') for n in nodes), '
 (out / 'calendar.png').write_bytes(adb('exec-out', 'screencap', '-p'))
 print('PASS: calendar starts with SQLite recipes and exposes both meal markers on the correct day.')
 
-# Exercise tap, the >2 second threshold, No, meal/type context and actual SQLite planning.
+# Exercise native Android-standard long press, No, meal/type context and SQLite planning.
 import time
 
 def snapshot(name):
@@ -101,18 +101,18 @@ assert any(n.attrib.get('text') == 'Il calendario dei pasti' for n in home)
 assert not any(n.attrib.get('text') == 'Trova cosa cucinare' for n in home)
 cell = next(n for n in home if 'Pranzo e Cena' in n.attrib.get('content-desc',''))
 assert cell.attrib.get('selected') == 'true'
-hold(cell, 1200)
+hold(cell, 120)
 short = snapshot('short-hold')
 assert not any(n.attrib.get('text') == 'Aggiungi ricetta a questo giorno?' for n in short)
 cell = next(n for n in short if 'Pranzo e Cena' in n.attrib.get('content-desc',''))
-hold(cell, 2400)
+hold(cell, 900)
 confirm = snapshot('hold-confirm')
 tap(text_node(confirm, 'No'))
 unchanged = snapshot('hold-no')
 assert any(n.attrib.get('text') == 'Il calendario dei pasti' for n in unchanged)
 assert len(db_rows()) == 3
 cell = next(n for n in unchanged if 'Pranzo e Cena' in n.attrib.get('content-desc',''))
-hold(cell, 2400)
+hold(cell, 900)
 tap(text_node(snapshot('hold-again'), 'Sì'))
 tap(text_node(snapshot('meal'), 'Pranzo'))
 kind = snapshot('kind')
@@ -146,7 +146,7 @@ assert rows[-1] == ('Ricetta alternativa',today,'Pranzo',1), rows
 button=find_scrolling('🔄 Alternativa · Primo · Ricetta alternativa','home-alternative')
 assert button is not None
 (out / 'home-alternative.png').write_bytes(adb('exec-out','screencap','-p'))
-print('PASS: tap selects day; 1200ms does not prompt; 2400ms prompts; No preserves data; existing main proposes alternative.')
+print('PASS: tap selects day; 120ms short press does not prompt; 900ms native long press prompts; No preserves data; existing main proposes alternative.')
 print('PASS: lunch/alternative context reaches search and saved-recipe planning; SQLite and the home dashboard show the saved alternative.')
 
 # Native PDF output and the Android print UI (no physical print is sent).
