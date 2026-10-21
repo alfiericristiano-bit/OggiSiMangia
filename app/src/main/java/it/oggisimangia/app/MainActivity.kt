@@ -315,6 +315,7 @@ class MainActivity : Activity() {
             toolbar.addView(button, LinearLayout.LayoutParams(0, dp(55), 1f))
         }
         toolbarButton("← Indietro") {
+            root.removeView(view)
             view.destroy()
             if (lastResults.isNotEmpty()) showRecipeChoices(lastResults) else showSearch()
         }
@@ -323,6 +324,7 @@ class MainActivity : Activity() {
             if (trusted(current)) {
                 val candidateTitle = view.title?.substringBefore(" - ")?.trim()
                     ?.takeIf { it.isNotBlank() } ?: title
+                root.removeView(view)
                 view.destroy()
                 showMealChoice(candidateTitle, current)
             } else {
@@ -355,6 +357,7 @@ class MainActivity : Activity() {
             setPadding(dp(12), dp(8), dp(12), dp(12))
         }
         scroll.addView(column)
+        lateinit var resultsDialog: AlertDialog
         items.forEachIndexed { index, recipe ->
             val card = LinearLayout(this).apply {
                 orientation = LinearLayout.VERTICAL
@@ -409,19 +412,20 @@ class MainActivity : Activity() {
             }
             val open = Button(this).apply {
                 text = "👁 Leggi dentro l'app"; isAllCaps = false
-                setOnClickListener { openInside(recipe.url, recipe.title) }
+                setOnClickListener { resultsDialog.dismiss(); openInside(recipe.url, recipe.title) }
             }
             card.addView(open)
             val add = Button(this).apply {
                 text = "＋ Scegli per il calendario"; isAllCaps = false
-                setOnClickListener { showMealChoice(recipe.title, recipe.url) }
+                setOnClickListener { resultsDialog.dismiss(); showMealChoice(recipe.title, recipe.url) }
             }
             card.addView(add)
         }
-        AlertDialog.Builder(this).setTitle("🍽️ Ricette trovate (${items.size}/10)")
+        resultsDialog = AlertDialog.Builder(this).setTitle("🍽️ Ricette trovate (${items.size}/10)")
             .setView(scroll).setPositiveButton("Chiudi", null)
             .setNeutralButton("Nuova ricerca") { _, _ -> showSearch() }
-            .show()
+            .create()
+        resultsDialog.show()
     }
 
     private fun showSearch() {
@@ -536,7 +540,7 @@ class MainActivity : Activity() {
         label("PREPARAZIONE", 17f, true)
         label(r.instructions.ifBlank { "Consulta la ricetta originale, se disponibile." })
         if (r.url.isNotBlank() && trusted(r.url)) {
-            action("🌐 Apri la ricetta originale") { openWeb(r.url) }
+            action("🌐 Leggi la ricetta nell’app") { openInside(r.url, r.title) }
         }
         action("✏️ Modifica questa ricetta") {
             selectedDate = LocalDate.parse(r.day)
