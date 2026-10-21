@@ -170,7 +170,7 @@ class MainActivity : Activity() {
                 text = "‹  Indietro"
                 textSize = 14f; isAllCaps = false; gravity = Gravity.CENTER_VERTICAL
                 setTextColor(familyDeep)
-                background = outlined(Color.WHITE, 16f)
+                this.background = outlined(Color.WHITE, 16f)
                 setOnClickListener { goBack() }
             }
             content.addView(back, LinearLayout.LayoutParams(-1, dp(44)).apply { bottomMargin = dp(6) })
