@@ -409,7 +409,7 @@ class MainActivity : Activity() {
     private fun removeFromDay(recipe: Recipe) {
         AlertDialog.Builder(this).setTitle("Rimuovere dal giorno?")
             .setMessage("«" + recipe.title + "» non comparirà più nel giorno " +
-                selectedDate.format(dateFormatter) + ". Resterà nel ricettario.")
+                recipe.day + ". Resterà nel ricettario.")
             .setPositiveButton("Rimuovi dal giorno") { _, _ ->
                 db.save(recipe.copy(day = ""))
                 showCalendar()
@@ -863,32 +863,59 @@ class MainActivity : Activity() {
             "La modifica rimane anche dopo il riavvio e gli aggiornamenti.", 13f)
         val names = entries.map { it.key }.toTypedArray()
         entries.forEachIndexed { position, entry ->
-            val spinner = dropdown("${position+1}ª priorità", names, entry.key)
-            spinner.contentDescription = "Priorità ${position+1}"
+            val row = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+            }
+            val spinner = Spinner(this).apply {
+                adapter = ArrayAdapter(this@MainActivity,
+                    android.R.layout.simple_spinner_dropdown_item, names)
+                setSelection(position)
+                background = outlined(Color.WHITE, 15f)
+                setPadding(dp(9), 0, dp(5), 0)
+                contentDescription = "${position + 1}ª priorità: " + entry.key
+            }
             spinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
                 override fun onNothingSelected(parent: AdapterView<*>?) { }
                 override fun onItemSelected(parent: AdapterView<*>?, view: View?, selected: Int, id: Long) {
                     if (selected == position) return
                     val reordered = entries.toMutableList()
-                    java.util.Collections.swap(reordered,position,selected)
+                    java.util.Collections.swap(reordered, position, selected)
                     sourcePreferences.save(reordered.associateTo(linkedMapOf()) { it.key to it.value })
                     showSourceSettings()
                 }
             }
-            action("🗑️ Elimina sito · " + entry.key) {
-                AlertDialog.Builder(this)
-                    .setTitle("Eliminare questo sito di ricerca?")
-                    .setMessage(entry.key + "\n" + entry.value +
-                        "\nNon sarà più consultato nelle ricerche. Potrai aggiungerlo nuovamente o ripristinare i siti iniziali.")
-                    .setPositiveButton("Elimina sito") { _, _ ->
-                        val remaining = LinkedHashMap(RecipeSources.sites)
-                        remaining.remove(entry.key)
-                        sourcePreferences.save(remaining)
-                        showSourceSettings()
-                    }
-                    .setNegativeButton("Annulla", null)
-                    .show()
+            row.addView(TextView(this).apply {
+                text = "${position + 1}."
+                textSize = 14f
+                setTextColor(familyDeep)
+            }, LinearLayout.LayoutParams(dp(25), -2))
+            row.addView(spinner, LinearLayout.LayoutParams(0, dp(44), 1f))
+            val remove = Button(this).apply {
+                text = "🗑"; textSize = 15f
+                isAllCaps = false
+                contentDescription = "Elimina sito " + entry.key
+                background = outlined(familyPale, 16f)
+                setOnClickListener {
+                    AlertDialog.Builder(this@MainActivity)
+                        .setTitle("Eliminare il sito?")
+                        .setMessage(entry.key + "\n" + entry.value +
+                            "\nNon sarà più consultato nelle ricerche.")
+                        .setPositiveButton("Elimina sito") { _, _ ->
+                            val remaining = LinkedHashMap(RecipeSources.sites)
+                            remaining.remove(entry.key)
+                            sourcePreferences.save(remaining)
+                            showSourceSettings()
+                        }
+                        .setNegativeButton("Annulla", null).show()
+                }
             }
+            row.addView(remove, LinearLayout.LayoutParams(dp(48), dp(44)).apply {
+                marginStart = dp(5)
+            })
+            content.addView(row, LinearLayout.LayoutParams(-1, -2).apply {
+                bottomMargin = dp(5)
+            })
         }
         action("Ripristina siti e ordine iniziali") {
             val restored = LinkedHashMap(RecipeSources.defaults)
