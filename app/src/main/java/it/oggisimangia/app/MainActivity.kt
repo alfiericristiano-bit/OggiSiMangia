@@ -52,6 +52,24 @@ class MainActivity : Activity() {
     private var lastSearchResults: List<WebRecipe> = emptyList()
     private var lastSearchOffset = 0
     private var photoLabel: TextView? = null
+    private val expandedMeals = mutableSetOf<String>()
+    private val screenHistory = mutableListOf<() -> Unit>()
+    private var currentScreenKey = ""
+    private var currentScreenRestore: (() -> Unit)? = null
+    private var restoringScreen = false
+
+    private fun backToPrevious() {
+        if (screenHistory.isEmpty()) {
+            if (currentScreenKey != "calendar") showCalendar() else finish()
+            return
+        }
+        val previous = screenHistory.removeAt(screenHistory.lastIndex)
+        restoringScreen = true
+        try { previous() } finally { restoringScreen = false }
+    }
+
+    @Deprecated("Legacy back key support")
+    override fun onBackPressed() = backToPrevious()
     private val dateFormatter = DateTimeFormatter.ofPattern("EEEE d MMMM yyyy", java.util.Locale.ITALIAN)
 
     companion object {
@@ -106,12 +124,19 @@ class MainActivity : Activity() {
     private val familyDeep = Color.rgb(21, 103, 91)
     private val familyInk = Color.rgb(35, 61, 57)
     private val familyPale = Color.rgb(234, 244, 241)
-    private fun shape(color: Int, radius: Float = 16f): GradientDrawable =
+    private fun shape(color: Int, radius: Float = 18f): GradientDrawable =
         GradientDrawable().apply { setColor(color); cornerRadius = dp(radius.toInt()).toFloat() }
-    private fun outlined(color: Int = Color.WHITE, radius: Float = 12f): GradientDrawable =
+    private fun outlined(color: Int = Color.WHITE, radius: Float = 16f): GradientDrawable =
         shape(color, radius).apply { setStroke(dp(1), Color.rgb(199, 216, 210)) }
 
-    private fun screen(title: String, subtitle: String) {
+    private fun screen(title: String, subtitle: String, key: String = title) {
+        if (key != currentScreenKey) {
+            if (!restoringScreen) currentScreenRestore?.let {
+                if (screenHistory.size >= 16) screenHistory.removeAt(0)
+                screenHistory.add(it)
+            }
+            currentScreenKey = key
+        }
         val background = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setBackgroundColor(Color.rgb(244, 247, 247))
@@ -119,7 +144,7 @@ class MainActivity : Activity() {
         val scroll = ScrollView(this).apply { isFillViewport = true }
         content = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(dp(12), dp(10), dp(12), dp(22))
+            setPadding(dp(11), dp(8), dp(11), dp(16))
         }
         scroll.addView(content)
         background.addView(scroll)
@@ -128,12 +153,21 @@ class MainActivity : Activity() {
         val hero = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
-            setPadding(dp(13), dp(10), dp(13), dp(11))
+            setPadding(dp(11), dp(8), dp(11), dp(8))
             this.background = GradientDrawable(GradientDrawable.Orientation.TL_BR,
                 intArrayOf(familyTeal, Color.rgb(32, 165, 140))).apply {
-                cornerRadius = dp(22).toFloat()
+                cornerRadius = dp(19).toFloat()
             }
             elevation = dp(3).toFloat()
+        }
+        if (key != "calendar") {
+            hero.addView(Button(this).apply {
+                text = "‹"; textSize = 25f; isAllCaps = false
+                contentDescription = "Indietro alla pagina precedente"
+                setTextColor(Color.WHITE)
+                background = shape(Color.argb(55, 255, 255, 255), 16f)
+                setOnClickListener { hideKeyboard(); backToPrevious() }
+            }, LinearLayout.LayoutParams(dp(45), dp(46)).apply { marginEnd = dp(6) })
         }
         hero.addView(TextView(this).apply {
             text = "🍝"; textSize = 26f; gravity = Gravity.CENTER
@@ -141,11 +175,11 @@ class MainActivity : Activity() {
         }, LinearLayout.LayoutParams(dp(44), dp(44)).apply { marginEnd = dp(8) })
         val headerText = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         headerText.addView(TextView(this).apply {
-            text = "OggiSiMangia..."; textSize = 21f
+            text = "OggiSiMangia..."; textSize = 19f
             setTextColor(Color.WHITE); setTypeface(null, Typeface.BOLD)
         })
         headerText.addView(TextView(this).apply {
-            text = title; textSize = 15f; setTextColor(Color.WHITE)
+            text = title; textSize = 14f; setTextColor(Color.WHITE)
             setTypeface(null, Typeface.BOLD)
         })
         headerText.addView(TextView(this).apply {
@@ -153,7 +187,7 @@ class MainActivity : Activity() {
             setTextColor(Color.rgb(235, 251, 244)); maxLines = 3
         })
         hero.addView(headerText, LinearLayout.LayoutParams(0, -2, 1f))
-        content.addView(hero, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(8) })
+        content.addView(hero, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(7) })
         navigation(title)
     }
 
@@ -168,14 +202,14 @@ class MainActivity : Activity() {
 
     private fun action(value: String, onClick: () -> Unit) {
         val btn = Button(this).apply {
-            text = value; isAllCaps = false; textSize = 14f
+            text = value; isAllCaps = false; textSize = 13f
             setTextColor(familyDeep)
-            background = outlined(familyPale, 12f)
+            background = outlined(familyPale, 17f)
             elevation = dp(1).toFloat()
             setOnClickListener { hideKeyboard(); onClick() }
         }
-        content.addView(btn, LinearLayout.LayoutParams(-1, dp(48)).apply {
-            bottomMargin = dp(6)
+        content.addView(btn, LinearLayout.LayoutParams(-1, dp(46)).apply {
+            bottomMargin = dp(5)
         })
     }
 
@@ -189,10 +223,10 @@ class MainActivity : Activity() {
                 maxLines = 2
                 ellipsize = android.text.TextUtils.TruncateAt.END
                 setTextColor(familyDeep)
-                background = outlined(familyPale, 12f)
+                background = outlined(familyPale, 17f)
                 setOnClickListener { hideKeyboard(); entry.second() }
             }
-            row.addView(button, LinearLayout.LayoutParams(0, dp(48), 1f).apply {
+            row.addView(button, LinearLayout.LayoutParams(0, dp(46), 1f).apply {
                 if (index == 0) marginEnd = dp(6)
             })
         }
@@ -207,7 +241,7 @@ class MainActivity : Activity() {
             setText(initial)
             textSize = 16f
             setPadding(dp(12), dp(8), dp(12), dp(8))
-            background = outlined(Color.WHITE, 11f)
+            background = outlined(Color.WHITE, 15f)
             setTextColor(familyInk)
             setHintTextColor(Color.rgb(105,129,120))
             if (multi) {
@@ -239,9 +273,9 @@ class MainActivity : Activity() {
         val spinner = Spinner(this)
         spinner.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, choices)
         spinner.setSelection(choices.indexOf(value).coerceAtLeast(0))
-        spinner.background = outlined(Color.WHITE, 11f)
+        spinner.background = outlined(Color.WHITE, 15f)
         spinner.setPadding(dp(9), 0, dp(9), 0)
-        content.addView(spinner, LinearLayout.LayoutParams(-1, dp(48)).apply { bottomMargin = dp(6) })
+        content.addView(spinner, LinearLayout.LayoutParams(-1, dp(46)).apply { bottomMargin = dp(5) })
         return spinner
     }
 
@@ -275,7 +309,7 @@ class MainActivity : Activity() {
             }
             nav.addView(b, LinearLayout.LayoutParams(0, dp(48), 1f))
         }
-        content.addView(nav, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(8) })
+        content.addView(nav, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(7) })
     }
 
     private fun chooseDate(after: () -> Unit) {
