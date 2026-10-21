@@ -138,12 +138,12 @@ object RecipeFinder {
                 else -> ""
             }
             val ratingString = card.select("[itemprop=ratingValue], [aria-label*=stelle], .rating")
-                .firstOrNull()?.let { it.attr("content").ifBlank { _ -> it.text() } }.orEmpty()
+                .firstOrNull()?.let { it.attr("content").ifBlank { it.text() } }.orEmpty()
             val rating = Regex("[0-5][,.][0-9]").find(ratingString)
                 ?.value?.replace(',', '.')?.toDoubleOrNull()
             val feedbackString = card.select(
                 "[itemprop=reviewCount], [itemprop=ratingCount], a[href*=comment], a[href*=recension]"
-            ).firstOrNull()?.let { it.attr("content").ifBlank { _ -> it.text() } }.orEmpty()
+            ).firstOrNull()?.let { it.attr("content").ifBlank { it.text() } }.orEmpty()
             val feedbacks = Regex("\\d+").find(feedbackString)?.value?.toIntOrNull()
 
             found.putIfAbsent(url.substringBefore('?'), WebRecipe(
