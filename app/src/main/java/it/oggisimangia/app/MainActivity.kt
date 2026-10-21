@@ -207,11 +207,23 @@ class MainActivity : Activity() {
         searchForDay = false
         selectedAlternative = false
         label("Tocca un giorno per vederne i pasti. Tieni premuto oltre 2 secondi per aggiungere una ricetta.", 13f)
+        action("ⓘ Come funziona il calendario") {
+            AppHints.showAgain(this, "calendar_long_press", "Come funziona il calendario",
+                "Tocca una data per scegliere il giorno e vedere pranzo e cena. " +
+                "Tieni premuta la data per più di 2 secondi per aggiungere una ricetta: " +
+                "potrai scegliere pranzo, cena e principale o alternativa.")
+        }
         val calendar = MealCalendar(this, selectedDate, { month -> db.monthMarkers(month) }, { day ->
             selectedDate = day
             showCalendar()
         }, { day -> confirmDaySearch(day) })
         content.addView(calendar, LinearLayout.LayoutParams(-1, -2))
+        content.post {
+            AppHints.showOnce(this, "calendar_long_press", "Come funziona il calendario",
+                "Tocca una data per scegliere il giorno e vedere pranzo e cena. " +
+                "Tieni premuta la data per più di 2 secondi per aggiungere una ricetta: " +
+                "potrai scegliere pranzo, cena e principale o alternativa.")
+        }
         label(selectedDate.format(dateFormatter).replaceFirstChar { it.uppercase() }, 18f, true)
         action("◀ Giorno precedente") { selectedDate = selectedDate.minusDays(1); showCalendar() }
         action("Giorno successivo ▶") { selectedDate = selectedDate.plusDays(1); showCalendar() }
