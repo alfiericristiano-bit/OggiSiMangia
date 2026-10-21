@@ -35,65 +35,63 @@ object RecipeFinder {
         difficulty: String,
         duration: String
     ): List<WebRecipe> {
-        val terms = ingredients.split(',', ';', '\n')
-            .map { it.trim() }.filter { it.isNotBlank() }.take(10)
-        if (terms.isEmpty()) return emptyList()
+        val queries = RecipeSearchQueries.variants(ingredients)
+        if (queries.isEmpty()) return emptyList()
+        val sources = listOf("GialloZafferano", "Fatto in Casa da Benedetta",
+            "Il Cucchiaio d'Argento").filter { it in RecipeSources.sites }
 
-        val query = terms.joinToString(" ")
-        val encoded = URLEncoder.encode(query, "UTF-8")
-        val sources = listOf(
-            Pair("GialloZafferano",
-                "https://www.giallozafferano.it/ricerca-ricette/" +
-                    encoded.replace("+", "%2B") + "/"),
-            Pair("Fatto in Casa da Benedetta",
-                "https://www.fattoincasadabenedetta.it/?s=$encoded"),
-            Pair("Il Cucchiaio d'Argento", "https://www.cucchiaio.it/?s=$encoded")
-        ).filter { (name, _) -> name in RecipeSources.sites }
-
-        val collected = linkedMapOf<String, WebRecipe>()
-        // Prima fonte: pagine di ricerca editoriali con dati di recensione quando esposti.
-        // Consulta sempre tutte e tre le fonti prima di ordinare i risultati.
-        for ((name, address) in sources) {
-            try {
-                val document = Jsoup.connect(address)
-                    .userAgent("Mozilla/5.0 (compatible; OggiSiMangia/1.1; Android)")
-                    .referrer("https://www.google.com/")
-                    .timeout(8500)
-                    .maxBodySize(1_800_000)
-                    .followRedirects(true)
-                    .get()
-                for (recipe in extract(document, name).take(10)) {
-                    if (collected.size >= 60) break
-                    collected.putIfAbsent(recipe.url.substringBefore('?'), recipe)
+        // Fetch editorial sites in parallel: trying the comma fallback must not
+        // triple the waiting time for a single offline/blocked site.
+        val sourcePool = java.util.concurrent.Executors.newFixedThreadPool(3)
+        val collected = try {
+            val calls = sources.map { name -> java.util.concurrent.Callable {
+                val candidates = linkedMapOf<String, WebRecipe>()
+                for (query in queries) {
+                    try {
+                        val document = Jsoup.connect(RecipeSearchQueries.editorial(name, query))
+                            .userAgent("Mozilla/5.0 (Android; OggiSiMangia/1.5.3)")
+                            .referrer("https://www.google.com/")
+                            .timeout(7000).maxBodySize(1_800_000).followRedirects(true).get()
+                        for (recipe in extract(document, name).take(12)) {
+                            candidates.putIfAbsent(recipe.url.substringBefore('?'), recipe)
+                        }
+                    } catch (_: Exception) {
+                        // Retry with the next punctuation variant.
+                    }
+                    if (candidates.size >= 15) break
                 }
-            } catch (_: Exception) {
-                // Una fonte può non consentire lettura automatica: nessun dato inventato.
-            }
-        }
+                candidates.values.toList()
+            } }
+            sourcePool.invokeAll(calls, 27, java.util.concurrent.TimeUnit.SECONDS)
+                .flatMap { try { if (it.isCancelled) emptyList() else it.get() }
+                    catch (_: Exception) { emptyList() } }
+                .distinctBy { it.url.substringBefore('?') }.take(42)
+        } finally { sourcePool.shutdownNow() }
 
-        // Do not trust search cards: verify each page's Recipe JSON-LD ingredients and steps.
+        // Source cards are not enough: only published Recipe JSON-LD with
+        // the full ingredient list AND cooking steps may become a result.
         val pool = java.util.concurrent.Executors.newFixedThreadPool(6)
         val verified = try {
-            val calls = collected.values.map { candidate -> java.util.concurrent.Callable {
+            val calls = collected.map { candidate -> java.util.concurrent.Callable {
                 try {
                     val html = Jsoup.connect(candidate.url)
-                        .userAgent("Mozilla/5.0 (Android; OggiSiMangia/1.4.1)")
+                        .userAgent("Mozilla/5.0 (Android; OggiSiMangia/1.5.3)")
                         .timeout(7500).maxBodySize(2_000_000).get().outerHtml()
                     RecipeDiscovery.preview(html, candidate.url, candidate.source, ingredients)
                 } catch (_: Exception) { null }
             } }
-            pool.invokeAll(calls, 35, java.util.concurrent.TimeUnit.SECONDS).mapNotNull {
+            pool.invokeAll(calls, 36, java.util.concurrent.TimeUnit.SECONDS).mapNotNull {
                 try { if (it.isCancelled) null else it.get() } catch (_: Exception) { null }
             }
         } finally { pool.shutdownNow() }
 
-        // Time, difficulty and course are preferences only; show all verified recipes.
+        // Category, difficulty and duration remain preferences, not exclusions.
         return RecipeRanking.order(verified, ingredients)
     }
 
     private fun extract(doc: Document, source: String): List<WebRecipe> {
         val found = linkedMapOf<String, WebRecipe>()
-        for (anchor in doc.select("h2 a[href], h3 a[href]")) {
+        for (anchor in doc.select("h2 a[href], h3 a[href], article a[href], .recipe-card a[href], [class*=recipe] a[href]")) {
             val title = anchor.text().trim().replace(Regex("\\s+"), " ")
             val url = anchor.absUrl("href")
             if (title.length !in 6..130 || !isTrusted(url) ||
