@@ -51,10 +51,10 @@ class MealCalendar(context: Context, private val selected: LocalDate,
             })
         }
         listOf("L", "M", "M", "G", "V", "S", "D").forEach { day ->
-            cell(TextView(context).apply { text = day; gravity = Gravity.CENTER; setTypeface(null, Typeface.BOLD) }, 28)
+            cell(TextView(context).apply { text = day; gravity = Gravity.CENTER; setTypeface(null, Typeface.BOLD) }, 22)
         }
         val occupied = markers(month)
-        repeat(month.atDay(1).dayOfWeek.value - 1) { cell(TextView(context), 46) }
+        repeat(month.atDay(1).dayOfWeek.value - 1) { cell(TextView(context), 48) }
         for (number in 1..month.lengthOfMonth()) {
             val date = month.atDay(number)
             val meals = occupied[date.toString()].orEmpty()
@@ -85,13 +85,13 @@ class MealCalendar(context: Context, private val selected: LocalDate,
                 }, LayoutParams(dp(7), dp(7)).apply { setMargins(dp(2), dp(3), dp(2), 0) })
             }
             dayCell.addView(dots, LayoutParams(-1, dp(12)))
-            cell(dayCell, 52)
+            cell(dayCell, 48)
         }
         addView(grid, LayoutParams(-1, -2))
         val legend = LinearLayout(context).apply { gravity = Gravity.CENTER }
         for ((meal, color) in listOf("Pranzo" to lunch, "Cena" to dinner)) {
             legend.addView(TextView(context).apply {
-                text = "● $meal  "; textSize = 14f; setTextColor(color); setPadding(0, dp(8), 0, dp(8))
+                text = "● $meal  "; textSize = 14f; setTextColor(color); setPadding(0, dp(4), 0, dp(4))
             })
         }
         addView(legend)

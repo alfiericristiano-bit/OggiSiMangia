@@ -22,10 +22,26 @@
   function fromISO(value) { return new Date(String(value).slice(0,4)*1,String(value).slice(5,7)*1-1,String(value).slice(8,10)*1); }
   function escape(value) { return String(value == null ? "" : value).replace(/[&<>"']/g,function(ch){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[ch];}); }
   function slug(value) { return String(value).toLocaleLowerCase("it").normalize("NFD").replace(/[\u0300-\u036f]/g,""); }
+  // Local recipe archive uses the same Italian ingredient forms as Android.
+  const INGREDIENT_GROUPS=[
+    ["pomodoro","pomodori","pomodorino","pomodorini","datterino","datterini","ciliegino","ciliegini"],
+    ["lenticchia","lenticchie"],["zucchina","zucchine","zucchino","zucchini"],
+    ["carciofo","carciofi"],["cece","ceci"],["fagiolo","fagioli"],
+    ["patata","patate"],["uovo","uova"],["fungo","funghi"],
+    ["cipolla","cipolle"],["melanzana","melanzane"],["pisello","piselli"],["peperone","peperoni"]
+  ];
+  const INGREDIENT_LOOKUP=new Map(INGREDIENT_GROUPS.flatMap((set,i)=>set.map(word=>[word,"ing:"+i])));
+  function ingredientWord(word) {
+    if(INGREDIENT_LOOKUP.has(word))return INGREDIENT_LOOKUP.get(word);
+    if(word.length>=5&&word.endsWith("i"))return word.slice(0,-1)+"o";
+    if(word.length>=5&&word.endsWith("e"))return word.slice(0,-1)+"a";
+    return word;
+  }
   function ingredientMatch(line,requested) {
-    const normalized=slug(line).replace(/[^a-z0-9]+/g," ").trim();
-    const term=slug(requested).replace(/[^a-z0-9]+/g," ").trim();
-    return term!=="" && (" "+normalized+" ").includes(" "+term+" ");
+    const words=s=>slug(s).replace(/[^a-z0-9]+/g," ").trim().split(/\s+/).filter(Boolean);
+    const have=new Set(words(line).map(ingredientWord));
+    const wanted=words(requested).filter(x=>!["di","del","della","delle","dei","degli","con","per","da"].includes(x));
+    return wanted.length>0&&wanted.every(x=>have.has(ingredientWord(x)));
   }
   function formatDate(value, options) { return new Intl.DateTimeFormat("it-IT",options || {weekday:"long",day:"numeric",month:"long"}).format(fromISO(value)); }
   function uid() { return "r-"+Date.now().toString(36)+"-"+Math.random().toString(36).slice(2,8); }

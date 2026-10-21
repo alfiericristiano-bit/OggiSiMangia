@@ -87,29 +87,8 @@ object RecipeFinder {
             }
         } finally { pool.shutdownNow() }
 
-        val maxMinutes = when (duration) {
-            "Volante" -> 15
-            "Veloce" -> 30
-            "Media" -> 60
-            else -> Int.MAX_VALUE
-        }
-        fun rank(r: WebRecipe): Int {
-            return RecipeRanking.relevance(r.ingredients, ingredients)
-        }
-        // I dati di difficoltà e tempo non sempre sono forniti dalla fonte.
-        // In quel caso la scheda resta visibile con l'attributo "non disponibile".
-        return verified.filter { r ->
-            RecipeValidation.containsEvery(r.ingredients, ingredients) && (r.minutes == null || r.minutes <= maxMinutes) &&
-                (r.difficulty.isBlank() || difficulty == "Non disponibile" ||
-                    r.difficulty.equals(difficulty, true) ||
-                    (difficulty == "Facile" && r.difficulty == "Molto facile")) &&
-                (r.category.isBlank() || category.isBlank() ||
-                    r.category.equals(category, true))
-        }.sortedWith(
-            compareByDescending<WebRecipe> { it.feedbackCount ?: -1 }
-                .thenByDescending { rank(it) }
-                .thenByDescending { it.rating ?: -1.0 }
-        )
+        // Time, difficulty and course are preferences only; show all verified recipes.
+        return RecipeRanking.order(verified, ingredients)
     }
 
     private fun extract(doc: Document, source: String): List<WebRecipe> {

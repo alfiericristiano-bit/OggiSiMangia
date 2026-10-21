@@ -546,3 +546,68 @@ body.dark .calendar-hero::after{opacity:.58;}
   .phone-preview .topbar,.phone-preview .bottom-nav{display:none!important;}
   .phone-preview .app-shell{height:auto;overflow:visible;}
 }
+
+/* Compact mobile-first layout. The preview remains smartphone-only (390 x 844).
+   Preserve at least 44px web button targets and readable text instead of
+   solving scrolling by shrinking the entire interface. */
+@media screen {
+  .phone-preview .topbar { min-height:60px; height:60px; padding:7px 13px; }
+  .phone-preview .mobile-brand { font-size:19px; }
+  .phone-preview .brand-theme { width:44px; height:44px; }
+  .phone-preview #app { padding:11px 11px 20px; }
+  .phone-preview .headline { gap:8px; margin-bottom:12px; }
+  .phone-preview .headline h1 { font-size:22px; margin-bottom:4px; }
+  .phone-preview .subtitle { font-size:12px; line-height:1.35; }
+  .phone-preview .kicker { margin-bottom:3px; }
+  .phone-preview .calendar-hero { min-height:124px; padding:13px; margin-bottom:10px; border-radius:16px; }
+  .phone-preview .calendar-hero h1 { font-size:22px; }
+  .phone-preview .calendar-hero::after { font-size:40px; right:5px; bottom:7px; }
+  .phone-preview .calendar-hero .head-actions { gap:6px; }
+  .phone-preview .calendar-layout { gap:10px; }
+  .phone-preview .card { padding:11px; border-radius:13px; }
+  .phone-preview .card-head { gap:7px; margin-bottom:8px; }
+  .phone-preview .card-head h2 { font-size:18px; }
+  .phone-preview .week-grid, .phone-preview .day-grid { gap:4px; }
+  .phone-preview .week-grid { margin-bottom:3px; }
+  .phone-preview .week-grid span { padding:4px 0; }
+  .phone-preview .day { min-height:48px; gap:3px; font-size:14px; }
+  .phone-preview .dots { min-height:5px; }
+  .phone-preview .legend { margin-top:8px; gap:15px; }
+  .phone-preview .card-hint { margin-top:9px; padding:8px; }
+  .phone-preview .meal-section { margin:10px 0; }
+  .phone-preview .meal-title { margin-bottom:6px; padding-bottom:5px; }
+  .phone-preview .meal-entry { margin:5px 0; padding:9px; }
+  .phone-preview .meal-entry .actions { margin-top:6px; gap:6px; }
+  .phone-preview .empty { padding:10px; }
+  .phone-preview .quick-stat { gap:7px; margin-top:10px; }
+  .phone-preview .stat { padding:9px; border-radius:11px; }
+  .phone-preview .stat strong { font-size:21px; }
+  .phone-preview .btn { min-height:44px; padding:8px 9px; font-size:12px; }
+  .phone-preview .btn.tiny { min-height:44px; }
+  .phone-preview .head-actions { display:flex; flex-wrap:nowrap; gap:6px; width:100%; }
+  .phone-preview .head-actions .btn { flex:1 1 0; min-width:0; white-space:normal; }
+  .phone-preview .filters { gap:8px; margin-bottom:12px; }
+  .phone-preview .form-grid { grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }
+  .phone-preview .form-grid .wide { grid-column:1/-1; }
+  .phone-preview .field { gap:3px; }
+  .phone-preview .field label { line-height:1.25; }
+  .phone-preview .input, .phone-preview .select, .phone-preview .textarea { padding:9px; font-size:14px; min-height:44px; }
+  .phone-preview .textarea { min-height:76px; }
+  .phone-preview .form-section { margin:13px 0 10px; padding-top:12px; }
+  .phone-preview .form-section h2 { margin-bottom:8px; font-size:18px; }
+  .phone-preview .inline-list { gap:6px; }
+  .phone-preview .list-line { gap:6px; }
+  .phone-preview .source-list { gap:6px; }
+  .phone-preview .source-item { gap:6px; padding:8px; }
+  .phone-preview .recipe-grid { gap:10px; }
+  .phone-preview .recipe-card img, .phone-preview .recipe-placeholder { height:112px; }
+  .phone-preview .recipe-card .body { padding:11px; gap:6px; }
+  .phone-preview .info-grid { gap:7px; }
+  .phone-preview .info-grid .item { padding:8px; }
+  .phone-preview .recipe-lines { gap:5px; }
+  .phone-preview .recipe-lines li { padding:8px 9px; }
+  .phone-preview .notice { padding:9px; }
+  .phone-preview .modal-actions { gap:6px; margin-top:9px; }
+  .phone-preview .bottom-nav button { min-height:52px; padding:5px 0; }
+  .phone-preview .footer { padding:10px 8px 77px; }
+}

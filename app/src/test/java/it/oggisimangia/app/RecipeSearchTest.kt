@@ -50,6 +50,19 @@ class RecipeSearchTest {
         assertEquals(4.555555,r.rating!!,0.00001)
         assertNull(RecipeDiscovery.preview(html,"https://www.tavolartegusto.it/ricetta/pasta/","Tavolartegusto","cioccolato"))
     }
+    @Test fun preferenceDeviationsAreDisplayedWithoutExcludingPublishedRecipes() {
+        val r = WebRecipe("Lenticchie in umido", "", "https://www.misya.info/ricetta/lenticchie.htm",
+            "Misya", category = "Contorno", difficulty = "Media", minutes = 50,
+            ingredients = "200 g lenticchie\n150 g pomodoro")
+        assertEquals(listOf(r), RecipeRanking.order(listOf(r), "lenticchia, pomodori"))
+        val notices = RecipePreferences.notices(r, "Secondo", "Facile", "Veloce")
+        assertEquals(3, notices.size)
+        assertTrue(notices.any { it.contains("Contorno") && it.contains("Secondo") })
+        assertTrue(notices.any { it.contains("Media") && it.contains("Facile") })
+        assertTrue(notices.any { it.contains("50") && it.contains("30") })
+        assertTrue(RecipePreferences.notices(r, "Contorno", "Media", "Lunga").isEmpty())
+    }
+
     @Test fun articlesAndCommentsCannotBecomeRatedRecipes() {
         assertNull(RecipeDiscovery.preview("<title>Pasta</title>","https://www.agrodolce.it/pasta","Agrodolce","pasta"))
         val html = """<script type="application/ld+json">{"@type":"Recipe","name":"Pasta zucchine","commentCount":500}</script>"""
