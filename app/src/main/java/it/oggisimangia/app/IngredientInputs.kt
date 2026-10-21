@@ -49,7 +49,7 @@ class IngredientInputs(context: Context, initial: String, private val changed: (
             })
         }
         val add = Button(context).apply {
-            text = "Aggiungi ingrediente"; isAllCaps = false; textSize = 12f
+            text = "＋ Ingrediente"; isAllCaps = false; textSize = 12f
             setTextColor(android.graphics.Color.rgb(21,103,91))
             background = android.graphics.drawable.GradientDrawable().apply {
                 setColor(android.graphics.Color.rgb(234,244,241))
@@ -64,9 +64,9 @@ class IngredientInputs(context: Context, initial: String, private val changed: (
                 if (fields.size < 10) append()
             }
         }
-        row.addView(field, LayoutParams(0,dp(60),1f))
-        row.addView(add, LayoutParams(dp(122),dp(60)))
-        addView(row, LayoutParams(-1,-2).apply { bottomMargin = dp(8) })
+        row.addView(field, LayoutParams(0,dp(48),1f))
+        row.addView(add, LayoutParams(dp(108),dp(48)))
+        addView(row, LayoutParams(-1,-2).apply { bottomMargin = dp(5) })
         fields.add(field); buttons.add(add)
         buttons.forEachIndexed { index,b -> b.visibility = if(index == buttons.lastIndex) VISIBLE else INVISIBLE }
         if (fields.size == 10) { add.text = "Massimo 10"; add.isEnabled = false }

@@ -56,7 +56,7 @@ class RecipeListFields(context: Context, initial: String, private val steps: Boo
         }
         val index = TextView(context).apply {
             textSize = 15f
-            setPadding(dp(3), dp(13), dp(3), 0)
+            setPadding(dp(3), dp(10), dp(3), 0)
         }
         val field = EditText(context).apply {
             hint = if (steps) "Descrivi il passaggio" else "Es. 200 g di farina"
@@ -110,7 +110,7 @@ class RecipeListFields(context: Context, initial: String, private val steps: Boo
         }
         row.addView(index, LayoutParams(dp(29), LayoutParams.WRAP_CONTENT))
         row.addView(field, LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f))
-        row.addView(remove, LayoutParams(dp(48), dp(55)))
+        row.addView(remove, LayoutParams(dp(48), dp(48)))
         fields.add(field)
         indexes.add(index)
         addView(row, if (indexOfChild(addButton) >= 0) childCount - 1 else childCount,
