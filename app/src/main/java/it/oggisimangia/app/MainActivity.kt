@@ -348,29 +348,75 @@ class MainActivity : Activity() {
                 "Tieni premuta la data con una pressione prolungata per aggiungere una ricetta: " +
                 "potrai scegliere pranzo, cena e principale o alternativa.")
         }
-        label(selectedDate.format(dateFormatter).replaceFirstChar { it.uppercase() }, 18f, true)
+        label(selectedDate.format(dateFormatter).replaceFirstChar { it.uppercase() }, 17f, true)
         actionRow("◀ Precedente", { selectedDate = selectedDate.minusDays(1); showCalendar() },
             "Successivo ▶", { selectedDate = selectedDate.plusDays(1); showCalendar() })
+        actionRow("↻ Oggi", { selectedDate = LocalDate.now(); showCalendar() },
+            "🧹 Svuota giorno", { clearDayPlanning() })
         val today = db.onDay(selectedDate.toString())
         listOf("Pranzo", "Cena").forEach { meal ->
-            label(if (meal == "Pranzo") "☀️ PRANZO" else "🌙 CENA", 20f, true)
             val planned = today.filter { it.meal == meal || it.meal == "Entrambi" }
-            if (planned.isEmpty()) label("Ancora nessun piatto selezionato.", 14f)
+            val expanded = meal in expandedMeals
+            val header = (if (meal == "Pranzo") "☀️ PRANZO" else "🌙 CENA") +
+                " · " + planned.size + (if (expanded) " ▴" else " ▾")
+            action(header) {
+                if (expanded) expandedMeals.remove(meal) else expandedMeals.add(meal)
+                showCalendar()
+            }
+            // In collapsed mode show only the dish title and no edit buttons.
             planned.forEach { recipe ->
-                action((if (recipe.alternative) "🔄 Alternativa · " else "🍴 ") +
-                    recipe.category + " · " + recipe.title) {
+                action((if (recipe.alternative) "🔄 " else "🍴 ") + recipe.title) {
                     showDetail(recipe.id)
                 }
-                action("✏️ Cambia assegnazione · " + recipe.title) { changePlanning(recipe) }
-                action("📋 Clona su altri giorni · " + recipe.title) { cloneRecipeToDay(recipe) }
+                if (expanded) {
+                    actionRow("✏️ Modifica", { changePlanning(recipe) },
+                        "🗑️ Rimuovi", { removeFromDay(recipe, meal) })
+                    action("📋 Clona su altri giorni") { cloneRecipeToDay(recipe) }
+                }
             }
-            actionRow("＋ Aggiungi per $meal", {
-                selectedMeal = meal
-                showEditor(planByDefault = true)
-            }, "🔎 Alternativa", { startMealSearch(meal, true) })
+            if (expanded) {
+                if (planned.isEmpty()) label("Nessun piatto assegnato.", 13f)
+                actionRow("＋ Aggiungi $meal", {
+                    selectedMeal = meal
+                    showEditor(planByDefault = true)
+                }, "🔎 Alternativa", { startMealSearch(meal, true) })
+            }
         }
-        action("🔎 Cerca una nuova ricetta") { showSearch() }
-        action("PDF e stampa del giorno") { report("Menu del giorno", selectedDate.format(dateFormatter), db.onDay(selectedDate.toString())) }
+        action("🔎 Cerca una nuova ricetta", emphasis = true) { showSearch() }
+        action("PDF e stampa del giorno") {
+            report("Menu del giorno", selectedDate.format(dateFormatter), db.onDay(selectedDate.toString()))
+        }
+    }
+
+    /** Remove an assignment while keeping the recipe in the archive. */
+    private fun removeFromDay(recipe: Recipe, meal: String) {
+        AlertDialog.Builder(this).setTitle("Rimuovere dal giorno?")
+            .setMessage("Rimuovo " + recipe.title + " dal " + meal.lowercase() +
+                ". La ricetta resterà nel ricettario.")
+            .setNegativeButton("Annulla", null)
+            .setPositiveButton("Rimuovi") { _, _ ->
+                db.save(if (recipe.meal == "Entrambi")
+                    recipe.copy(meal = if (meal == "Pranzo") "Cena" else "Pranzo")
+                else recipe.copy(day = ""))
+                showCalendar()
+            }.show()
+    }
+
+    private fun clearDayPlanning() {
+        val planned = db.onDay(selectedDate.toString())
+        if (planned.isEmpty()) {
+            Toast.makeText(this, "Nessuna ricetta assegnata", Toast.LENGTH_SHORT).show()
+            return
+        }
+        AlertDialog.Builder(this).setTitle("Svuotare il giorno?")
+            .setMessage("Rimuovo le " + planned.size +
+                " assegnazioni del giorno. Le ricette restano nel ricettario.")
+            .setNegativeButton("Annulla", null)
+            .setPositiveButton("Svuota giorno") { _, _ ->
+                planned.forEach { db.save(it.copy(day = "")) }
+                expandedMeals.clear()
+                showCalendar()
+            }.show()
     }
 
     /** Update a saved appointment in place, preserving the recipe and its photographs. */
