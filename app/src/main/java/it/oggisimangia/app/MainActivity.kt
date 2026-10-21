@@ -165,7 +165,7 @@ class MainActivity : Activity() {
                 text = "‹"; textSize = 25f; isAllCaps = false
                 contentDescription = "Indietro alla pagina precedente"
                 setTextColor(Color.WHITE)
-                background = shape(Color.argb(55, 255, 255, 255), 16f)
+                this.background = shape(Color.argb(55, 255, 255, 255), 16f)
                 setOnClickListener { hideKeyboard(); backToPrevious() }
             }, LinearLayout.LayoutParams(dp(45), dp(46)).apply { marginEnd = dp(6) })
         }
@@ -820,7 +820,7 @@ class MainActivity : Activity() {
             "Categoria, difficoltà e tempi sono preferenze: gli scostamenti vengono segnalati.", 13f)
 
         prominentAction("🔎 CERCA RICETTE NEI SITI") {
-            searchIngredients = ingredients.query() ?: return@action
+            searchIngredients = ingredients.query() ?: return@prominentAction
             searchCategory = category.selectedItem.toString()
             searchDifficulty = difficulty.selectedItem.toString()
             searchDuration = duration.selectedItem.toString()
