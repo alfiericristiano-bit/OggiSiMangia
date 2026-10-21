@@ -2,6 +2,9 @@
 
 Android 1.4.1 (versionCode 12).
 
+- Le spiegazioni facoltative sono popup compatti con «Ho capito» e casella «Non mostrare più questo messaggio». Le scelte sono memorizzate nelle SharedPreferences dell'app (resistono a riavvii e aggiornamenti senza cancellazione dati); ogni spiegazione appare al più una volta a sessione, salvo richiamo manuale. Il tooltip nativo dei giorni è rimosso; una voce «Come funziona il calendario» permette di rileggere le istruzioni. La regola si estende ai futuri tooltip; non riguarda conferme, avvisi ed errori.
+
+
 - La tastiera si chiude su Invio/Fatto e quando si toccano i pulsanti o si esce dal campo di inserimento.
 - La ricerca dei piatti verifica i dati Recipe JSON-LD: richiede una ricetta vera, con procedimento e tutti gli ingredienti richiesti presenti nella lista ingredienti; titoli, descrizioni e guide non sono prove valide. Anche il filtro del ricettario locale richiede tutti gli ingredienti.
 - Su una ricetta già presente in un giorno del calendario, Cambia assegnazione modifica pasto (Pranzo/Cena/Entrambi), principale/alternativa e categoria, senza duplicare. Clona su altri giorni crea copie indipendenti, scegliendo data e pasto/tipo, e permette di ripetere per più giorni.
