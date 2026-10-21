@@ -69,8 +69,8 @@ class MainActivity : Activity() {
         db = RecipeDb(this)
         sourcePreferences = SourcePreferences(this)
         RecipeSources.configure(sourcePreferences.load())
-        window.statusBarColor = Color.rgb(31, 78, 49)
-        window.navigationBarColor = Color.rgb(31, 78, 49)
+        window.statusBarColor = Color.rgb(15, 98, 86)
+        window.navigationBarColor = Color.rgb(15, 98, 86)
         showCalendar()
     }
 
@@ -101,32 +101,66 @@ class MainActivity : Activity() {
         return super.dispatchTouchEvent(ev)
     }
 
+    /** FamilyChat visual tokens, used only by the UI; stored recipe data remains unchanged. */
+    private val familyTeal = Color.rgb(20, 125, 114)
+    private val familyDeep = Color.rgb(21, 103, 91)
+    private val familyInk = Color.rgb(35, 61, 57)
+    private val familyPale = Color.rgb(234, 244, 241)
     private fun shape(color: Int, radius: Float = 16f): GradientDrawable =
         GradientDrawable().apply { setColor(color); cornerRadius = dp(radius.toInt()).toFloat() }
+    private fun outlined(color: Int = Color.WHITE, radius: Float = 12f): GradientDrawable =
+        shape(color, radius).apply { setStroke(dp(1), Color.rgb(199, 216, 210)) }
 
     private fun screen(title: String, subtitle: String) {
         val background = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setBackgroundColor(Color.rgb(249, 250, 245))
+            setBackgroundColor(Color.rgb(244, 247, 247))
         }
         val scroll = ScrollView(this).apply { isFillViewport = true }
         content = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(dp(18), dp(12), dp(18), dp(32))
+            setPadding(dp(15), dp(14), dp(15), dp(32))
         }
         scroll.addView(content)
         background.addView(scroll)
         setContentView(background)
-        label("🍽️ OggiSiMangia...", 27f, true)
-        label(title, 21f, true)
-        label(subtitle, 14f)
-        navigation()
+        // FamilyChat-inspired teal brand header with rounded corners and native controls.
+        val hero = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(17), dp(17), dp(16), dp(18))
+            background = GradientDrawable(GradientDrawable.Orientation.TL_BR,
+                intArrayOf(familyTeal, Color.rgb(32, 165, 140))).apply {
+                cornerRadius = dp(22).toFloat()
+            }
+            elevation = dp(3).toFloat()
+        }
+        hero.addView(TextView(this).apply {
+            text = "🍝"; textSize = 30f; gravity = Gravity.CENTER
+            background = shape(Color.argb(45, 255, 255, 255), 15f)
+        }, LinearLayout.LayoutParams(dp(55), dp(55)).apply { marginEnd = dp(13) })
+        val headerText = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        headerText.addView(TextView(this).apply {
+            text = "OggiSiMangia..."; textSize = 24f
+            setTextColor(Color.WHITE); setTypeface(null, Typeface.BOLD)
+        })
+        headerText.addView(TextView(this).apply {
+            text = title; textSize = 16f; setTextColor(Color.WHITE)
+            setTypeface(null, Typeface.BOLD)
+        })
+        headerText.addView(TextView(this).apply {
+            text = subtitle; textSize = 12f
+            setTextColor(Color.rgb(235, 251, 244)); maxLines = 3
+        })
+        hero.addView(headerText, LinearLayout.LayoutParams(0, -2, 1f))
+        content.addView(hero, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(12) })
+        navigation(title)
     }
 
     private fun label(value: String, size: Float = 16f, bold: Boolean = false): TextView =
         TextView(this).apply {
             text = value; textSize = size
-            setTextColor(Color.rgb(33, 65, 43))
+            setTextColor(familyInk)
             if (bold) setTypeface(null, Typeface.BOLD)
             setPadding(dp(4), dp(8), dp(4), dp(8))
             content.addView(this)
@@ -135,8 +169,9 @@ class MainActivity : Activity() {
     private fun action(value: String, onClick: () -> Unit) {
         val btn = Button(this).apply {
             text = value; isAllCaps = false; textSize = 15f
-            setTextColor(Color.rgb(22, 59, 35))
-            background = shape(Color.rgb(226, 241, 226), 13f)
+            setTextColor(familyDeep)
+            background = outlined(familyPale, 12f)
+            elevation = dp(1).toFloat()
             setOnClickListener { hideKeyboard(); onClick() }
         }
         content.addView(btn, LinearLayout.LayoutParams(-1, dp(53)).apply {
@@ -150,7 +185,9 @@ class MainActivity : Activity() {
             setText(initial)
             textSize = 16f
             setPadding(dp(12), dp(10), dp(12), dp(10))
-            setBackgroundColor(Color.WHITE)
+            background = outlined(Color.WHITE, 11f)
+            setTextColor(familyInk)
+            setHintTextColor(Color.rgb(105,129,120))
             if (multi) {
                 minLines = 3
                 gravity = Gravity.TOP
@@ -180,16 +217,31 @@ class MainActivity : Activity() {
         val spinner = Spinner(this)
         spinner.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, choices)
         spinner.setSelection(choices.indexOf(value).coerceAtLeast(0))
-        content.addView(spinner, LinearLayout.LayoutParams(-1, dp(48)))
+        spinner.background = outlined(Color.WHITE, 11f)
+        spinner.setPadding(dp(9), 0, dp(9), 0)
+        content.addView(spinner, LinearLayout.LayoutParams(-1, dp(48)).apply { bottomMargin = dp(9) })
         return spinner
     }
 
-    private fun navigation() {
-        val nav = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+    private fun navigation(title: String) {
+        val nav = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            setPadding(dp(4), dp(4), dp(4), dp(4))
+            background = outlined(Color.WHITE, 15f)
+        }
+        val active = when {
+            title.contains("calendario", true) -> 0
+            title.contains("trova", true) || title.contains("ricerca", true) -> 1
+            title.contains("ricettario", true) -> 2
+            else -> -1
+        }
         listOf("📅 Calendario", "🔎 Cerca", "📚 Ricettario").forEachIndexed { index, name ->
             val b = Button(this).apply {
                 text = name; isAllCaps = false; textSize = 11f
-                setPadding(0, 0, 0, 0)
+                setPadding(dp(2), 0, dp(2), 0)
+                background = shape(if (active == index) Color.rgb(229,246,239) else Color.WHITE, 11f)
+                setTextColor(if (active == index) familyDeep else Color.rgb(93,118,112))
+                setTypeface(null, if (active == index) Typeface.BOLD else Typeface.NORMAL)
                 setOnClickListener {
                     hideKeyboard()
                     when (index) {
@@ -199,9 +251,9 @@ class MainActivity : Activity() {
                     }
                 }
             }
-            nav.addView(b, LinearLayout.LayoutParams(0, dp(53), 1f))
+            nav.addView(b, LinearLayout.LayoutParams(0, dp(48), 1f))
         }
-        content.addView(nav)
+        content.addView(nav, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(13) })
     }
 
     private fun chooseDate(after: () -> Unit) {
@@ -215,11 +267,11 @@ class MainActivity : Activity() {
         screen("Il calendario dei pasti", "Organizza pranzo e cena, anche per i prossimi giorni.")
         searchForDay = false
         selectedAlternative = false
-        label("Tocca un giorno per vederne i pasti. Tieni premuto oltre 2 secondi per aggiungere una ricetta.", 13f)
+        label("Tocca un giorno per vederne i pasti. Tieni premuto come da impostazioni Android per aggiungere una ricetta.", 13f)
         action("ⓘ Come funziona il calendario") {
             AppHints.showAgain(this, "calendar_long_press", "Come funziona il calendario",
                 "Tocca una data per scegliere il giorno e vedere pranzo e cena. " +
-                "Tieni premuta la data per più di 2 secondi per aggiungere una ricetta: " +
+                "Tieni premuta la data con una pressione prolungata per aggiungere una ricetta: " +
                 "potrai scegliere pranzo, cena e principale o alternativa.")
         }
         val calendar = MealCalendar(this, selectedDate, { month -> db.monthMarkers(month) }, { day ->
@@ -230,7 +282,7 @@ class MainActivity : Activity() {
         content.post {
             AppHints.showOnce(this, "calendar_long_press", "Come funziona il calendario",
                 "Tocca una data per scegliere il giorno e vedere pranzo e cena. " +
-                "Tieni premuta la data per più di 2 secondi per aggiungere una ricetta: " +
+                "Tieni premuta la data con una pressione prolungata per aggiungere una ricetta: " +
                 "potrai scegliere pranzo, cena e principale o alternativa.")
         }
         label(selectedDate.format(dateFormatter).replaceFirstChar { it.uppercase() }, 18f, true)
@@ -784,13 +836,13 @@ class MainActivity : Activity() {
             val row = LinearLayout(this).apply {
                 orientation = LinearLayout.VERTICAL
                 setPadding(dp(12), dp(10), dp(12), dp(12))
-                background = shape(Color.rgb(239, 246, 236), 12f)
+                background = shape(Color.rgb(242, 248, 245), 12f)
             }
             val heading = TextView(this).apply {
                 text = recipe.title
                 textSize = 17f
                 setTypeface(null, Typeface.BOLD)
-                setTextColor(Color.rgb(31, 78, 49))
+                setTextColor(Color.rgb(21, 103, 91))
             }
             row.addView(heading)
             if (recipe.imageUrl.isNotBlank()) {
