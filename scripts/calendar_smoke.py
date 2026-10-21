@@ -78,12 +78,16 @@ def hold(node, duration):
     time.sleep(0.4)
 
 def text_node(nodes, text):
-    return next(n for n in nodes if n.attrib.get('text','').casefold() == text.casefold())
+    # Buttons may include an icon before a stable, spoken label.
+    return next(n for n in nodes if n.attrib.get('text','').casefold() == text.casefold()
+                or n.attrib.get('text','').casefold().endswith(' '+text.casefold()))
 
 def find_scrolling(text, name):
     for attempt in range(12):
         current = snapshot(name)
-        matches = [n for n in current if n.attrib.get('text') == text and n.attrib.get('bounds') != '[0,0][0,0]']
+        matches = [n for n in current if (n.attrib.get('text') == text
+                   or n.attrib.get('content-desc') == text)
+                   and n.attrib.get('bounds') != '[0,0][0,0]']
         if matches: return matches[0]
         adb('shell', 'input', 'swipe','160','530','160','220','300')
     raise AssertionError('Missing UI text: '+text)
@@ -122,7 +126,7 @@ search = snapshot('search')
 assert any(n.attrib.get('text') == 'Trova cosa cucinare' for n in search)
 assert any(n.attrib.get('text') == 'Pranzo · Alternativa' for n in search)
 assert any('Massimo 10 ingredienti' in n.attrib.get('text','') for n in search)
-button = text_node(search,'Ho già trovato la ricetta da aggiungere')
+button = text_node(search,'Ho un link')
 tap(button)
 link = snapshot('recipe-link')
 assert any(n.attrib.get('text') == 'Aggiungi una ricetta dal link' for n in link)
@@ -143,7 +147,7 @@ assert any(n.attrib.get('text') == 'Ricetta copiata' for n in cloned), 'Cloning 
 tap(text_node(cloned,'Torna al calendario'))
 rows=db_rows()
 assert rows[-1] == ('Ricetta alternativa',today,'Pranzo',1), rows
-button=find_scrolling('🔄 Alternativa · Primo · Ricetta alternativa','home-alternative')
+button=find_scrolling('↪ Ricetta alternativa','home-alternative')
 assert button is not None
 (out / 'home-alternative.png').write_bytes(adb('exec-out','screencap','-p'))
 print('PASS: tap selects day; 120ms short press does not prompt; 900ms native long press prompts; No preserves data; existing main proposes alternative.')
@@ -172,7 +176,7 @@ assert not any(n.attrib.get('text')=='Come funziona il calendario' for n in home
 tap(next(n for n in home if 'Cerca' in n.attrib.get('text','') and n.attrib.get('clickable')=='true'))
 tap(find_scrolling('Priorità dei siti e nuove fonti','source-action'))
 settings=snapshot('source-settings')
-spinner=next(n for n in settings if n.attrib.get('content-desc')=='Priorità 1')
+spinner=next(n for n in settings if n.attrib.get('content-desc','').startswith('1ª priorità:'))
 tap(spinner)
 choices=snapshot('source-choices')
 tap(text_node(choices,'Misya'))
@@ -187,9 +191,9 @@ tap(address);adb('shell','input','text','https://example.org')
 adb('shell','input','keyevent','KEYCODE_BACK')
 tap(text_node(snapshot('source-filled'),'Memorizza'))
 # A disliked source can be deleted and stays gone after the app process restarts.
-tap(find_scrolling('🗑️ Elimina sito · GialloZafferano','source-delete'))
+tap(find_scrolling('Elimina sito GialloZafferano','source-delete'))
 confirm_delete=snapshot('source-delete-confirm')
-assert any(n.attrib.get('text') == 'Eliminare questo sito di ricerca?' for n in confirm_delete)
+assert any(n.attrib.get('text') == 'Eliminare il sito?' for n in confirm_delete)
 tap(text_node(confirm_delete,'Elimina sito'))
 adb('shell','am','force-stop',package)
 adb('shell','am','start','-W','-n',package+'/.MainActivity')
@@ -206,14 +210,14 @@ for index in range(1,11):
         field=next((n for n in current if n.attrib.get('content-desc')=='Ingrediente '+str(index)),None)
     assert field is not None
     tap(field);adb('shell','input','text','ingrediente'+str(index));adb('shell','input','keyevent','KEYCODE_BACK')
-    if index<10: tap(find_scrolling('Aggiungi ingrediente','ingredient-add'))
+    if index<10: tap(find_scrolling('＋ Ingrediente','ingredient-add'))
 last=snapshot('ingredients-limit')
 limit=next((n for n in last if n.attrib.get('text')=='Massimo 10'),None)
 if limit is None: limit=find_scrolling('Massimo 10','ingredient-limit-scroll')
 assert limit.attrib.get('enabled')=='false'
 tap(find_scrolling('Priorità dei siti e nuove fonti','source-persist-action'))
 settings=snapshot('sources-restored')
-first=next(n for n in settings if n.attrib.get('content-desc')=='Priorità 1')
+first=next(n for n in settings if n.attrib.get('content-desc','').startswith('1ª priorità:'))
 # Inspect the selected spinner descendant and the persisted authoritative preference file.
 prefs=adb('exec-out','run-as',package,'cat','shared_prefs/recipe_sources.xml')
 root=ET.fromstring(prefs)
