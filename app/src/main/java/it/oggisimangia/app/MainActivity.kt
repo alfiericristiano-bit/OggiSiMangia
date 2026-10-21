@@ -923,7 +923,10 @@ class MainActivity : Activity() {
         val details = listOf(
             "Dosi" to recipe.portions, "Preparazione" to recipe.prepTime,
             "Cottura" to recipe.cookTime, "Tempo totale" to recipe.totalTime, "Riposo / attesa" to recipe.restTime,
-            "Valori nutrizionali pubblicati" to recipe.nutrition
+            "Valori nutrizionali" to recipe.nutrition,
+            "Cucina / provenienza" to recipe.cuisine, "Autore" to recipe.author,
+            "Temperatura" to recipe.temperature, "Costo indicativo" to recipe.cost,
+            "Etichette" to recipe.tags, "Allergeni" to recipe.allergens
         ).filter { it.second.isNotBlank() }
         details.forEach { (caption, value) -> label("$caption: $value", 14f) }
         if (details.isEmpty()) label("Dosi e tempi dettagliati non disponibili dalla fonte.", 14f)
@@ -1052,6 +1055,7 @@ class MainActivity : Activity() {
         if (r.imagePath.isNotBlank()) addPhotoPreview(r.imagePath)
         label("📅 " + r.day.ifBlank { "Solo ricettario" } + "   ⏱ " + r.duration + "   👩‍🍳 " + r.difficulty, 15f)
         showRecipeMetadata(r)
+        if (r.description.isNotBlank()) { label("DESCRIZIONE", 17f, true); label(r.description) }
         label("INGREDIENTI", 17f, true)
         label(r.ingredients.ifBlank { "Non annotati" })
         label("PREPARAZIONE", 17f, true)
@@ -1061,6 +1065,11 @@ class MainActivity : Activity() {
             label(r.originalInstructions)
         }
         if (r.instructions.isBlank() && r.originalInstructions.isBlank()) label("Consulta la ricetta originale, se disponibile.")
+        listOf("ATTREZZATURA" to r.equipment, "CONSIGLI" to r.tips,
+            "VARIANTI" to r.variations, "CONSERVAZIONE" to r.storage,
+            "NOTE PERSONALI" to r.notes).forEach { (heading, value) ->
+            if (value.isNotBlank()) { label(heading, 17f, true); label(value) }
+        }
         if (r.url.isNotBlank() && trusted(r.url)) {
             action("🌐 Leggi la ricetta nell’app") { openWeb(r.url) }
         }
