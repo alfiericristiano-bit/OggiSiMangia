@@ -1,29 +1,29 @@
 # 🍽️ OggiSiMangia...
 
-**Versione Android 1.1.0 — ricerca integrata sperimentale**
+**Android 1.1.0 — anteprime ricette integrate (versione di prova)**
 
-App Android per organizzare i pasti e tenere il ricettario personale.
+App Android per organizzare i pasti (pranzo e cena) con ricetta principale e alternativa, e conservare un ricettario locale.
 
-## Cosa puoi fare
-- Calendario con pranzo/cena, primo/secondo/piatto unico/dolce, ricetta principale e alternativa.
-- Ricerca per ingredienti, categoria, difficoltà e durata.
-- **Nuovo:** schermata di ricerca che tenta di mostrare fino a 10 schede con titolo, breve descrizione, fotografia, tempo, valutazione e numero di feedback **quando forniti dalle fonti**. Selezione ordinata per numero di feedback noto, poi attinenza.
-- **Nuovo:** lettore interno WebView per leggere la pagina originale senza aprire Chrome; accesso ai soli siti selezionati.
-- Scelta da una scheda o dalla pagina web aperta nell'app: **pranzo/cena** e **principale/alternativa**; salvataggio di titolo e link nel calendario.
-- Ricettario SQLite locale con ricerca e filtri. Foto scelte dalla galleria compresse.
-- Apertura delle ricette salvate **dentro l'app**.
+## Novità 1.1.0
+- Ricerca per ingredienti, categoria, difficoltà e tempo: fino a **10 schede** dentro un popup dell'app.
+- Ogni scheda prova a mostrare **nome, fonte, sintesi, foto, tempo, difficoltà e valutazioni/feedback quando effettivamente pubblicati**.
+- L'ordinamento dà precedenza al numero di feedback *quando verificabile* e poi all'attinenza con gli ingredienti.
+- Pulsante **Leggi**: pagina originale aperta nel visualizzatore WebView **interno** all'app, senza lanciare Chrome.
+- Pulsante **Scegli**: specifica pranzo/cena e ricetta principale/alternativa, poi apre la scheda da completare e salvare nel calendario.
+- Se una fonte non restituisce schede leggibili, è disponibile la **ricerca diretta nel WebView interno** dei siti selezionati.
 
-## Limiti trasparenti della ricerca 1.1.0
-Il recupero delle anteprime usa, senza chiavi API, i risultati RSS pubblici di Bing limitati ai domini:
-**GialloZafferano**, **Il Cucchiaio d'Argento**, **Fatto in Casa da Benedetta**.
-Per ogni URL attendibile legge i metadati pubblici Schema.org Recipe e Open Graph.
-Questo servizio non garantisce 10 risultati e può bloccare/ridurre le risposte; le schede non sono sempre disponibili.
-Se la ricerca strutturata non trova risultati, rimane la **ricerca web interna** e la navigazione alle pagine originali, senza browser esterno.
-Non vengono inventati rating, tempi o immagini. La difficoltà non è filtrabile con precisione dove manca nei metadati. Le foto di anteprima sono temporanee e non si salvano automaticamente nel database; i contenuti integrali restano consultabili sul sito originale tramite WebView, per rispettare le condizioni delle fonti.
+## Fonti e limiti
+Ricerca on-demand tra pagine pubbliche di **GialloZafferano**, **Il Cucchiaio d'Argento** e **Fatto in Casa da Benedetta**. Le anteprime sono sperimentali: le strutture delle pagine possono cambiare o i siti possono bloccare l'estrazione, quindi **non è garantito** trovare 10 risultati, tutte le foto, tutte le valutazioni o un ordinamento per feedback completo. L'app non inventa dati assenti.
 
-## Compilazione GitHub
-La compilazione avviene nella scheda [Actions](../../actions/workflows/android.yml).
-Workflow **Android APK**: produce l'Artifact `OggiSiMangia-v1.1.0-APK`, contenente `OggiSiMangia-v1.1.0-debug.apk`.
-Non occorre Android Studio.
+Gli ingredienti e i procedimenti integrali di altre testate **non vengono copiati automaticamente**. Si salva il titolo e il link originale; i tuoi ingredienti, appunti e foto personali possono essere aggiunti nell'editor. Le fotografie delle anteprime sono caricate temporaneamente e non archiviate senza autorizzazione.
 
-**Attenzione agli aggiornamenti:** l'APK debug è firmato dalla chiave temporanea del runner e può risultare incompatibile con quello già installato. **Non disinstallare l'app contenente ricette importanti** prima di averne salvato i dati: questa versione non integra ancora un backup. Per aggiornamenti affidabili occorre introdurre una chiave di firma persistente gestita nei Secrets GitHub.
+## Funzioni conservate dalla 1.0.0
+- Calendario mensile, pranzo/cena, primi/secondi/piatti unici/dolci.
+- Ricetta principale e alternativa per ogni pasto.
+- Archivio SQLite locale con filtri per categoria e difficoltà, ricerca e riutilizzo.
+- Foto dalla galleria compresse automaticamente in JPEG per il ricettario personale.
+
+## Build solo su GitHub
+Le compilazioni sono nella scheda [Actions](../../actions/workflows/android.yml). Quando una build è verde, GitHub pubblica l'Artifact `OggiSiMangia-v1.1.0-APK` con `OggiSiMangia-v1.1.0-debug.apk`.
+
+**Attenzione:** gli APK debug generati da runner diversi possono avere firme differenti e richiedere la disinstallazione prima di aggiornare. **Non disinstallare** una versione con ricette importanti senza un backup: l'esportazione dati e la firma persistente non sono ancora state implementate.
