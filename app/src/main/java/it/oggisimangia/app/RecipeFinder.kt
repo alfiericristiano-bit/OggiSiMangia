@@ -100,7 +100,7 @@ object RecipeFinder {
             compareByDescending<WebRecipe> { it.feedbackCount ?: -1 }
                 .thenByDescending { rank(it) }
                 .thenByDescending { it.rating ?: -1.0 }
-        ).take(10)
+        )
     }
 
     private fun extract(doc: Document, source: String): List<WebRecipe> {
@@ -166,4 +166,5 @@ object RecipeFinder {
         return anchor.parent() ?: anchor
     }
 }
+
 

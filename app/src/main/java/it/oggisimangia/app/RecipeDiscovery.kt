@@ -217,7 +217,8 @@ object RecipeDiscovery {
                     (item.difficulty.isBlank() || item.difficulty.contains(difficulty, true))
             }.sortedWith(compareByDescending<OnlineRecipe> { it.feedbackCount ?: -1 }
                 .thenByDescending { it.relevance }
-                .thenBy { it.title }).take(10)
+                .thenBy { it.title })
         } finally { executor.shutdownNow() }
     }
 }
+

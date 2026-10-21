@@ -38,6 +38,8 @@ class MainActivity : Activity() {
     private var searchDuration = "Veloce"
     private var searchCategory = "Primo"
     private var selectedPhoto = ""
+    private var lastSearchResults: List<WebRecipe> = emptyList()
+    private var lastSearchOffset = 0
     private var photoLabel: TextView? = null
     private val dateFormatter = DateTimeFormatter.ofPattern("EEEE d MMMM yyyy", java.util.Locale.ITALIAN)
 
@@ -337,7 +339,7 @@ class MainActivity : Activity() {
                 val results = try {
                     val primary = RecipeFinder.search(selectedIngredients, selectedCategory,
                         selectedDifficulty, selectedDuration)
-                    val backup = if (primary.size < 10) {
+                    val backup = if (primary.size <= 10) {
                         try {
                             RecipeDiscovery.search(selectedIngredients, selectedCategory,
                                 selectedDifficulty, selectedDuration).map { r ->
@@ -347,13 +349,13 @@ class MainActivity : Activity() {
                             }
                         } catch (_: Exception) { emptyList() }
                     } else emptyList()
-                    (primary + backup).distinctBy { it.url.substringBefore('?') }
+                    (primary + backup).distinctBy { it.url.substringBefore('?').substringBefore('#').trimEnd('/') }
                         .sortedWith(compareByDescending<WebRecipe> { it.feedbackCount ?: -1 }
                             .thenByDescending {
                                 val title = it.title.lowercase()
                                 selectedIngredients.split(',', ';', '\n')
                                     .count { term -> title.contains(term.trim().lowercase()) }
-                            }).take(10)
+                            })
                 } catch (_: Exception) { emptyList() }
                 runOnUiThread {
                     if (isFinishing || isDestroyed) return@runOnUiThread
@@ -390,7 +392,13 @@ class MainActivity : Activity() {
             .setNegativeButton("Chiudi", null).show()
     }
 
-    private fun showRecipeResults(items: List<WebRecipe>) {
+    private fun showRecipeResults(items: List<WebRecipe>, offset: Int = 0) {
+        if (items.isEmpty()) return
+        val start = offset.coerceIn(0, items.lastIndex)
+        val page = items.drop(start).take(10)
+        val end = start + page.size
+        lastSearchResults = items
+        lastSearchOffset = start
         val scroll = ScrollView(this)
         val rows = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -398,11 +406,17 @@ class MainActivity : Activity() {
         }
         scroll.addView(rows)
         val popup = AlertDialog.Builder(this)
-            .setTitle("Ricette trovate: " + items.size)
+            .setTitle("Ricette ${start + 1}–$end di ${items.size}")
             .setView(scroll)
             .setNegativeButton("Chiudi", null)
+            .setPositiveButton("Prossime 10") { _, _ ->
+                showRecipeResults(items, end)
+            }
+            .setNeutralButton("Precedenti 10") { _, _ ->
+                showRecipeResults(items, (start - 10).coerceAtLeast(0))
+            }
             .create()
-        for (recipe in items) {
+        for (recipe in page) {
             val row = LinearLayout(this).apply {
                 orientation = LinearLayout.VERTICAL
                 setPadding(dp(12), dp(10), dp(12), dp(12))
@@ -461,7 +475,16 @@ class MainActivity : Activity() {
                 bottomMargin = dp(12)
             })
         }
+        if (end == items.size) {
+            rows.addView(TextView(this).apply {
+                text = "Non ci sono altre ricette disponibili per questa ricerca. Puoi cambiare ingredienti o filtri."
+                textSize = 14f
+                setPadding(dp(8), dp(8), dp(8), dp(8))
+            })
+        }
         popup.show()
+        popup.getButton(AlertDialog.BUTTON_POSITIVE).isEnabled = end < items.size
+        popup.getButton(AlertDialog.BUTTON_NEUTRAL).visibility = if (start > 0) View.VISIBLE else View.GONE
         popup.window?.setLayout(
             android.view.ViewGroup.LayoutParams.MATCH_PARENT,
             (resources.displayMetrics.heightPixels * 0.83).toInt()
@@ -496,7 +519,10 @@ class MainActivity : Activity() {
                     startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(recipe.url)))
                 }
                 action("💾 Salva ricetta") { chooseOnlineRecipe(recipe, result) }
-                action("← Torna alla ricerca") { showSearch() }
+                if (lastSearchResults.isNotEmpty()) {
+                    action("← Torna ai risultati") { showRecipeResults(lastSearchResults, lastSearchOffset) }
+                }
+                action("🔎 Modifica ricerca") { showSearch() }
             }
         }.start()
     }
@@ -670,4 +696,5 @@ class MainActivity : Activity() {
         super.onDestroy()
     }
 }
+
 

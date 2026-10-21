@@ -10,8 +10,8 @@ android {
         applicationId = "it.oggisimangia.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = providers.gradleProperty("verificationVersionCode").orNull?.toInt() ?: 5
-        versionName = "1.2.1"
+        versionCode = providers.gradleProperty("verificationVersionCode").orNull?.toInt() ?: 6
+        versionName = "1.2.2"
     }
     val signingPath = System.getenv("ANDROID_KEYSTORE_PATH")
     if (!signingPath.isNullOrBlank()) {
@@ -39,3 +39,4 @@ dependencies {
     testImplementation("org.json:json:20240303")
     implementation("org.jsoup:jsoup:1.18.3")
 }
+
