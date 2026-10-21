@@ -10,8 +10,8 @@ android {
         applicationId = "it.oggisimangia.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = providers.gradleProperty("verificationVersionCode").orNull?.toInt() ?: 16
-        versionName = "1.5.3"
+        versionCode = providers.gradleProperty("verificationVersionCode").orNull?.toInt() ?: 17
+        versionName = "1.5.4"
     }
     val signingPath = System.getenv("ANDROID_KEYSTORE_PATH")
     if (!signingPath.isNullOrBlank()) {
