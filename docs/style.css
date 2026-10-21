@@ -161,3 +161,74 @@ body.dark .recipe-placeholder{background:linear-gradient(120deg,#254631,#4e422e)
 }
 @media(max-width:370px){.day{min-height:49px}.week-grid,.day-grid{gap:3px}.month-picker strong{min-width:118px;font-size:13px}.site-pill{font-size:10px;padding:6px 8px}.card{padding:12px}.quick-stat{gap:7px}.stat{padding:10px}}
 @media print { .sidebar,.topbar,.bottom-nav,.footer,.head-actions,.btn,.hide-print,.site-pill{display:none!important} #app{padding:0;max-width:100%} .app-shell{display:block}.card{box-shadow:none}body{background:white;color:black}.recipe-form{display:none} }
+
+
+/* Anteprima web ESCLUSIVAMENTE smartphone (390 × 844 CSS px simulati sul PC).
+   Il layout Android nativo è indipendente. Non si crea una UI desktop separata. */
+@media screen {
+  body { min-height: 100dvh; display: grid; place-items: center; background: #dce4e0; }
+  body.dark { background: #0c1712; }
+  .phone-preview {
+    position: relative;
+    width: 390px;
+    max-width: 100%;
+    height: min(844px, calc(100dvh - 32px));
+    border: 9px solid #1e2933;
+    border-radius: 36px;
+    overflow: hidden;
+    background: var(--paper);
+    box-shadow: 0 20px 70px rgba(15, 35, 24, .26);
+  }
+  .phone-preview .app-shell {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    min-height: 0;
+    height: 100%;
+    overflow-y: auto;
+    overflow-x: hidden;
+    overscroll-behavior: contain;
+  }
+  .phone-preview .sidebar { display: none; }
+  .phone-preview .main-wrap { flex: 1 0 auto; width: 100%; }
+  .phone-preview .mobile-brand { display: block; font-size: 16px; }
+  .phone-preview .topbar { height: 66px; padding: 0 14px; }
+  .phone-preview .topbar-intro { display: none; }
+  .phone-preview #app { width: 100%; max-width: none; padding: 22px 14px 32px; }
+  .phone-preview .bottom-nav {
+    display: grid;
+    position: absolute;
+    z-index: 30;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    transform: none;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    background: var(--paper);
+    border-top: 1px solid var(--outline);
+    padding-bottom: env(safe-area-inset-bottom);
+    box-shadow: 0 -5px 25px rgba(0,0,0,.045);
+  }
+  .phone-preview .bottom-nav button { background: transparent; border: 0; color: var(--muted); font-size: 10px; padding: 7px 0 4px; display: grid; justify-items: center; }
+  .phone-preview .bottom-nav button span { font-size: 23px; line-height: 1.15; }
+  .phone-preview .bottom-nav button.active { color: var(--green); font-weight: 800; }
+  .phone-preview .footer { padding-bottom: 95px; }
+  .phone-preview .calendar-layout { grid-template-columns: 1fr; gap: 15px; }
+  .phone-preview .quick-stat { margin-bottom: 15px; gap: 7px; }
+  .phone-preview .filters, .phone-preview .form-grid, .phone-preview .details { grid-template-columns: 1fr; }
+  .phone-preview .card { padding: 14px; }
+  .phone-preview .headline { margin-bottom: 20px; }
+  .phone-preview .day { min-height: 56px; gap: 5px; font-size: 14px; }
+  .phone-preview .source-item { flex-wrap: wrap; }
+  .phone-preview #toast { position: absolute; bottom: 84px; max-width: calc(100% - 20px); }
+  #modal { max-width: min(350px, calc(100vw - 34px)); }
+}
+@media screen and (max-width: 520px) {
+  body { display: block; }
+  .phone-preview { width: 100%; max-width: none; height: 100dvh; border: 0; border-radius: 0; box-shadow: none; }
+}
+@media print {
+  body { display: block; }
+  .phone-preview { width: auto; max-width: none; height: auto; border: 0; border-radius: 0; overflow: visible; box-shadow: none; }
+  .phone-preview .app-shell { overflow: visible; height: auto; }
+}

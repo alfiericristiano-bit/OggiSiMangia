@@ -27,3 +27,6 @@ GitHub Actions esegue `node --check docs/app.js`, `node scripts/test_pages_previ
 Per ogni aggiornamento: mantenere l'anteprima Vercel aggiornata tramite il collegamento GitHub. **Non** estrarre o allegare l'APK a ogni modifica: farlo solo se l'utente scrive «apk».
 
 Il repository Android può rimanere privato anche quando il sito web è raggiungibile da un URL pubblico. Non inserire chiavi private, dati reali degli utenti o credenziali nella cartella `docs`.
+
+## Simulazione smartphone obbligatoria
+L'anteprima Vercel è dedicata soltanto allo smartphone: anche su PC mostra un telefono virtuale largo circa 390 px e alto 844 px; menu mobile in basso, niente sidebar desktop. Su smartphone usa la dimensione reale del viewport. Per ogni modifica sostanziale proporre il link diretto Vercel e l'opzione APK, senza superare le quote automatiche e senza allegare l'APK a meno che l'utente lo chieda scrivendo «apk».

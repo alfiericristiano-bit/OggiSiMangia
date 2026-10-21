@@ -14,6 +14,10 @@ for(const asset of ["style.css","app.js","icon.svg","manifest.webmanifest"]) {
   assert(fs.existsSync(path.join(root,"docs",asset)),asset+" missing");
 }
 assert(style.includes("@media(max-width:760px)"),"Mobile layout missing");
+assert(html.includes('class="phone-preview"'),"Web preview must be wrapped in a smartphone frame");
+assert(style.includes("width: 390px;") && style.includes("height: min(844px"),"PC preview must simulate smartphone dimensions");
+assert(style.includes(".phone-preview .sidebar { display: none; }"),"No desktop navigation should appear");
+assert(style.includes(".phone-preview .bottom-nav"),"Phone preview must show the mobile navigation");
 assert(source.includes("Tutti gli ingredienti")||source.includes("tutti gli ingredienti"),"AND filter description missing");
 
 const storage=new Map();

@@ -1,5 +1,15 @@
 # 🍽️ OggiSiMangia...
 
+## Regola globale – APK e anteprima Vercel smartphone
+
+Per ogni modifica **sostanziale** proporre sempre **entrambi i percorsi**: link diretto dell'anteprima Vercel in produzione e opzione per l'APK Android. URL di produzione della demo: **https://oggisimangia.vercel.app/**. Specificare la versione effettiva e distinguere la demo browser dall'APK.
+
+**Regola specifica di questo progetto da preservare:** non scaricare, estrarre o allegare APK automaticamente; quando l'utente scrive **«apk»** consegnare il file installabile diretto più recente verificato, con la versione nel nome.
+
+L'anteprima web è **sempre solo in formato smartphone** (PC: cornice e area circa **390 × 844 px**, scorrimento interno; sul telefono reale: tutto il viewport). Niente layout desktop/tablet. Dati dell'anteprima confinati nel browser e non sincronizzati con Android.
+
+**Risparmio quote:** effettuare un'unica pubblicazione Vercel per blocco sostanziale su `main`, raggruppare i piccoli aggiustamenti e usare GitHub Actions senza verifiche online ripetute e superflue. Il monitoraggio approfondito online è lanciato solo manualmente con il workflow `Verifica sito Vercel online`.
+
 Android 1.5.0 (versionCode 13).
 
 - Ricette personali: editor completo con titolo, descrizione, portata, difficoltà, provenienza, porzioni, autore, costo, etichette, allergeni, ingredienti in righe con quantità/unità, procedimento numerato aggiungibile ed eliminabile, tempi di preparazione/cottura/riposo/totale, temperatura, attrezzatura, consigli, varianti, conservazione, valori nutrizionali e note personali. Obbligatori nome, un ingrediente e un passaggio; possibilità di salvare solo nel ricettario o anche nel calendario.
