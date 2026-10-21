@@ -47,10 +47,18 @@ jobs:
               echo "::error::Manca la risorsa $file"; exit 1;
             }
           done
-          if cmp -s /tmp/oggisimangia-app.js docs/app.js; then
-            echo "PASS: il JavaScript su Vercel coincide con il codice attuale di GitHub"
-          else
-            echo "::error::Il JavaScript su Vercel non coincide con quello di GitHub"
-            exit 1
-          fi
+          # Vercel may finish its deployment shortly after the GitHub push.
+          for attempt in 1 2 3 4 5 6 7 8; do
+            if cmp -s /tmp/oggisimangia-app.js docs/app.js; then
+              echo "PASS: il JavaScript su Vercel coincide con il codice attuale di GitHub"
+              break
+            fi
+            if [ "$attempt" = 8 ]; then
+              echo "::error::Il JavaScript in produzione non coincide ancora con GitHub"
+              exit 1
+            fi
+            echo "Attendo l'aggiornamento Vercel ($attempt/8)..."
+            sleep 10
+            curl -fLsS -o /tmp/oggisimangia-app.js --max-time 25 "$base/app.js"
+          done
           echo "PASS: URL permanente, HTML, CSS, JavaScript, icona e manifesto"
