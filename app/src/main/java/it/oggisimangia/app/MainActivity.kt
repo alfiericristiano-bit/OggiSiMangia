@@ -40,6 +40,12 @@ class MainActivity : Activity() {
     private var selectedDate = LocalDate.now()
     private var selectedMeal = "Pranzo"
     private var selectedAlternative = false
+    private val expandedMeals = mutableSetOf<String>()
+    private var expandedForDay = selectedDate
+    private var currentPage = ""
+    private var currentRestore: () -> Unit = { showCalendar() }
+    private val backPages = mutableListOf<() -> Unit>()
+    private var goingBack = false
     private var searchForDay = false
     private var selectedCategory = "Primo"
     private var searchIngredients = ""
@@ -111,7 +117,28 @@ class MainActivity : Activity() {
     private fun outlined(color: Int = Color.WHITE, radius: Float = 12f): GradientDrawable =
         shape(color, radius).apply { setStroke(dp(1), Color.rgb(199, 216, 210)) }
 
-    private fun screen(title: String, subtitle: String) {
+    private fun backToPage() {
+        hideKeyboard()
+        val target: () -> Unit = if (backPages.isNotEmpty()) backPages.removeAt(backPages.lastIndex)
+            else { { showCalendar() } }
+        goingBack = true
+        target()
+    }
+
+    @Deprecated("Use in-app navigation")
+    override fun onBackPressed() {
+        if (backPages.isNotEmpty() || currentPage != "calendar") backToPage()
+        else super.onBackPressed()
+    }
+
+    private fun screen(title: String, subtitle: String, key: String = title,
+                       restore: () -> Unit = { showCalendar() }) {
+        if (key != currentPage) {
+            if (!goingBack && currentPage.isNotEmpty()) backPages.add(currentRestore)
+            goingBack = false
+        }
+        currentPage = key
+        currentRestore = restore
         val background = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setBackgroundColor(Color.rgb(244, 247, 247))
@@ -154,6 +181,14 @@ class MainActivity : Activity() {
         })
         hero.addView(headerText, LinearLayout.LayoutParams(0, -2, 1f))
         content.addView(hero, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(8) })
+        if (key != "calendar") {
+            val back = Button(this).apply {
+                text = "← Indietro"; isAllCaps = false; textSize = 13f
+                setTextColor(familyDeep); background = outlined(Color.WHITE, 17f)
+                setOnClickListener { backToPage() }
+            }
+            content.addView(back, LinearLayout.LayoutParams(-1, dp(46)).apply { bottomMargin = dp(5) })
+        }
         navigation(title)
     }
 
@@ -166,16 +201,17 @@ class MainActivity : Activity() {
             content.addView(this)
         }
 
-    private fun action(value: String, onClick: () -> Unit) {
+    private fun action(value: String, emphasis: Boolean = false, onClick: () -> Unit) {
         val btn = Button(this).apply {
-            text = value; isAllCaps = false; textSize = 14f
-            setTextColor(familyDeep)
-            background = outlined(familyPale, 12f)
-            elevation = dp(1).toFloat()
+            text = value; isAllCaps = false; textSize = if (emphasis) 16f else 13f
+            setTypeface(null, if (emphasis) Typeface.BOLD else Typeface.NORMAL)
+            setTextColor(if (emphasis) Color.WHITE else familyDeep)
+            background = if (emphasis) shape(familyTeal, 18f) else outlined(familyPale, 17f)
+            elevation = dp(if (emphasis) 3 else 1).toFloat()
             setOnClickListener { hideKeyboard(); onClick() }
         }
-        content.addView(btn, LinearLayout.LayoutParams(-1, dp(48)).apply {
-            bottomMargin = dp(6)
+        content.addView(btn, LinearLayout.LayoutParams(-1, dp(if (emphasis) 54 else 46)).apply {
+            bottomMargin = dp(5)
         })
     }
 
@@ -189,10 +225,10 @@ class MainActivity : Activity() {
                 maxLines = 2
                 ellipsize = android.text.TextUtils.TruncateAt.END
                 setTextColor(familyDeep)
-                background = outlined(familyPale, 12f)
+                background = outlined(familyPale, 17f)
                 setOnClickListener { hideKeyboard(); entry.second() }
             }
-            row.addView(button, LinearLayout.LayoutParams(0, dp(48), 1f).apply {
+            row.addView(button, LinearLayout.LayoutParams(0, dp(46), 1f).apply {
                 if (index == 0) marginEnd = dp(6)
             })
         }
