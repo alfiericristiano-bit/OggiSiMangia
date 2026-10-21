@@ -11,7 +11,13 @@ data class RecipeText(
     val summary: String = "",
     val portions: String = "",
     val time: String = "",
-    val notice: String = ""
+    val notice: String = "",
+    val prepTime: String = "",
+    val cookTime: String = "",
+    val totalTime: String = "",
+    val restTime: String = "",
+    val imageUrl: String = "",
+    val nutrition: String = ""
 )
 
 /** Reads only explicitly published Recipe data; never guesses quantities or temperatures. */
@@ -47,9 +53,14 @@ object RecipeReader {
         for (script in doc.select("script[type=application/ld+json]")) {
             try { visit(JSONTokener(script.data()).nextValue()) } catch (_: Exception) { }
         }
+        val fallbackImage = doc.select("meta[property=og:image]").firstOrNull()?.attr("content").orEmpty()
         val recipe = recipes.maxByOrNull { it.optJSONArray("recipeIngredient")?.length() ?: 0 }
-            ?: return RecipeText(notice = "Il sito non fornisce una ricetta leggibile automaticamente. Puoi salvare il link.")
-        return parse(recipe)
+            ?: return RecipeText(notice = "Il sito non fornisce una ricetta leggibile automaticamente. Puoi salvare il link.", imageUrl = fallbackImage)
+        val result = parse(recipe)
+        return result.copy(imageUrl = result.imageUrl.ifBlank { fallbackImage }.let {
+            try { if (it.isBlank()) "" else java.net.URL(java.net.URL(address), it).toString().takeIf { u -> u.startsWith("https://") }.orEmpty() }
+            catch (_: Exception) { "" }
+        })
     }
 
     internal fun parse(recipe: JSONObject): RecipeText {
@@ -69,12 +80,31 @@ object RecipeReader {
             val essential = Regex("[0-9]|cuoc|cottura|forno|fuoco|minut|raffredd|frigg|boll", RegexOption.IGNORE_CASE)
             "${i + 1}. " + sentences.filterIndexed { index, sentence -> index == 0 || essential.containsMatchIn(sentence) }.joinToString(" ")
         }.joinToString("\n\n")
-        return RecipeText(ingredients, original, summary,
-            strings(recipe.opt("recipeYield")).joinToString(", "),
-            recipe.optString("totalTime").ifBlank { recipe.optString("cookTime") }.let { raw ->
-                try { "${java.time.Duration.parse(raw).toMinutes()} min" } catch (_: Exception) { raw }
-            },
-            if (steps.isEmpty()) "Procedimento non disponibile: consulta l'originale."
-            else "Sintesi automatica: consulta il testo completo per tutti i dettagli e le indicazioni di cottura.")
+        fun value(key: String) = recipe.optString(key).takeUnless { it == "null" }.orEmpty()
+        fun duration(key: String): String {
+            val raw = value(key)
+            return try { "${java.time.Duration.parse(raw).toMinutes()} min" } catch (_: Exception) { raw }
+        }
+        fun image(value: Any?): String = when (value) {
+            is String -> value
+            is JSONObject -> value.optString("url").ifBlank { value.optString("contentUrl") }
+            is JSONArray -> (0 until value.length()).firstNotNullOfOrNull { image(value.opt(it)).takeIf { url -> url.isNotBlank() } }.orEmpty()
+            else -> ""
+        }
+        val nutrients = recipe.optJSONObject("nutrition")
+        val nutrition = listOf("calories" to "Energia", "proteinContent" to "Proteine",
+            "carbohydrateContent" to "Carboidrati", "fatContent" to "Grassi").mapNotNull { (key, caption) ->
+            nutrients?.optString(key)?.takeIf { it.isNotBlank() && it != "null" }?.let { "$caption: $it" }
+        }.joinToString(" · ")
+        return RecipeText(
+            ingredients = ingredients, original = original, summary = summary,
+            portions = strings(recipe.opt("recipeYield")).joinToString(", "),
+            time = duration("totalTime").ifBlank { duration("cookTime") },
+            notice = if (steps.isEmpty()) "Procedimento non disponibile: consulta l'originale."
+                else "Sintesi automatica: consulta il testo completo per tutti i dettagli e le indicazioni di cottura.",
+            prepTime = duration("prepTime"), cookTime = duration("cookTime"), totalTime = duration("totalTime"),
+            restTime = duration("restTime").ifBlank { duration("additionalTime") },
+            imageUrl = image(recipe.opt("image")), nutrition = nutrition
+        )
     }
 }

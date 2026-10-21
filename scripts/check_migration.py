@@ -1,23 +1,34 @@
-"""Exercise actual migration statements against a populated v1 SQLite database."""
+"""Exercise actual v1/v2 to v3 migration statements on populated SQLite databases."""
 import re
 import sqlite3
 from pathlib import Path
-
 source = Path('app/src/main/java/it/oggisimangia/app/RecipeDb.kt').read_text()
-db = sqlite3.connect(':memory:')
 schema = re.search(r'CREATE TABLE recipes \((.*?)\n            \)', source, re.S).group(1)
-old_schema = re.sub(r",\s*originalInstructions TEXT.*?saveMode TEXT NOT NULL DEFAULT 'Semplificata'", '', schema, flags=re.S)
-db.execute('CREATE TABLE recipes (' + old_schema + ')')
-db.execute("INSERT INTO recipes (id, day, meal, category, title, ingredients, instructions, imagePath) VALUES (7, '2026-10-21', 'Cena', 'Primo', 'Risotto', '200 g riso', 'Cuoci 18 minuti', '/photos/riso.jpg')")
-before = db.execute('SELECT * FROM recipes').fetchone()
-for statement in re.findall(r'db.execSQL\("(ALTER TABLE [^"]+)"\)', source):
-    db.execute(statement)
-after = db.execute('SELECT * FROM recipes').fetchone()
-assert after[:len(before)] == before, (before, after)
-assert after[-2:] == ('', 'Semplificata'), after
-db.execute("UPDATE recipes SET originalInstructions='Cuoci 18 minuti', saveMode='Entrambe' WHERE id=7")
-assert db.execute('SELECT COUNT(*) FROM recipes').fetchone()[0] == 1
-fresh = sqlite3.connect(':memory:')
-fresh.execute('CREATE TABLE recipes (' + schema + ')')
-assert [r[1] for r in fresh.execute('PRAGMA table_info(recipes)')] == [r[1] for r in db.execute('PRAGMA table_info(recipes)')]
-print('PASS: populated v1 migration preserves recipe, quantities, calendar and photo; fresh schema matches.')
+columns = [line.strip().rstrip(',') for line in schema.splitlines() if line.strip()]
+new_v2 = {'originalInstructions', 'saveMode'}
+new_v3 = {'prepTime','cookTime','totalTime','restTime','portions','sourceImageUrl','nutrition'}
+for version in [1, 2]:
+    excluded = new_v3 | (new_v2 if version == 1 else set())
+    old_columns = [c for c in columns if c.split()[0] not in excluded]
+    db = sqlite3.connect(':memory:')
+    db.execute('CREATE TABLE recipes (' + ','.join(old_columns) + ')')
+    db.execute("INSERT INTO recipes (id,day,meal,category,title,ingredients,instructions,imagePath) VALUES (7,'2026-10-21','Cena','Primo','Risotto','200 g riso','Cuoci 18 minuti','/photos/riso.jpg')")
+    if version == 2:
+        db.execute("UPDATE recipes SET originalInstructions='Cuoci 18 minuti', saveMode='Entrambe'")
+    before = db.execute('SELECT * FROM recipes').fetchone()
+    for target, body in re.findall(r'if \(oldVersion < (\d+)\) \{(.*?)\n        \}', source, re.S):
+        if version < int(target):
+            for statement in re.findall(r'db.execSQL\("(ALTER TABLE [^"]+)"\)', body):
+                db.execute(statement)
+    after = db.execute('SELECT * FROM recipes').fetchone()
+    assert after[:len(before)] == before, (version, before, after)
+    names = [r[1] for r in db.execute('PRAGMA table_info(recipes)')]
+    assert names == [c.split()[0] for c in columns]
+    for field in new_v3:
+        assert after[names.index(field)] == ''
+    db.execute("UPDATE recipes SET prepTime='10 min',cookTime='18 min',portions='4',meal='Entrambi',sourceImageUrl='https://example.org/riso.jpg' WHERE id=7")
+    db.execute("INSERT INTO recipes (day,meal,category,title) VALUES ('','Pranzo','Primo','Solo archivio')")
+    db.execute("INSERT INTO recipes (day,meal,category,title) VALUES ('2026-11-01','Cena','Secondo','Altro mese')")
+    assert db.execute("SELECT day,meal FROM recipes WHERE day>=? AND day<=?", ('2026-10-01','2026-10-31')).fetchall() == [('2026-10-21','Entrambi')]
+    assert db.execute('SELECT prepTime,cookTime,portions,imagePath FROM recipes WHERE id=7').fetchone() == ('10 min','18 min','4','/photos/riso.jpg')
+    print(f'PASS: v{version} -> v3 preserves existing recipe and photo; metadata and month filter work.')

@@ -20,10 +20,17 @@ data class Recipe(
     val alternative: Boolean,
     val imagePath: String,
     val originalInstructions: String = "",
-    val saveMode: String = "Semplificata"
+    val saveMode: String = "Semplificata",
+    val prepTime: String = "",
+    val cookTime: String = "",
+    val totalTime: String = "",
+    val restTime: String = "",
+    val portions: String = "",
+    val sourceImageUrl: String = "",
+    val nutrition: String = ""
 )
 
-class RecipeDb(context: Context) : SQLiteOpenHelper(context, "oggisimangia.db", null, 2) {
+class RecipeDb(context: Context) : SQLiteOpenHelper(context, "oggisimangia.db", null, 3) {
     override fun onCreate(db: SQLiteDatabase) {
         db.execSQL("""
             CREATE TABLE recipes (
@@ -40,7 +47,14 @@ class RecipeDb(context: Context) : SQLiteOpenHelper(context, "oggisimangia.db", 
                 alternative INTEGER NOT NULL DEFAULT 0,
                 imagePath TEXT NOT NULL DEFAULT '',
                 originalInstructions TEXT NOT NULL DEFAULT '',
-                saveMode TEXT NOT NULL DEFAULT 'Semplificata'
+                saveMode TEXT NOT NULL DEFAULT 'Semplificata',
+                prepTime TEXT NOT NULL DEFAULT '',
+                cookTime TEXT NOT NULL DEFAULT '',
+                totalTime TEXT NOT NULL DEFAULT '',
+                restTime TEXT NOT NULL DEFAULT '',
+                portions TEXT NOT NULL DEFAULT '',
+                sourceImageUrl TEXT NOT NULL DEFAULT '',
+                nutrition TEXT NOT NULL DEFAULT ''
             )
         """.trimIndent())
         db.execSQL("CREATE INDEX by_day ON recipes(day)")
@@ -51,6 +65,15 @@ class RecipeDb(context: Context) : SQLiteOpenHelper(context, "oggisimangia.db", 
         if (oldVersion < 2) {
             db.execSQL("ALTER TABLE recipes ADD COLUMN originalInstructions TEXT NOT NULL DEFAULT ''")
             db.execSQL("ALTER TABLE recipes ADD COLUMN saveMode TEXT NOT NULL DEFAULT 'Semplificata'")
+        }
+        if (oldVersion < 3) {
+            db.execSQL("ALTER TABLE recipes ADD COLUMN prepTime TEXT NOT NULL DEFAULT ''")
+            db.execSQL("ALTER TABLE recipes ADD COLUMN cookTime TEXT NOT NULL DEFAULT ''")
+            db.execSQL("ALTER TABLE recipes ADD COLUMN totalTime TEXT NOT NULL DEFAULT ''")
+            db.execSQL("ALTER TABLE recipes ADD COLUMN restTime TEXT NOT NULL DEFAULT ''")
+            db.execSQL("ALTER TABLE recipes ADD COLUMN portions TEXT NOT NULL DEFAULT ''")
+            db.execSQL("ALTER TABLE recipes ADD COLUMN sourceImageUrl TEXT NOT NULL DEFAULT ''")
+            db.execSQL("ALTER TABLE recipes ADD COLUMN nutrition TEXT NOT NULL DEFAULT ''")
         }
     }
 
@@ -68,7 +91,14 @@ class RecipeDb(context: Context) : SQLiteOpenHelper(context, "oggisimangia.db", 
         alternative = c.getInt(c.getColumnIndexOrThrow("alternative")) == 1,
         imagePath = c.getString(c.getColumnIndexOrThrow("imagePath")),
         originalInstructions = c.getString(c.getColumnIndexOrThrow("originalInstructions")),
-        saveMode = c.getString(c.getColumnIndexOrThrow("saveMode"))
+        saveMode = c.getString(c.getColumnIndexOrThrow("saveMode")),
+        prepTime = c.getString(c.getColumnIndexOrThrow("prepTime")),
+        cookTime = c.getString(c.getColumnIndexOrThrow("cookTime")),
+        totalTime = c.getString(c.getColumnIndexOrThrow("totalTime")),
+        restTime = c.getString(c.getColumnIndexOrThrow("restTime")),
+        portions = c.getString(c.getColumnIndexOrThrow("portions")),
+        sourceImageUrl = c.getString(c.getColumnIndexOrThrow("sourceImageUrl")),
+        nutrition = c.getString(c.getColumnIndexOrThrow("nutrition"))
     )
 
     fun save(r: Recipe): Long {
@@ -86,6 +116,13 @@ class RecipeDb(context: Context) : SQLiteOpenHelper(context, "oggisimangia.db", 
             put("imagePath", r.imagePath)
             put("originalInstructions", r.originalInstructions)
             put("saveMode", r.saveMode)
+            put("prepTime", r.prepTime)
+            put("cookTime", r.cookTime)
+            put("totalTime", r.totalTime)
+            put("restTime", r.restTime)
+            put("portions", r.portions)
+            put("sourceImageUrl", r.sourceImageUrl)
+            put("nutrition", r.nutrition)
         }
         return if (r.id == 0L) writableDatabase.insertOrThrow("recipes", null, v)
         else {
@@ -105,12 +142,24 @@ class RecipeDb(context: Context) : SQLiteOpenHelper(context, "oggisimangia.db", 
             buildList { while (c.moveToNext()) add(parse(c)) }
         }
 
-    fun archive(search: String, category: String, difficulty: String, order: String): List<Recipe> {
+    fun monthMarkers(month: java.time.YearMonth): Map<String, Set<String>> =
+        readableDatabase.query("recipes", arrayOf("day", "meal"), "day>=? AND day<=?",
+            arrayOf(month.atDay(1).toString(), month.atEndOfMonth().toString()), null, null, null).use { c ->
+            val result = linkedMapOf<String, MutableSet<String>>()
+            while (c.moveToNext()) {
+                val meals = result.getOrPut(c.getString(0)) { linkedSetOf() }
+                if (c.getString(1) == "Entrambi") meals.addAll(listOf("Pranzo", "Cena")) else meals.add(c.getString(1))
+            }
+            result
+        }
+
+    fun archive(search: String, category: String, difficulty: String, order: String, ingredientQuery: String = ""): List<Recipe> {
         val all = readableDatabase.query("recipes", null, null, null, null, null, null).use { c ->
             buildList { while (c.moveToNext()) add(parse(c)) }
         }
         val filtered = all.filter {
             (category == "Tutte" || it.category == category) &&
+            IngredientFilter.matches(it.ingredients, ingredientQuery) &&
             (difficulty == "Tutte" || it.difficulty == difficulty) &&
             (search.isBlank() || (it.title + " " + it.ingredients).contains(search, ignoreCase = true))
         }
@@ -124,4 +173,5 @@ class RecipeDb(context: Context) : SQLiteOpenHelper(context, "oggisimangia.db", 
     fun remove(id: Long): Boolean =
         writableDatabase.delete("recipes", "id=?", arrayOf(id.toString())) > 0
 }
+
 

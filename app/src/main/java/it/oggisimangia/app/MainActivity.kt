@@ -163,15 +163,11 @@ class MainActivity : Activity() {
 
     private fun showCalendar() {
         screen("Il calendario dei pasti", "Organizza pranzo e cena, anche per i prossimi giorni.")
-        val calendar = CalendarView(this).apply {
-            firstDayOfWeek = java.util.Calendar.MONDAY
-            date = selectedDate.atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
-            setOnDateChangeListener { _, year, month, day ->
-                selectedDate = LocalDate.of(year, month + 1, day)
-                showCalendar()
-            }
+        val calendar = MealCalendar(this, selectedDate, { month -> db.monthMarkers(month) }) { day ->
+            selectedDate = day
+            showCalendar()
         }
-        content.addView(calendar, LinearLayout.LayoutParams(-1, dp(310)))
+        content.addView(calendar, LinearLayout.LayoutParams(-1, -2))
         label(selectedDate.format(dateFormatter).replaceFirstChar { it.uppercase() }, 18f, true)
         action("◀ Giorno precedente") { selectedDate = selectedDate.minusDays(1); showCalendar() }
         action("Giorno successivo ▶") { selectedDate = selectedDate.plusDays(1); showCalendar() }
@@ -199,6 +195,7 @@ class MainActivity : Activity() {
         selectedPhoto = existing?.imagePath ?: ""
         screen(if (existing == null || existing.id == 0L) "Nuova ricetta" else "Modifica ricetta",
             "Le ricette pianificate vengono conservate nel ricettario.")
+        existing?.let { showRecipeMetadata(it) }
         val mealPicker = dropdown("Pasto", arrayOf("Pranzo", "Cena", "Entrambi"), existing?.meal ?: selectedMeal)
         val categoryPicker = dropdown("Categoria", categories, existing?.category ?: selectedCategory)
         val alternativePicker = dropdown("Tipo di scelta", arrayOf("Principale", "Alternativa"),
@@ -256,7 +253,11 @@ class MainActivity : Activity() {
                 alternative = alternativePicker.selectedItem.toString() == "Alternativa",
                 imagePath = selectedPhoto,
                 originalInstructions = if (modePicker.selectedItem.toString() != "Semplificata") originalField.text.toString().trim() else "",
-                saveMode = modePicker.selectedItem.toString()
+                saveMode = modePicker.selectedItem.toString(),
+                prepTime = existing?.prepTime.orEmpty(), cookTime = existing?.cookTime.orEmpty(),
+                totalTime = existing?.totalTime.orEmpty(), restTime = existing?.restTime.orEmpty(),
+                portions = existing?.portions.orEmpty(), sourceImageUrl = existing?.sourceImageUrl.orEmpty(),
+                nutrition = existing?.nutrition.orEmpty()
             ))
             Toast.makeText(this, "Ricetta salvata", Toast.LENGTH_SHORT).show()
             searchIngredients = ""
@@ -503,8 +504,31 @@ class MainActivity : Activity() {
                 if (isFinishing || isDestroyed) return@runOnUiThread
                 progress.dismiss()
                 screen(recipe.title, recipe.source)
-                label("Dosi: " + result.portions.ifBlank { "non disponibili" }, 14f)
-                label("Tempo pubblicato: " + result.time.ifBlank { recipe.minutes?.let { "$it min" } ?: "non disponibile" }, 14f)
+                val imageUrl = result.imageUrl.ifBlank { recipe.imageUrl }
+                if (imageUrl.isNotBlank()) {
+                    val photo = ImageView(this).apply {
+                        scaleType = ImageView.ScaleType.CENTER_CROP
+                        contentDescription = "Foto della ricetta da " + recipe.source
+                    }
+                    content.addView(photo, LinearLayout.LayoutParams(-1, dp(200)))
+                    fetchPreview(imageUrl, photo)
+                    label("Foto: " + recipe.source, 12f)
+                }
+                val details = onlineDraft(recipe, result, "Entrambe")
+                showRecipeMetadata(details)
+                action("📅 Aggiungi al calendario") {
+                    chooseDate {
+                        chooseMeal { meal, alternative ->
+                            chooseSaveMode { mode ->
+                                prepareOnlineDraft(recipe, result, mode) { draft ->
+                                    db.save(draft.copy(day = selectedDate.toString(), meal = meal, alternative = alternative))
+                                    Toast.makeText(this, "Ricetta aggiunta al calendario", Toast.LENGTH_SHORT).show()
+                                    showCalendar()
+                                }
+                            }
+                        }
+                    }
+                }
                 label("INGREDIENTI", 17f, true)
                 label(result.ingredients.ifBlank { "Non disponibili: consulta l'originale." })
                 label("PREPARAZIONE SEMPLIFICATA", 17f, true)
@@ -527,55 +551,96 @@ class MainActivity : Activity() {
         }.start()
     }
 
-    private fun chooseOnlineRecipe(recipe: WebRecipe, text: RecipeText) {
+    private fun showRecipeMetadata(recipe: Recipe) {
+        val details = listOf(
+            "Dosi" to recipe.portions, "Preparazione" to recipe.prepTime,
+            "Cottura" to recipe.cookTime, "Tempo totale" to recipe.totalTime, "Riposo / attesa" to recipe.restTime,
+            "Valori nutrizionali pubblicati" to recipe.nutrition
+        ).filter { it.second.isNotBlank() }
+        details.forEach { (caption, value) -> label("$caption: $value", 14f) }
+        if (details.isEmpty()) label("Dosi e tempi dettagliati non disponibili dalla fonte.", 14f)
+        if (recipe.totalTime.isBlank() && recipe.prepTime.isBlank() && recipe.cookTime.isBlank()) {
+            label("Tempo: " + recipe.duration, 14f)
+        }
+    }
+
+    private fun chooseSaveMode(after: (String) -> Unit) {
         val choices = arrayOf("Semplificata", "Originale", "Entrambe")
-        AlertDialog.Builder(this).setTitle("Quale versione vuoi salvare?")
-            .setItems(choices) { _, choice ->
-                selectedCategory = recipe.category.takeIf { it in categories } ?: searchCategory
-                showEditor(Recipe(
-                    day = "", meal = selectedMeal, category = selectedCategory,
-                    title = recipe.title,
-                    ingredients = listOfNotNull(text.portions.takeIf { it.isNotBlank() }?.let { "Dosi: $it" },
-                        text.time.takeIf { it.isNotBlank() }?.let { "Tempo: $it" }, text.ingredients.takeIf { it.isNotBlank() }).joinToString("\n\n"),
-                    instructions = text.summary.ifBlank { recipe.summary },
-                    difficulty = recipe.difficulty.takeIf { it in difficulties } ?: "Non disponibile",
-                    duration = text.time.ifBlank { recipe.minutes?.let { "$it min" } ?: "Non disponibile" }, url = recipe.url, alternative = false, imagePath = "",
-                    originalInstructions = text.original,
-                    saveMode = choices[choice]
-                ))
-            }.setNegativeButton("Annulla", null).show()
+        AlertDialog.Builder(this).setTitle("Quale versione vuoi conservare?")
+            .setItems(choices) { _, choice -> after(choices[choice]) }
+            .setNegativeButton("Annulla", null).show()
+    }
+
+    private fun chooseMeal(after: (String, Boolean) -> Unit) {
+        val choices = arrayOf("Pranzo · Principale", "Pranzo · Alternativa", "Cena · Principale", "Cena · Alternativa")
+        AlertDialog.Builder(this).setTitle("Inserisci il " + selectedDate.format(dateFormatter))
+            .setItems(choices) { _, index -> after(if (index < 2) "Pranzo" else "Cena", index % 2 == 1) }
+            .setNegativeButton("Annulla", null).show()
+    }
+
+    private fun planSavedRecipe(recipe: Recipe) {
+        chooseDate {
+            chooseMeal { meal, alternative ->
+                db.save(recipe.copy(id = 0L, day = selectedDate.toString(), meal = meal, alternative = alternative))
+                Toast.makeText(this, "Ricetta aggiunta al calendario", Toast.LENGTH_SHORT).show()
+                showCalendar()
+            }
+        }
+    }
+
+    private fun onlineDraft(recipe: WebRecipe, text: RecipeText, mode: String) = Recipe(
+        day = "", meal = selectedMeal,
+        category = recipe.category.takeIf { it in categories } ?: searchCategory,
+        title = recipe.title, ingredients = text.ingredients,
+        instructions = if (mode != "Originale") text.summary.ifBlank { recipe.summary } else "",
+        difficulty = recipe.difficulty.takeIf { it in difficulties } ?: "Non disponibile",
+        duration = text.totalTime.ifBlank { text.time }.ifBlank { recipe.minutes?.let { "$it min" } ?: "Non disponibile" },
+        url = recipe.url, alternative = false, imagePath = "",
+        originalInstructions = if (mode != "Semplificata") text.original else "", saveMode = mode,
+        prepTime = text.prepTime, cookTime = text.cookTime, totalTime = text.totalTime,
+        restTime = text.restTime, portions = text.portions,
+        sourceImageUrl = text.imageUrl.ifBlank { recipe.imageUrl }, nutrition = text.nutrition
+    )
+
+    private fun prepareOnlineDraft(recipe: WebRecipe, text: RecipeText, mode: String, after: (Recipe) -> Unit) {
+        val draft = onlineDraft(recipe, text, mode)
+        val progress = AlertDialog.Builder(this).setTitle("Preparo il salvataggio")
+            .setMessage("Salvo una copia compressa della foto, se disponibile...").setCancelable(false).create()
+        progress.show()
+        Thread {
+            val path = try { RecipePhotoStore.save(this, draft.sourceImageUrl) } catch (_: Exception) { "" }
+            runOnUiThread {
+                if (isFinishing || isDestroyed) return@runOnUiThread
+                progress.dismiss()
+                if (draft.sourceImageUrl.isNotBlank() && path.isBlank()) {
+                    Toast.makeText(this, "Foto non scaricabile: salvo comunque la ricetta e il link.", Toast.LENGTH_LONG).show()
+                }
+                after(draft.copy(imagePath = path))
+            }
+        }.start()
+    }
+
+    private fun chooseOnlineRecipe(recipe: WebRecipe, text: RecipeText) {
+        chooseSaveMode { mode -> prepareOnlineDraft(recipe, text, mode) { draft -> showEditor(draft) } }
     }
 
     private fun fetchPreview(url: String, target: ImageView) {
         if (!url.startsWith("https://")) return
         Thread {
-            var connection: HttpURLConnection? = null
-            try {
-                connection = URL(url).openConnection() as HttpURLConnection
-                connection.connectTimeout = 5000
-                connection.readTimeout = 6000
-                connection.instanceFollowRedirects = true
-                connection.connect()
-                if (connection.responseCode !in 200..299 ||
-                    connection.contentLengthLong > 3_000_000L) return@Thread
-                val bitmap = connection.inputStream.use { stream ->
-                    BitmapFactory.decodeStream(stream, null,
-                        BitmapFactory.Options().apply { inSampleSize = 4 })
-                } ?: return@Thread
-                runOnUiThread {
-                    if (!isFinishing && !isDestroyed) target.setImageBitmap(bitmap)
-                    else bitmap.recycle()
-                }
-            } catch (_: Exception) {
-                // Immagine opzionale: una fonte esterna può non permetterne la lettura.
-            } finally { connection?.disconnect() }
+            val bitmap = try { RecipePhotoStore.load(url) } catch (_: Exception) { null } ?: return@Thread
+            runOnUiThread {
+                if (!isFinishing && !isDestroyed && target.isAttachedToWindow) target.setImageBitmap(bitmap)
+                else bitmap.recycle()
+            }
         }.start()
     }
 
     private fun showArchive(search: String = "", category: String = "Tutte",
-                            difficulty: String = "Tutte", order: String = "Nome A–Z") {
+                            difficulty: String = "Tutte", order: String = "Nome A–Z", ingredientQuery: String = "") {
         screen("Il mio ricettario", "Ricette salvate sul telefono, consultabili anche offline.")
-        val queryField = input("Cerca per nome o ingrediente", search)
+        val queryField = input("Cerca per nome o parola chiave", search)
+        label("Ingredienti: basta che la ricetta ne contenga almeno uno", 14f, true)
+        val ingredientField = input("Es. uova, zucchine, riso (separati da virgola)", ingredientQuery, true)
         val categoryPicker = dropdown("Categoria", arrayOf("Tutte") + categories, category)
         val difficultyPicker = dropdown("Difficoltà", arrayOf("Tutte") + difficulties, difficulty)
         val orderPicker = dropdown("Ordina", arrayOf("Nome A–Z", "Data (recenti)", "Difficoltà"), order)
@@ -583,15 +648,16 @@ class MainActivity : Activity() {
             showArchive(queryField.text.toString().trim(),
                 categoryPicker.selectedItem.toString(),
                 difficultyPicker.selectedItem.toString(),
-                orderPicker.selectedItem.toString())
+                orderPicker.selectedItem.toString(), ingredientField.text.toString().trim())
         }
-        val items = db.archive(search, category, difficulty, order)
+        val items = db.archive(search, category, difficulty, order, ingredientQuery)
         label("Risultati: " + items.size, 17f, true)
         if (items.isEmpty()) label("Nessuna ricetta trovata. Cambia i filtri o aggiungine una.", 14f)
         items.forEach { r ->
             action("🍴 " + r.title + "\n" + r.category + " · " + r.difficulty + " · " + r.duration) {
                 showDetail(r.id)
             }
+            action("📅 Pianifica «" + r.title + "»") { planSavedRecipe(r) }
         }
         action("＋ Nuova ricetta") { showEditor() }
     }
@@ -614,6 +680,7 @@ class MainActivity : Activity() {
             (if (r.alternative) "Alternativa" else "Principale"))
         if (r.imagePath.isNotBlank()) addPhotoPreview(r.imagePath)
         label("📅 " + r.day.ifBlank { "Solo ricettario" } + "   ⏱ " + r.duration + "   👩‍🍳 " + r.difficulty, 15f)
+        showRecipeMetadata(r)
         label("INGREDIENTI", 17f, true)
         label(r.ingredients.ifBlank { "Non annotati" })
         label("PREPARAZIONE", 17f, true)
@@ -630,18 +697,7 @@ class MainActivity : Activity() {
             if (r.day.isNotBlank()) selectedDate = LocalDate.parse(r.day)
             showEditor(r)
         }
-        action("📅 Pianifica di nuovo questa ricetta") {
-            val options = arrayOf("Pranzo · Principale", "Pranzo · Alternativa",
-                "Cena · Principale", "Cena · Alternativa")
-            AlertDialog.Builder(this).setTitle("Dove vuoi inserirla il " + selectedDate.toString() + "?")
-                .setItems(options) { _, position ->
-                    db.save(r.copy(id = 0L, day = selectedDate.toString(),
-                        meal = if (position < 2) "Pranzo" else "Cena",
-                        alternative = position % 2 == 1))
-                    Toast.makeText(this, "Ricetta pianificata", Toast.LENGTH_SHORT).show()
-                    showCalendar()
-                }.setNegativeButton("Annulla", null).show()
-        }
+        action("📅 Aggiungi al calendario") { planSavedRecipe(r) }
         action("🗑️ Elimina questa voce") {
             AlertDialog.Builder(this).setTitle("Eliminare la ricetta?")
                 .setMessage("La voce sarà rimossa dal calendario e dal ricettario. Operazione non reversibile.")

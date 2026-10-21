@@ -12,3 +12,5 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 test "$(adb shell run-as "$package" cat files/update-check.txt | tr -d '\r')" = dati-conservati
 adb shell dumpsys package "$package" | grep "versionCode=$next "
 echo 'PASS: aggiornamento installato senza disinstallare; dati locali conservati.'
+
+python3 scripts/calendar_smoke.py
