@@ -358,29 +358,79 @@ class MainActivity : Activity() {
                 "Tieni premuta la data con una pressione prolungata per aggiungere una ricetta: " +
                 "potrai scegliere pranzo, cena e principale o alternativa.")
         }
-        label(selectedDate.format(dateFormatter).replaceFirstChar { it.uppercase() }, 18f, true)
-        actionRow("◀ Precedente", { selectedDate = selectedDate.minusDays(1); showCalendar() },
-            "Successivo ▶", { selectedDate = selectedDate.plusDays(1); showCalendar() })
+        label(selectedDate.format(dateFormatter).replaceFirstChar { it.uppercase() }, 17f, true)
+        actionRow("◀ Precedente", { selectedDate = selectedDate.minusDays(1); expandedMeals.clear(); showCalendar() },
+            "Successivo ▶", { selectedDate = selectedDate.plusDays(1); expandedMeals.clear(); showCalendar() })
+        actionRow("↻ Oggi", { selectedDate = LocalDate.now(); expandedMeals.clear(); showCalendar() },
+            "🗑 Svuota giorno", { confirmClearDay() })
         val today = db.onDay(selectedDate.toString())
         listOf("Pranzo", "Cena").forEach { meal ->
-            label(if (meal == "Pranzo") "☀️ PRANZO" else "🌙 CENA", 20f, true)
             val planned = today.filter { it.meal == meal || it.meal == "Entrambi" }
-            if (planned.isEmpty()) label("Ancora nessun piatto selezionato.", 14f)
-            planned.forEach { recipe ->
-                action((if (recipe.alternative) "🔄 Alternativa · " else "🍴 ") +
-                    recipe.category + " · " + recipe.title) {
-                    showDetail(recipe.id)
+            val expanded = meal in expandedMeals
+            val section = Button(this).apply {
+                text = (if (meal == "Pranzo") "☀️ PRANZO" else "🌙 CENA") +
+                    "  ·  " + planned.size + (if (expanded) "  ⌃" else "  ⌄")
+                textSize = 17f; isAllCaps = false
+                gravity = Gravity.CENTER_VERTICAL
+                setTypeface(null, Typeface.BOLD)
+                setTextColor(familyDeep)
+                background = outlined(familyPale, 17f)
+                setOnClickListener {
+                    if (expanded) expandedMeals.remove(meal) else expandedMeals.add(meal)
+                    showCalendar()
                 }
-                action("✏️ Cambia assegnazione · " + recipe.title) { changePlanning(recipe) }
-                action("📋 Clona su altri giorni · " + recipe.title) { cloneRecipeToDay(recipe) }
             }
-            actionRow("＋ Aggiungi per $meal", {
-                selectedMeal = meal
-                showEditor(planByDefault = true)
-            }, "🔎 Alternativa", { startMealSearch(meal, true) })
+            content.addView(section, LinearLayout.LayoutParams(-1, dp(46)).apply {
+                topMargin = dp(5); bottomMargin = dp(4)
+            })
+            if (planned.isEmpty()) label("Nessun piatto assegnato.", 13f)
+            planned.forEach { recipe ->
+                action((if (recipe.alternative) "↪ " else "• ") + recipe.title) { showDetail(recipe.id) }
+                if (expanded) {
+                    actionRow("✏️ Modifica", { changePlanning(recipe) },
+                        "🗑 Dal giorno", { removeFromDay(recipe) })
+                    action("📋 Clona in un altro giorno") { cloneRecipeToDay(recipe) }
+                }
+            }
+            if (expanded) {
+                actionRow("＋ Aggiungi", {
+                    selectedMeal = meal; showEditor(planByDefault = true)
+                }, "🔎 Alternativa", { startMealSearch(meal, true) })
+            }
         }
-        action("🔎 Cerca una nuova ricetta") { showSearch() }
-        action("PDF e stampa del giorno") { report("Menu del giorno", selectedDate.format(dateFormatter), db.onDay(selectedDate.toString())) }
+        actionRow("🔎 Cerca ricetta", { showSearch() },
+            "＋ Nuova ricetta", { showEditor() })
+        action("PDF e stampa del giorno") {
+            report("Menu del giorno", selectedDate.format(dateFormatter), db.onDay(selectedDate.toString()))
+        }
+    }
+
+    /** Unplan a recipe without deleting its saved ingredients, steps or photograph. */
+    private fun removeFromDay(recipe: Recipe) {
+        AlertDialog.Builder(this).setTitle("Rimuovere dal giorno?")
+            .setMessage("«" + recipe.title + "» non comparirà più nel giorno " +
+                selectedDate.format(dateFormatter) + ". Resterà nel ricettario.")
+            .setPositiveButton("Rimuovi dal giorno") { _, _ ->
+                db.save(recipe.copy(day = ""))
+                showCalendar()
+            }.setNegativeButton("Annulla", null).show()
+    }
+
+    private fun confirmClearDay() {
+        val recipes = db.onDay(selectedDate.toString())
+        if (recipes.isEmpty()) {
+            Toast.makeText(this, "Il giorno è già vuoto", Toast.LENGTH_SHORT).show()
+            return
+        }
+        AlertDialog.Builder(this).setTitle("Svuotare questo giorno?")
+            .setMessage("Rimuovere " + recipes.size + " piatti dal " +
+                selectedDate.format(dateFormatter) +
+                "? Le ricette rimarranno tutte nel ricettario.")
+            .setPositiveButton("Svuota giorno") { _, _ ->
+                recipes.forEach { db.save(it.copy(day = "")) }
+                expandedMeals.clear()
+                showCalendar()
+            }.setNegativeButton("Annulla", null).show()
     }
 
     /** Update a saved appointment in place, preserving the recipe and its photographs. */
@@ -719,7 +769,7 @@ class MainActivity : Activity() {
         label("Ingredienti obbligatori, anche singolare/plurale e preparazioni equivalenti. " +
             "Categoria, difficoltà e tempi sono preferenze: gli scostamenti vengono segnalati.", 13f)
 
-        action("🔎 Mostra fino a 10 ricette") {
+        primaryAction("🔎 CERCA RICETTE NEI SITI") {
             searchIngredients = ingredients.query() ?: return@action
             searchCategory = category.selectedItem.toString()
             searchDifficulty = difficulty.selectedItem.toString()
@@ -769,7 +819,11 @@ class MainActivity : Activity() {
                 }
             }.start()
         }
-        actionRow("＋ Nuova ricetta", { showEditor() }, "📚 Ricettario", { showArchive() })
+        actionRow("↻ Azzera ingredienti", {
+            searchIngredients = ""
+            showSearch()
+        }, "📚 Ricettario", { showArchive() })
+        action("＋ Nuova ricetta") { showEditor() }
     }
 
     private fun showSourceSettings() {
@@ -1228,7 +1282,10 @@ class MainActivity : Activity() {
             if (r.day.isNotBlank()) selectedDate = LocalDate.parse(r.day)
             showEditor(r)
         }
-        if (r.day.isNotBlank()) action("✏️ Cambia pranzo / cena / tipo / categoria") { changePlanning(r) }
+        if (r.day.isNotBlank()) {
+            actionRow("✏️ Cambia assegnazione", { changePlanning(r) },
+                "🗑 Dal giorno", { removeFromDay(r) })
+        }
         action("📋 Clona su altri giorni del calendario") { cloneRecipeToDay(r) }
         action("🗑️ Elimina questa voce") {
             AlertDialog.Builder(this).setTitle("Eliminare la ricetta?")
