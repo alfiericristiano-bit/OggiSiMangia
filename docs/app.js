@@ -22,6 +22,11 @@
   function fromISO(value) { return new Date(String(value).slice(0,4)*1,String(value).slice(5,7)*1-1,String(value).slice(8,10)*1); }
   function escape(value) { return String(value == null ? "" : value).replace(/[&<>"']/g,function(ch){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[ch];}); }
   function slug(value) { return String(value).toLocaleLowerCase("it").normalize("NFD").replace(/[\u0300-\u036f]/g,""); }
+  function ingredientMatch(line,requested) {
+    const normalized=slug(line).replace(/[^a-z0-9]+/g," ").trim();
+    const term=slug(requested).replace(/[^a-z0-9]+/g," ").trim();
+    return term!=="" && (" "+normalized+" ").includes(" "+term+" ");
+  }
   function formatDate(value, options) { return new Intl.DateTimeFormat("it-IT",options || {weekday:"long",day:"numeric",month:"long"}).format(fromISO(value)); }
   function uid() { return "r-"+Date.now().toString(36)+"-"+Math.random().toString(36).slice(2,8); }
   const fresh = () => ({recipes:copy(INITIAL_RECIPES),sources:copy(DEFAULT_SOURCES),tipsHidden:false,dark:false});
@@ -135,7 +140,7 @@
     const filtered=state.recipes.filter(function(r){
       return (!query||slug(r.title+" "+(r.description||"")).includes(query)) &&
         (category==="Tutte"||r.category===category) &&
-        terms.every(function(term){return (r.ingredients||[]).some(i=>slug(i).includes(term));});
+        terms.every(function(term){return (r.ingredients||[]).some(i=>ingredientMatch(i,term));});
     });
     app.innerHTML='<section class="headline"><div><p class="kicker">Il tuo archivio</p><h1>Ricettario</h1><p class="subtitle">Cerca tra le ricette salvate in questo browser. Tutti gli ingredienti inseriti sono obbligatori.</p></div>'+
       button("＋ Scrivi ricetta","new-recipe","primary")+'</section>'+
