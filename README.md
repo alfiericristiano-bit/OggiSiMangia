@@ -38,15 +38,11 @@ Le fonti possono bloccare richieste o cambiare struttura. Non sono garantiti die
 
 ## Regola permanente di distribuzione APK nella chat
 
-Dopo ogni modifica del codice e ogni nuova versione:
-1. Avviare la compilazione con GitHub Actions e controllare il completamento di test, lint, firma e prova di aggiornamento senza perdita dei dati.
-2. Recuperare l'Artifact APK della compilazione riuscita, estrarre il file `.apk` dallo ZIP di GitHub Actions e presentare **direttamente nella risposta ChatGPT il file APK scaricabile**, con nome che includa la versione (per esempio `OggiSiMangia-v1.4.1.apk`).
-3. Non sostituire il download diretto in chat con un pulsante o collegamento che apra soltanto la pagina GitHub Actions o la lista degli Artifact. Il link GitHub può essere un'informazione supplementare, non il download principale.
-4. Mostrare chiaramente nome file, versione, esito della compilazione e risultato delle verifiche; non dichiarare disponibile un file se non è stato effettivamente recuperato e allegato.
-5. Se la sessione non consente tecnicamente di recuperare o allegare il file, dichiarare esplicitamente la limitazione e fornire il percorso GitHub verificato come ripiego, senza presentarlo come download diretto.
-6. Mantenere sempre lo stesso `applicationId`, la stessa firma persistente e un `versionCode` crescente affinché l'APK possa aggiornare la versione già installata senza eliminare dati.
-
-Questa regola riguarda **la modalità di consegna all'utente in chat**, oltre alla pubblicazione dell'Artifact su GitHub.
+1. Dopo ogni modifica al codice, avviare GitHub Actions e verificare test, lint, firma persistente e aggiornamento in-place senza perdita dei dati. Pubblicare un Artifact con il numero di versione.
+2. **Non scaricare, estrarre né allegare l'APK a ogni compilazione.** Presentare in chat l'esito e la versione verificata, senza intraprendere la fase di recupero file.
+3. **Soltanto quando l'utente scrive «apk»**, recuperare l'Artifact più recente con esito positivo, estrarre il file `.apk` e allegarlo direttamente come file scaricabile in chat, senza sostituirlo con un semplice collegamento alla pagina GitHub.
+4. Non dichiarare l'APK disponibile se non è stato effettivamente recuperato. Se il recupero diretto non è tecnicamente possibile, descrivere la limitazione e indicare il percorso GitHub verificato.
+5. Mantenere identici `applicationId` e certificato di firma e aumentare `versionCode` a ogni nuova release; conservare ricette, calendario e preferenze durante gli aggiornamenti.
 
 ## Build e firma persistente (1.2.1)
 
