@@ -1,6 +1,6 @@
 # 🍽️ OggiSiMangia...
 
-Android 1.2.0 (versionCode 4).
+Android 1.2.1 (versionCode 5).
 
 - Un solo Cerca consulta GialloZafferano, Il Cucchiaio d'Argento e Fatto in Casa da Benedetta, mostrando fino a dieci risultati nel popup.
 - Scheda interna con ingredienti, dosi, tempo e sintesi estrattiva dei passaggi pubblicati in formato Recipe JSON-LD. La sintesi conserva frasi con quantità, tempi e riferimenti di cottura; il testo completo resta consultabile.
@@ -23,4 +23,6 @@ La chiave privata non deve essere inserita nel repository, nei log, nelle cache 
 
 L'applicationId resta it.oggisimangia.app. Il versionCode di distribuzione aumenta; la proprietà verificationVersionCode è riservata al test su emulatore. La prima installazione con questa nuova chiave richiede di rimuovere le precedenti build debug firmate diversamente, con perdita dei dati: l'utente ha autorizzato questa transizione. Gli aggiornamenti successivi devono mantenere la stessa chiave e aumentare il versionCode.
 
-Stato: configurazione della chiave e prova di aggiornamento ancora da completare prima del rilascio 1.2.1.
+Firma persistente configurata nei secret Actions. La build 39552763647 ha superato test, lint, controllo del certificato e aggiornamento in-place su emulatore Android 29 (versionCode 5 → 6), conservando un file di prova nel sandbox. La release distribuita è 1.2.1 (versionCode 5). Anche la firma crittografica APK v2 e il digest del file scaricato sono stati verificati.
+
+Certificato pubblico SHA-256: 3d788e2a2dfeeaa5039c6c0422b6f8068a709f7c9672d14635ceecbc18114c95. La copia riservata di recupero è conservata separatamente dal repository.
