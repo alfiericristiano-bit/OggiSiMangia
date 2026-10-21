@@ -165,7 +165,7 @@ class MainActivity : Activity() {
         screen("Il calendario dei pasti", "Organizza pranzo e cena, anche per i prossimi giorni.")
         val calendar = MealCalendar(this, selectedDate, { month -> db.monthMarkers(month) }) { day ->
             selectedDate = day
-            showCalendar()
+            showSearch()
         }
         content.addView(calendar, LinearLayout.LayoutParams(-1, -2))
         label(selectedDate.format(dateFormatter).replaceFirstChar { it.uppercase() }, 18f, true)
@@ -236,7 +236,7 @@ class MainActivity : Activity() {
                 return@action
             }
             if (url.isNotBlank() && !trusted(url)) {
-                urlField.error = "Sono ammessi solo link dei siti selezionati, con HTTPS"
+                urlField.error = "Inserisci un link HTTPS completo alla ricetta"
                 return@action
             }
             db.save(Recipe(
@@ -266,11 +266,7 @@ class MainActivity : Activity() {
         action("← Indietro") { showCalendar() }
     }
 
-    private fun trusted(url: String): Boolean = try {
-        val parsed = Uri.parse(url)
-        val host = parsed.host?.lowercase() ?: ""
-        parsed.scheme == "https" && allowedDomains.any { host == it || host.endsWith("." + it) }
-    } catch (_: Exception) { false }
+    private fun trusted(url: String): Boolean = RecipeLink.isValid(url)
 
 
     /** La lettura della ricetta originale resta nell'app (WebView), non in Chrome. */
@@ -309,6 +305,9 @@ class MainActivity : Activity() {
 
     private fun showSearch() {
         screen("Trova cosa cucinare", "Scopri le proposte senza uscire dall'app.")
+        label("Giorno scelto: " + selectedDate.format(dateFormatter), 16f, true)
+        action("Ho già trovato la ricetta da aggiungere") { showRecipeLink() }
+        action("📅 Vedi i pasti del giorno scelto") { showCalendar() }
         label("Quali ingredienti hai a disposizione?", 17f, true)
         val ingredients = input("Es. pasta, zucchine, uova, parmigiano", searchIngredients, true)
         val category = dropdown("Cerchi un...", categories, searchCategory)
@@ -376,6 +375,26 @@ class MainActivity : Activity() {
         }
         action("＋ Registra una ricetta manualmente") { showEditor() }
         action("📚 Apri ricettario") { showArchive() }
+    }
+
+    private fun showRecipeLink() {
+        screen("Aggiungi una ricetta dal link", "Per il " + selectedDate.format(dateFormatter))
+        label("Incolla il link della pagina della ricetta.", 16f)
+        val link = input("https://…")
+        link.inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_VARIATION_URI
+        link.isSingleLine = true
+        action("Leggi la ricetta dal link") {
+            val url = link.text.toString().trim()
+            if (!RecipeLink.isValid(url)) {
+                link.error = "Inserisci un link HTTPS completo alla ricetta"
+                return@action
+            }
+            lastSearchResults = emptyList()
+            lastSearchOffset = 0
+            showOnlineDetail(WebRecipe("Ricetta dal link", "", url,
+                java.net.URI(url).host.removePrefix("www.")), imported = true)
+        }
+        action("← Torna alla ricerca") { showSearch() }
     }
 
     private fun showSitePicker(query: String) {
@@ -492,18 +511,23 @@ class MainActivity : Activity() {
         )
     }
 
-    private fun showOnlineDetail(recipe: WebRecipe) {
+    private fun showOnlineDetail(sourceRecipe: WebRecipe, imported: Boolean = false) {
         val progress = AlertDialog.Builder(this).setTitle("Leggo la ricetta")
             .setMessage("Recupero ingredienti e procedimento dalla fonte...").setCancelable(false).create()
         progress.show()
         Thread {
-            val result = try { RecipeReader.read(recipe.url) } catch (_: Exception) {
+            val result = try { RecipeReader.read(sourceRecipe.url) } catch (_: Exception) {
                 RecipeText(notice = "Questa fonte non è leggibile adesso. Puoi comunque salvare il link.")
             }
             runOnUiThread {
                 if (isFinishing || isDestroyed) return@runOnUiThread
                 progress.dismiss()
+                val recipe = if (imported) sourceRecipe.copy(
+                    title = result.title.ifBlank { sourceRecipe.title },
+                    category = "", difficulty = "Non disponibile"
+                ) else sourceRecipe
                 screen(recipe.title, recipe.source)
+                label("Giorno scelto: " + selectedDate.format(dateFormatter), 14f)
                 val imageUrl = result.imageUrl.ifBlank { recipe.imageUrl }
                 if (imageUrl.isNotBlank()) {
                     val photo = ImageView(this).apply {
@@ -621,7 +645,7 @@ class MainActivity : Activity() {
     }
 
     private fun chooseOnlineRecipe(recipe: WebRecipe, text: RecipeText) {
-        chooseSaveMode { mode -> prepareOnlineDraft(recipe, text, mode) { draft -> showEditor(draft) } }
+        chooseSaveMode { mode -> prepareOnlineDraft(recipe, text, "Entrambe") { draft -> showEditor(draft.copy(saveMode = mode)) } }
     }
 
     private fun fetchPreview(url: String, target: ImageView) {

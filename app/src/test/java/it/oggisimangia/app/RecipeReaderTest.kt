@@ -60,5 +60,35 @@ class RecipeReaderTest {
         assertEquals("", result.restTime)
         assertEquals("", result.imageUrl)
     }
+    @Test fun importedPageUsesPublishedTitleAndRelativePhoto() {
+        val html = """<html><head><title>Pagina</title><script type="application/ld+json">
+            {"@type":"Recipe", "name":"Pasta &amp; zucchine", "image":"/foto.jpg",
+             "recipeIngredient":["200 g pasta"], "prepTime":"PT10M",
+             "recipeInstructions":["Cuoci 8 minuti."]}
+            </script></head></html>"""
+        val result = RecipeReader.parseDocument(org.jsoup.Jsoup.parse(html), "https://ricette.example.org/pasta")
+        assertEquals("Pasta & zucchine", result.title)
+        assertEquals("https://ricette.example.org/foto.jpg", result.imageUrl)
+        assertEquals("10 min", result.prepTime)
+        assertTrue(result.original.contains("8 minuti"))
+    }
+    @Test fun unreadableRecipeKeepsPageTitleAndPhotoWithoutInventingData() {
+        val result = RecipeReader.parseDocument(org.jsoup.Jsoup.parse(
+            """<title>Torta</title><meta property="og:image" content="/torta.jpg">"""),
+            "https://ricette.example.org/torta")
+        assertEquals("Torta", result.title)
+        assertEquals("https://ricette.example.org/torta.jpg", result.imageUrl)
+        assertEquals("", result.ingredients)
+        assertEquals("", result.totalTime)
+        assertTrue(result.notice.contains("manualmente"))
+    }
+    @Test fun explicitLinkAcceptsOtherRecipeSitesButRejectsInvalidAddresses() {
+        assertTrue(RecipeLink.isValid("https://ricette.example.org/torta?porzioni=4"))
+        listOf("http://example.org/", "https://127.0.0.1/", "https://localhost/",
+            "https://host.local/", "https://user:password@example.org/", "file:///tmp/a",
+            "https://example.org:8080/", "testo senza link").forEach {
+            assertFalse(it, RecipeLink.isValid(it))
+        }
+    }
 }
 

@@ -17,25 +17,29 @@ data class RecipeText(
     val totalTime: String = "",
     val restTime: String = "",
     val imageUrl: String = "",
-    val nutrition: String = ""
+    val nutrition: String = "",
+    val title: String = ""
 )
 
 /** Reads only explicitly published Recipe data; never guesses quantities or temperatures. */
 object RecipeReader {
     fun read(url: String): RecipeText {
-        require(RecipeFinder.isTrusted(url))
+        RecipeLink.requirePublic(url)
         var address = url
         var response = Jsoup.connect(address).userAgent("Mozilla/5.0 (Android; OggiSiMangia/1.2)")
             .timeout(12000).maxBodySize(3_000_000).followRedirects(false).execute()
         var redirects = 0
         while (response.statusCode() in 300..399 && redirects++ < 3) {
             address = java.net.URL(java.net.URL(address), response.header("Location") ?: error("Redirect senza destinazione")).toString()
-            require(RecipeFinder.isTrusted(address))
+            RecipeLink.requirePublic(address)
             response = Jsoup.connect(address).userAgent("Mozilla/5.0 (Android; OggiSiMangia/1.2)")
                 .timeout(12000).maxBodySize(3_000_000).followRedirects(false).execute()
         }
         require(response.statusCode() in 200..299)
-        val doc = response.parse()
+        return parseDocument(response.parse(), address)
+    }
+
+    internal fun parseDocument(doc: org.jsoup.nodes.Document, address: String): RecipeText {
         val recipes = mutableListOf<JSONObject>()
         fun visit(value: Any?) {
             when (value) {
@@ -54,13 +58,19 @@ object RecipeReader {
             try { visit(JSONTokener(script.data()).nextValue()) } catch (_: Exception) { }
         }
         val fallbackImage = doc.select("meta[property=og:image]").firstOrNull()?.attr("content").orEmpty()
+        fun imageUrl(raw: String): String = try {
+            if (raw.isBlank()) "" else java.net.URL(java.net.URL(address), raw).toString()
+                .takeIf { RecipeLink.isValid(it) }.orEmpty()
+        } catch (_: Exception) { "" }
+        val fallbackTitle = doc.select("meta[property=og:title]").firstOrNull()?.attr("content")
+            ?.takeIf { it.isNotBlank() } ?: doc.title()
         val recipe = recipes.maxByOrNull { it.optJSONArray("recipeIngredient")?.length() ?: 0 }
-            ?: return RecipeText(notice = "Il sito non fornisce una ricetta leggibile automaticamente. Puoi salvare il link.", imageUrl = fallbackImage)
+            ?: return RecipeText(title = fallbackTitle,
+                notice = "Il sito non fornisce una ricetta leggibile automaticamente. Puoi salvare il link e completare i dati manualmente.",
+                imageUrl = imageUrl(fallbackImage))
         val result = parse(recipe)
-        return result.copy(imageUrl = result.imageUrl.ifBlank { fallbackImage }.let {
-            try { if (it.isBlank()) "" else java.net.URL(java.net.URL(address), it).toString().takeIf { u -> u.startsWith("https://") }.orEmpty() }
-            catch (_: Exception) { "" }
-        })
+        return result.copy(title = result.title.ifBlank { fallbackTitle },
+            imageUrl = imageUrl(result.imageUrl.ifBlank { fallbackImage }))
     }
 
     internal fun parse(recipe: JSONObject): RecipeText {
@@ -104,7 +114,7 @@ object RecipeReader {
                 else "Sintesi automatica: consulta il testo completo per tutti i dettagli e le indicazioni di cottura.",
             prepTime = duration("prepTime"), cookTime = duration("cookTime"), totalTime = duration("totalTime"),
             restTime = duration("restTime").ifBlank { duration("additionalTime") },
-            imageUrl = image(recipe.opt("image")), nutrition = nutrition
+            imageUrl = image(recipe.opt("image")), nutrition = nutrition, title = clean(value("name"))
         )
     }
 }

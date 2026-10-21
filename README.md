@@ -1,7 +1,9 @@
 # 🍽️ OggiSiMangia...
 
-Android 1.3.0 (versionCode 7).
+Android 1.3.1 (versionCode 8).
 
+- Tocco su un giorno della home: apre la ricerca mantenendo la data scelta, con accesso ai pasti già pianificati.
+- "Ho già trovato la ricetta da aggiungere": importazione da un link HTTPS pubblico, anche di altri siti, nella stessa scheda interna della ricerca. Titolo, foto, ingredienti, procedimento e metadati provengono dai dati pubblicati; in assenza di dati si può salvare il link e completare la scheda manualmente.
 - Risultati sfogliabili in gruppi di dieci: Prossime 10, Precedenti 10 e indicazione dell'intervallo. Nessun doppione della stessa URL; l'ultima pagina può contenerne meno di dieci. Tornando dalla scheda si ritrova il gruppo consultato. La navigazione usa le ricette leggibili già raccolte nella ricerca, senza nuove attese di rete a ogni pagina.\n- Foto della fonte nella scheda e copia offline compressa (JPEG, dimensione massima 960 px) al salvataggio. Se il download fallisce viene conservata comunque la ricetta.
 - Preparazione, cottura, totale, eventuale riposo, dosi e valori nutrizionali vengono conservati separatamente quando pubblicati dalla fonte. Tempi mancanti non vengono dedotti.
 - Aggiungi al calendario apre la scelta del giorno e del pasto, con ricetta principale o alternativa. La griglia mensile legge il database e distingue pranzo (arancione) e cena (blu), anche sullo stesso giorno.

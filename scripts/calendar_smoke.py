@@ -9,6 +9,7 @@ from pathlib import Path
 def adb(*args):
     return subprocess.check_output(['adb', *args])
 
+assert adb('shell', 'getprop', 'ro.kernel.qemu').decode().strip() == '1', 'Emulator required'
 package = 'it.oggisimangia.app'
 out = Path('build/calendar-check'); out.mkdir(parents=True, exist_ok=True)
 source = Path('app/src/main/java/it/oggisimangia/app/RecipeDb.kt').read_text()
@@ -35,3 +36,30 @@ nodes = list(ET.fromstring(xml).iter('node'))
 assert any('Pranzo e Cena' in n.attrib.get('content-desc','') for n in nodes), 'Missing lunch/dinner day markers'
 (out / 'calendar.png').write_bytes(adb('exec-out', 'screencap', '-p'))
 print('PASS: calendar starts with SQLite recipes and exposes both meal markers on the correct day.')
+
+# Follow the actual day cell into the date-aware search and the pasted-link form.
+import time
+
+def snapshot(name):
+    adb('shell', 'uiautomator', 'dump', '/sdcard/check.xml')
+    data = adb('exec-out', 'cat', '/sdcard/check.xml')
+    (out / (name + '.xml')).write_bytes(data)
+    return list(ET.fromstring(data).iter('node'))
+
+def tap(node):
+    x1, y1, x2, y2 = map(int, re.findall(r'\d+', node.attrib['bounds']))
+    adb('shell', 'input', 'tap', str((x1+x2)//2), str((y1+y2)//2))
+    time.sleep(0.5)
+
+cell = next(n for n in nodes if 'Pranzo e Cena' in n.attrib.get('content-desc',''))
+tap(cell)
+search = snapshot('search')
+assert any(n.attrib.get('text') == 'Trova cosa cucinare' for n in search)
+assert any('Giorno scelto:' in n.attrib.get('text','') for n in search)
+button = next(n for n in search if n.attrib.get('text') == 'Ho già trovato la ricetta da aggiungere')
+tap(button)
+link = snapshot('recipe-link')
+assert any(n.attrib.get('text') == 'Aggiungi una ricetta dal link' for n in link)
+assert any(n.attrib.get('text') == 'Leggi la ricetta dal link' for n in link)
+(out / 'recipe-link.png').write_bytes(adb('exec-out', 'screencap', '-p'))
+print('PASS: tapping a marked day opens search for the selected date, and the existing-link action opens the import form.')
