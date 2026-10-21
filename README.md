@@ -41,6 +41,14 @@ Android 1.5.0 (versionCode 13).
 
 Le fonti possono bloccare richieste o cambiare struttura. Non sono garantiti dieci risultati né recensioni per ogni ricetta. I conteggi pubblicati orientano l'ordinamento; non certificano la ricetta. Dati mancanti e riassunti non disponibili vengono dichiarati. Non vengono aggirati accessi riservati. Ingredienti e testi salvati dall'utente sono conservati localmente; le foto della fonte vengono conservate in copia compressa solo quando si sceglie di salvare o pianificare la ricetta, mantenendo il riferimento alla fonte.
 
+## Anteprima web interattiva (GitHub Pages)
+
+La cartella `docs/` contiene una versione interattiva per browser, separata dall'APK Android: calendario, ricette manuali, foto compressa, assegnazioni, alternative, clonazione, filtro di tutti gli ingredienti, gestione dei siti, backup JSON e stampa tramite browser. La ricerca in tempo reale sui siti esterni e le API native Android non sono replicate; i dati di prova sono memorizzati nel localStorage del browser e non sincronizzati con SQLite sul telefono.
+
+La GitHub Action `.github/workflows/pages.yml` valida JavaScript e funzionalità web, quindi pubblica `docs/` a ogni push sul ramo `main` quando GitHub Pages è abilitato. **Attivazione necessaria**: repository → Settings → Pages → Build and deployment → Source: GitHub Actions. GitHub Pages in repository privato richiede un piano GitHub idoneo (Pro/Team/Enterprise); con GitHub Free è disponibile nei repository pubblici. Non modificare la visibilità del progetto senza autorizzazione.
+
+Istruzioni dettagliate: `docs/README.md`. URL previsto per una pubblicazione standard: `https://alfiericristiano-bit.github.io/OggiSiMangia/` (da considerare attivo soltanto dopo conferma di GitHub Pages).
+
 ## Regola permanente di distribuzione APK nella chat
 
 1. Dopo ogni modifica al codice, avviare GitHub Actions e verificare test, lint, firma persistente e aggiornamento in-place senza perdita dei dati. Pubblicare un Artifact con il numero di versione.

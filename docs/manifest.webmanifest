@@ -1,0 +1,18 @@
+{
+  "name": "OggiSiMangia... — Anteprima web",
+  "short_name": "OggiSiMangia",
+  "description": "Anteprima interattiva del calendario dei pasti e del ricettario personale",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f7f8f4",
+  "theme_color": "#21533a",
+  "icons": [
+    {
+      "src": "./icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}
