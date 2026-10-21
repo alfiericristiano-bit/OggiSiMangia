@@ -55,6 +55,7 @@
     return fresh();
   }
   let state=load(), view="calendar", selected=todayISO(), month=fromISO(todayISO());
+  let viewStack=[],expandedMeals=new Set();
   let editingId=null,photoDraft="",formIngredients=[""],formSteps=[""];
   let archiveSearch="",archiveCategory="Tutte",archiveIngredientFields=[""];
   // Web equivalent of the Android default long press. Native APK uses OS-configured delay.
@@ -87,7 +88,19 @@
     return '<div class="field '+(opts.wide?"wide":"")+'"><label for="f-'+escape(name)+'">'+escape(title)+'</label>'+input+(opts.hint?'<small>'+escape(opts.hint)+'</small>':"")+'</div>';
   }
   function saveAndRender() {persist();render();}
+  function rememberView(next) {
+    if(view!==next){
+      viewStack.push({view,editingId});
+      if(viewStack.length>16)viewStack.shift();
+    }
+  }
+  function goBack() {
+    const previous=viewStack.pop();
+    if(previous){view=previous.view;editingId=previous.editingId;render();}
+    else {view="calendar";editingId=null;render();}
+  }
   function setView(next) {
+    rememberView(next);
     view=next;editingId=null;
     render();
     document.getElementById("app").scrollIntoView({behavior:"smooth",block:"start"});
@@ -102,6 +115,8 @@
     else if(view==="detail") renderDetail();
     else if(view==="sources") renderSources();
     else renderAbout();
+    if(view!=="calendar")app.insertAdjacentHTML("afterbegin",
+      '<div class="web-back-row">'+button("← Indietro","go-back","soft")+'</div>');
   }
   function assignmentsFor(day,meal) {
     const out=[];
@@ -125,17 +140,21 @@
     }
     function mealCard(meal) {
       const items=assignmentsFor(selected,meal).sort((a,b)=>Number(a.assignment.alternative)-Number(b.assignment.alternative));
-      return '<div class="meal-section"><div class="meal-title"><h3><span class="emoji">'+(meal==="Pranzo"?"☀️":"🌙")+'</span>'+meal+'</h3>'+
-        button("＋ Aggiungi","add-to-day","tiny", 'data-meal="'+meal+'"')+'</div>'+
+      const expanded=expandedMeals.has(meal);
+      return '<div class="meal-section compact-meal"><button class="meal-toggle" type="button" data-action="toggle-meal" data-meal="'+meal+'" aria-expanded="'+expanded+'">'+
+        '<span>'+(meal==="Pranzo"?"☀️":"🌙")+' '+meal+'</span><span class="meal-count">'+items.length+' ricette '+(expanded?"⌃":"⌄")+'</span></button>'+
         (items.length?items.map(function(x) {
-          const a=x.assignment, r=x.recipe;
-          return '<div class="meal-entry"><strong>'+escape(r.title)+'</strong><span class="meal-meta">'+escape(r.category||"Piatto")+' · '+(a.alternative?"Alternativa":"Principale")+' · '+escape(r.totalTime||r.cookTime||"")+'</span><div class="actions">'+
-            button("Apri","open-recipe","tiny", 'data-id="'+escape(r.id)+'"')+
-            button("Modifica","edit-plan","tiny", 'data-id="'+escape(r.id)+'" data-aid="'+escape(a.id)+'"')+
-            button("Clona","clone-plan","tiny", 'data-id="'+escape(r.id)+'" data-aid="'+escape(a.id)+'"')+
-            button("✕","delete-plan","tiny danger", 'data-id="'+escape(r.id)+'" data-aid="'+escape(a.id)+'"')+
-            '</div></div>';
-        }).join(""):'<div class="empty">Nessuna ricetta assegnata a '+meal.toLowerCase()+'.</div>')+'</div>';
+          const a=x.assignment,r=x.recipe;
+          return '<div class="meal-entry compact-entry">'+
+            '<button class="recipe-title-link" type="button" data-action="open-recipe" data-id="'+escape(r.id)+'">'+
+              (a.alternative?"↪ ":"• ")+escape(r.title)+'</button>'+
+            (expanded?'<div class="meal-meta">'+escape(r.category||"Piatto")+' · '+(a.alternative?"Alternativa":"Principale")+'</div><div class="actions">'+
+              button("Modifica","edit-plan","tiny",'data-id="'+escape(r.id)+'" data-aid="'+escape(a.id)+'"')+
+              button("Clona","clone-plan","tiny",'data-id="'+escape(r.id)+'" data-aid="'+escape(a.id)+'"')+
+              button("✕ Rimuovi","delete-plan","tiny danger",'data-id="'+escape(r.id)+'" data-aid="'+escape(a.id)+'"')+
+              '</div>':"")+'</div>';
+        }).join(""):'<div class="empty">Nessun piatto assegnato</div>')+
+        (expanded?'<div class="meal-quick-actions">'+button("＋ Aggiungi","add-to-day","soft",'data-meal="'+meal+'"')+'</div>':"")+'</div>';
     }
     app.innerHTML=
       '<section class="headline calendar-hero"><div><p class="kicker">Calendario dei pasti</p><h1>Organizza i tuoi pasti</h1><p class="subtitle">Tocca un giorno per selezionarlo; tienilo premuto a lungo per aggiungere un piatto.</p></div>'+
@@ -147,7 +166,8 @@
       '<p class="card-hint">💡 Tieni premuto a lungo un giorno per aggiungere una ricetta; un tocco breve seleziona il giorno.</p></section>'+
       '<section class="card"><div class="card-head"><h2 class="selected-day-title">'+escape(formatDate(selected))+'</h2>'+
       button("Oggi","go-today","tiny")+'</div>'+mealCard("Pranzo")+mealCard("Cena")+
-      '<div class="head-actions">'+button("＋ Crea ricetta per questo giorno","new-for-day","soft")+'</div></section></div>'+
+      '<div class="head-actions compact-actions">'+button("✕ Svuota giorno","reset-day","danger")+
+      button("＋ Aggiungi ricetta","new-for-day","soft")+'</div></section></div>'+
       '<div class="quick-stat"><div class="stat"><strong>'+state.recipes.length+'</strong><span>Ricette nel browser</span></div>'+
       '<div class="stat"><strong>'+days.size+'</strong><span>Giorni pianificati nel mese</span></div>'+
       '<div class="stat"><strong>'+state.sources.length+'</strong><span>Fonti configurate</span></div></div>';
@@ -166,8 +186,10 @@
       field("search","Nome del piatto",archiveSearch,{placeholder:"Es. pasta alle zucchine"})+
       field("category","Categoria",archiveCategory,{select:["Tutte"].concat(CATEGORIES)})+'</div>'+
       '<div class="field"><label>Ingredienti richiesti — tutti devono essere presenti</label><div id="filter-ingredient-rows" class="select-ingredients">'+archiveIngredientFields.map((x,i)=>ingredientFilterLine(x,i)).join("")+'</div></div>'+
-      '<div class="head-actions" style="margin-top:12px">'+button("＋ Aggiungi ingrediente","add-filter-ingredient","soft")+
-      '<button type="submit" class="btn primary">🔎 Cerca</button>'+button("Azzera filtri","reset-filters")+'</div></form></section>'+
+      '<div class="head-actions" style="margin-top:12px">'+button("＋ Ingrediente","add-filter-ingredient","soft")+
+      button("✕ Azzera ingredienti","clear-ingredients","soft")+'</div>'+
+      '<button type="submit" class="btn primary search-submit">🔎 CERCA NEL RICETTARIO</button>'+
+      '<div class="head-actions" style="margin-top:8px">'+button("Azzera tutti i filtri","reset-filters")+'</div></form></section>'+
       '<div class="card-head"><h2>'+filtered.length+' '+(filtered.length===1?"ricetta":"ricette")+'</h2><span class="muted">Solo piatti, non guide generiche</span></div>'+
       (filtered.length?'<div class="recipe-grid">'+filtered.map(recipeTile).join("")+'</div>':
         '<section class="card empty">Non ci sono ricette che contengono <strong>tutti</strong> gli ingredienti richiesti. Prova a modificare i filtri oppure scrivi una nuova ricetta.</section>');
@@ -261,7 +283,7 @@
     formSteps=original?.steps?.slice()||[""];
     if(!formIngredients.length)formIngredients=[""];
     if(!formSteps.length)formSteps=[""];
-    view="editor";render();
+    rememberView("editor");view="editor";render();
     if(scheduled)document.getElementById("plan-on-save").checked=true;
   }
   function renderDetail() {
@@ -312,7 +334,7 @@
       button("◐ Tema chiaro / scuro","toggle-theme")+
       button("ⓘ Rivedi guida","show-help")+
       button("Reimposta i dati di prova","reset-data","danger")+'</div>'+
-      '<p class="muted" style="font-size:12px;margin-top:18px">Ultima versione Android di riferimento: 1.5.0. Le modifiche del browser non passano automaticamente all’APK.</p></section>';
+      '<p class="muted" style="font-size:12px;margin-top:18px">Ultima versione Android di riferimento: 1.5.4. Le modifiche del browser non passano automaticamente all’APK.</p></section>';
   }
   function showHelp(force) {
     if(!force&&state.tipsHidden)return;
@@ -363,18 +385,38 @@
     const b=e.target.closest("[data-action]");if(!b)return;
     const action=b.dataset.action,id=b.dataset.id,aid=b.dataset.aid,idx=Number(b.dataset.index);
     if(action==="close-modal"){closeModal();return;}
+    if(action==="go-back"){goBack();return;}
+    if(action==="toggle-meal"){
+      if(expandedMeals.has(b.dataset.meal))expandedMeals.delete(b.dataset.meal);
+      else expandedMeals.add(b.dataset.meal);
+      render();return;
+    }
+    if(action==="reset-day"){
+      const count=assignmentsFor(selected).length;
+      if(!count){toast("Questo giorno è già vuoto.");return;}
+      modal("Svuotare il giorno?",'<p>Rimuovere '+count+' assegnazioni del '+escape(formatDate(selected))+
+        '? Le ricette resteranno nel ricettario.</p><div class="modal-actions">'+
+        button("Annulla","close-modal")+button("Svuota giorno","confirm-reset-day","danger")+'</div>');
+      return;
+    }
+    if(action==="confirm-reset-day"){
+      for(const recipe of state.recipes)
+        recipe.assignments=(recipe.assignments||[]).filter(a=>a.date!==selected);
+      expandedMeals.clear();
+      persist();closeModal();render();toast("Giorno svuotato; ricette conservate.");return;
+    }
     if(action==="show-help"){showHelp(true);return;}
     if(action==="accept-help"){state.tipsHidden=!!document.getElementById("hide-help")?.checked;persist();closeModal();return;}
     if(action==="prev-month"||action==="next-month"){month=new Date(month.getFullYear(),month.getMonth()+(action==="prev-month"?-1:1),1);render();return;}
-    if(action==="go-today"){selected=todayISO();month=fromISO(selected);render();return;}
+    if(action==="go-today"){selected=todayISO();month=fromISO(selected);expandedMeals.clear();render();return;}
     if(action==="select-day"){
       if(pressedLong){pressedLong=false;return;}
-      selected=b.dataset.date;render();return;
+      selected=b.dataset.date;expandedMeals.clear();render();return;
     }
     if(action==="new-recipe"){beginEditor(null,false);return;}
     if(action==="new-for-day"){beginEditor(null,true);return;}
     if(action==="back-archive"){setView("archive");return;}
-    if(action==="open-recipe"){editingId=id;view="detail";render();return;}
+    if(action==="open-recipe"){rememberView("detail");editingId=id;view="detail";render();return;}
     if(action==="edit-recipe"){beginEditor(id,false);return;}
     if(action==="print-recipe"){window.print();return;}
     if(action==="add-to-day"){planner(null,null,"add",b.dataset.meal);return;}
@@ -421,6 +463,7 @@
       archiveIngredientFields.length>1?archiveIngredientFields.splice(idx,1):archiveIngredientFields=[""];
       render();return;
     }
+    if(action==="clear-ingredients"){currentArchiveValues();archiveIngredientFields=[""];render();return;}
     if(action==="reset-filters"){archiveSearch="";archiveCategory="Tutte";archiveIngredientFields=[""];render();return;}
     if(action==="add-source"){sourceDialog();return;}
     if(action==="move-source"){
