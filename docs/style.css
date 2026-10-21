@@ -611,3 +611,44 @@ body.dark .calendar-hero::after{opacity:.58;}
   .phone-preview .bottom-nav button { min-height:52px; padding:5px 0; }
   .phone-preview .footer { padding:10px 8px 77px; }
 }
+
+/* v1.5.4 mobile-first polish: rounded tactile controls with less vertical scrolling. */
+@media screen {
+  .phone-preview .card { border-radius:20px; padding:12px; box-shadow:0 4px 18px rgba(30,91,75,.075); }
+  .phone-preview .headline { margin-bottom:10px; }
+  .phone-preview .btn { border-radius:16px; min-height:44px; padding:8px 10px; font-weight:700; }
+  .phone-preview .btn.primary { background:linear-gradient(120deg,#137b6c,#20a58c); color:#fff; border:0; box-shadow:0 5px 14px rgba(22,125,108,.2); }
+  .phone-preview .btn.search-cta { flex:1 0 100%; min-height:52px; margin-top:5px; font-size:15px; letter-spacing:.15px; }
+  .phone-preview .input,.phone-preview .textarea,.phone-preview .select { border-radius:15px; }
+  .phone-preview .meal-section { margin:8px 0; }
+  .phone-preview .meal-title { margin:0 0 5px; padding:0; border:0; }
+  .phone-preview .meal-expand {
+    width:100%;min-height:47px;display:flex;align-items:center;justify-content:space-between;
+    padding:9px 13px;text-align:left;color:var(--green-2);font-size:15px;font-weight:800;
+    border:1px solid var(--outline);border-radius:16px;background:var(--green-pale);
+  }
+  .phone-preview .meal-expand small { color:var(--muted);font-weight:650; }
+  .phone-preview .meal-compact { padding:5px 9px;margin:3px 0;background:var(--paper);border-radius:12px; }
+  .phone-preview .dish-name {
+    min-height:40px;width:100%;text-align:left;font-size:14px;font-weight:700;
+    color:var(--ink);background:transparent;border:0;padding:7px 5px;
+  }
+  .phone-preview .meal-compact .actions { display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px;margin-top:5px; }
+  .phone-preview .meal-add { margin-top:5px; }
+  .phone-preview .page-back { margin:0 0 8px; }
+  .phone-preview .page-back .btn { min-height:42px;padding:6px 15px; }
+  .phone-preview .source-item { border-radius:15px; }
+  .phone-preview .source-item .btn { min-width:44px; }
+  .phone-preview .recipe-card { border-radius:19px; }
+  .phone-preview .calendar-hero { border-radius:20px; }
+  .phone-preview .card-hint { border-radius:13px; }
+  .phone-preview .head-actions { flex-wrap:wrap; }
+  .phone-preview .head-actions > .btn { flex:1 1 auto; }
+  .phone-preview #archive-form .head-actions .search-cta { flex:1 0 100%; }
+  #modal { border-radius:23px; }
+  #modal .btn { border-radius:15px; }
+  .phone-preview #app { padding:10px 11px 19px; }
+  @media(prefers-reduced-motion:reduce) {
+    .phone-preview .btn { transition:none; }
+  }
+}
