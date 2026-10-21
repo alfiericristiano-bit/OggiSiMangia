@@ -98,8 +98,8 @@ object RecipeFinder {
                 (r.category.isBlank() || category.isBlank() ||
                     r.category.equals(category, true))
         }.sortedWith(
-            compareByDescending<WebRecipe> { rank(it) }
-                .thenByDescending { it.feedbackCount ?: -1 }
+            compareByDescending<WebRecipe> { it.feedbackCount ?: -1 }
+                .thenByDescending { rank(it) }
                 .thenByDescending { it.rating ?: -1.0 }
         ).take(10)
     }
