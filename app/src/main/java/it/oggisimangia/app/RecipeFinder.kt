@@ -48,7 +48,7 @@ object RecipeFinder {
             Pair("Fatto in Casa da Benedetta",
                 "https://www.fattoincasadabenedetta.it/?s=$encoded"),
             Pair("Il Cucchiaio d'Argento", "https://www.cucchiaio.it/?s=$encoded")
-        )
+        ).filter { (name, _) -> name in RecipeSources.sites }
 
         val collected = linkedMapOf<String, WebRecipe>()
         // Prima fonte: pagine di ricerca editoriali con dati di recensione quando esposti.
