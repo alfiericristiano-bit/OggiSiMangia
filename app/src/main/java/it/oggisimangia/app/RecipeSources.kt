@@ -39,7 +39,7 @@ object RecipeSources {
 
 object RecipeRanking {
     fun terms(ingredients: String) = ingredients.split(',', ';', '\n').map { it.trim() }.filter { it.isNotBlank() }
-    fun relevance(text: String, ingredients: String) = terms(ingredients).count { text.contains(it, true) }
+    fun relevance(text: String, ingredients: String) = terms(ingredients).count { IngredientMatcher.containsEvery(text, it) }
     // A published rating with many votes outweighs a perfect rating with only one vote.
     fun confidence(rating: Double?, count: Int?): Double {
         if (rating == null || count == null || count <= 0 || rating !in 0.0..5.0) return -1.0

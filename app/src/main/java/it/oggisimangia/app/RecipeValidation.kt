@@ -9,20 +9,9 @@ object RecipeValidation {
         RegexOption.IGNORE_CASE
     )
 
-    /** Every query ingredient must occur as an independent term in recipeIngredient. */
-    fun containsEvery(published: String, requested: String): Boolean {
-        val terms = RecipeRanking.terms(requested).distinctBy { it.lowercase() }
-        if (terms.isEmpty()) return true
-        if (published.isBlank()) return false
-        return terms.all { term ->
-            val words = term.trim().split(Regex("\\s+")).filter { it.isNotBlank() }
-            val regex = Regex(
-                "(?<![\\p{L}])" + words.joinToString("\\s+") { Regex.escape(it) } + "(?![\\p{L}])",
-                RegexOption.IGNORE_CASE
-            )
-            published.lines().any { regex.containsMatchIn(it) }
-        }
-    }
+    /** Match all requested ingredients in published recipeIngredient, including Italian variants. */
+    fun containsEvery(published: String, requested: String): Boolean =
+        IngredientMatcher.containsEvery(published, requested)
 
     /** Reject editorial guides, partial metadata, and pages without actual cooking steps. */
     fun isDish(title: String, published: String, instructions: String): Boolean =

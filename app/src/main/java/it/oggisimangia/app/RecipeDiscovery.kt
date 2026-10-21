@@ -95,7 +95,8 @@ object RecipeDiscovery {
     fun search(ingredients: String, category: String, difficulty: String, duration: String): List<WebRecipe> {
         val executor = Executors.newFixedThreadPool(6)
         try {
-            val encoded = URLEncoder.encode(ingredients.replace('\n',' ') + " " + category, "UTF-8")
+            // Do not restrict the discovery query by preferred category.
+            val encoded = URLEncoder.encode(ingredients.replace('\n',' '), "UTF-8")
             val searches = RecipeSources.sites.map { (site, domain) -> Callable {
                 try {
                     val q = URLEncoder.encode("site:$domain ricetta ", "UTF-8") + encoded
@@ -112,12 +113,8 @@ object RecipeDiscovery {
             val all = executor.invokeAll(reads, 55, TimeUnit.SECONDS).mapNotNull {
                 try { if (it.isCancelled) null else it.get() } catch (_: Exception) { null }
             }
-            val maxMinutes = when(duration) { "Volante" -> 15; "Veloce" -> 30; "Media" -> 60; else -> Int.MAX_VALUE }
-            return RecipeRanking.order(all.filter {
-                (it.minutes == null || it.minutes <= maxMinutes) &&
-                    (it.category.isBlank() || it.category == category) &&
-                    (it.difficulty.isBlank() || difficulty == "Non disponibile" || it.difficulty == difficulty)
-            }, ingredients)
+            // Display legitimate recipes even if preferences do not match.
+            return RecipeRanking.order(all, ingredients)
         } finally { executor.shutdownNow() }
     }
 }
