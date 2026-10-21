@@ -322,7 +322,12 @@ class MainActivity : Activity() {
     }
 
     private fun showCalendar() {
-        screen("Il calendario dei pasti", "Organizza pranzo e cena, anche per i prossimi giorni.")
+        screen("Il calendario dei pasti", "Organizza pranzo e cena, anche per i prossimi giorni.",
+            "calendar") { showCalendar() }
+        if (expandedForDay != selectedDate) {
+            expandedMeals.clear()
+            expandedForDay = selectedDate
+        }
         searchForDay = false
         selectedAlternative = false
         label("Tocca un giorno per vederne i pasti. Tieni premuto come da impostazioni Android per aggiungere una ricetta.", 13f)
@@ -449,7 +454,10 @@ class MainActivity : Activity() {
         selectedPhoto = existing?.imagePath ?: ""
         photoPreview = null
         screen(if (existing == null || existing.id == 0L) "Scrivi la tua ricetta" else "Modifica ricetta",
-            "Compila i campi che conosci. Nome, ingredienti e preparazione sono obbligatori.")
+            "Compila i campi che conosci. Nome, ingredienti e preparazione sono obbligatori.",
+            "editor:${existing?.id ?: 0L}") {
+            showEditor(existing, initialAlternative, suggestedTitle, suggestedUrl, planByDefault)
+        }
         label("INFORMAZIONI GENERALI", 20f, true)
         val titleField = input("Nome del piatto *", existing?.title ?: suggestedTitle)
         val descriptionField = input("Descrizione breve / presentazione", existing?.description.orEmpty(), true)
@@ -679,7 +687,8 @@ class MainActivity : Activity() {
     }
 
     private fun showSearch() {
-        screen("Trova cosa cucinare", "Scopri le proposte senza uscire dall'app.")
+        screen("Trova cosa cucinare", "Scopri le proposte senza uscire dall'app.",
+            "search") { showSearch() }
         label("Giorno scelto: " + selectedDate.format(dateFormatter), 16f, true)
         if (searchForDay) label(selectedMeal + " · " + if (selectedAlternative) "Alternativa" else "Principale", 16f, true)
         actionRow("🔗 Ho un link", { showRecipeLink() }, "📅 Pasti del giorno", { showCalendar() })
@@ -687,6 +696,10 @@ class MainActivity : Activity() {
         label("Una casella per ingrediente. Massimo 10 ingredienti.", 13f)
         val ingredients = IngredientInputs(this, searchIngredients) { searchIngredients = it }
         content.addView(ingredients)
+        action("✕ Azzera ingredienti") {
+            searchIngredients = ""
+            showSearch()
+        }
         val category = dropdown("Cerchi un...", categories, searchCategory)
         val difficulty = dropdown("Difficoltà desiderata", difficulties, searchDifficulty)
         val duration = dropdown("Tempo a disposizione", durations, searchDuration)
@@ -700,7 +713,7 @@ class MainActivity : Activity() {
         label("Ingredienti obbligatori, anche singolare/plurale e preparazioni equivalenti. " +
             "Categoria, difficoltà e tempi sono preferenze: gli scostamenti vengono segnalati.", 13f)
 
-        action("🔎 Mostra fino a 10 ricette") {
+        action("🔎 CERCA RICETTE NEI SITI", emphasis = true) {
             searchIngredients = ingredients.query() ?: return@action
             searchCategory = category.selectedItem.toString()
             searchDifficulty = difficulty.selectedItem.toString()
@@ -754,7 +767,8 @@ class MainActivity : Activity() {
     }
 
     private fun showSourceSettings() {
-        screen("Priorità dei siti", "L'ordine viene memorizzato per le prossime ricerche.")
+        screen("Priorità dei siti", "L'ordine viene memorizzato per le prossime ricerche.",
+            "sources") { showSourceSettings() }
         label("Le fonti con priorità più alta vengono prima nei risultati compatibili. Seguono pertinenza e valutazioni degli utenti, quando disponibili.", 14f)
         action("Aggiungi un sito") {
             val box = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(18),dp(8),dp(18),dp(8)) }
@@ -834,7 +848,8 @@ class MainActivity : Activity() {
     }
 
     private fun showRecipeLink() {
-        screen("Aggiungi una ricetta dal link", "Per il " + selectedDate.format(dateFormatter))
+        screen("Aggiungi una ricetta dal link", "Per il " + selectedDate.format(dateFormatter),
+            "link") { showRecipeLink() }
         label("Incolla il link della pagina della ricetta.", 16f)
         val link = input("https://…")
         link.inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_VARIATION_URI
@@ -991,7 +1006,9 @@ class MainActivity : Activity() {
                     title = result.title.ifBlank { sourceRecipe.title },
                     category = "", difficulty = "Non disponibile"
                 ) else sourceRecipe
-                screen(recipe.title, recipe.source)
+                screen(recipe.title, recipe.source, "online:${recipe.url}") {
+                    showOnlineDetail(sourceRecipe, imported)
+                }
                 if (!imported) {
                     RecipePreferences.notices(recipe, searchCategory, searchDifficulty, searchDuration)
                         .forEach { label("⚠ " + it, 13f) }
@@ -1133,7 +1150,8 @@ class MainActivity : Activity() {
 
     private fun showArchive(search: String = "", category: String = "Tutte",
                             difficulty: String = "Tutte", order: String = "Nome A–Z", ingredientQuery: String = "") {
-        screen("Il mio ricettario", "Ricette salvate sul telefono, consultabili anche offline.")
+        screen("Il mio ricettario", "Ricette salvate sul telefono, consultabili anche offline.",
+            "archive") { showArchive(search, category, difficulty, order, ingredientQuery) }
         val queryField = input("Cerca per nome o parola chiave", search)
         label("Ingredienti: la ricetta deve contenerli tutti", 14f, true)
         label("Una casella per ingrediente. Massimo 10 ingredienti.", 13f)
@@ -1176,7 +1194,8 @@ class MainActivity : Activity() {
     private fun showDetail(id: Long) {
         val r = db.get(id) ?: run { showCalendar(); return }
         screen(r.title, r.meal + " · " + r.category + " · " +
-            (if (r.alternative) "Alternativa" else "Principale"))
+            (if (r.alternative) "Alternativa" else "Principale"),
+            "detail:$id") { showDetail(id) }
         if (r.imagePath.isNotBlank()) addPhotoPreview(r.imagePath)
         label("📅 " + r.day.ifBlank { "Solo ricettario" } + "   ⏱ " + r.duration + "   👩‍🍳 " + r.difficulty, 15f)
         showRecipeMetadata(r)
