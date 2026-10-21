@@ -41,13 +41,15 @@ Android 1.5.0 (versionCode 13).
 
 Le fonti possono bloccare richieste o cambiare struttura. Non sono garantiti dieci risultati né recensioni per ogni ricetta. I conteggi pubblicati orientano l'ordinamento; non certificano la ricetta. Dati mancanti e riassunti non disponibili vengono dichiarati. Non vengono aggirati accessi riservati. Ingredienti e testi salvati dall'utente sono conservati localmente; le foto della fonte vengono conservate in copia compressa solo quando si sceglie di salvare o pianificare la ricetta, mantenendo il riferimento alla fonte.
 
-## Anteprima web interattiva (GitHub Pages)
+## Anteprima web su Vercel — aggiornamento automatico
 
-La cartella `docs/` contiene una versione interattiva per browser, separata dall'APK Android: calendario, ricette manuali, foto compressa, assegnazioni, alternative, clonazione, filtro di tutti gli ingredienti, gestione dei siti, backup JSON e stampa tramite browser. La ricerca in tempo reale sui siti esterni e le API native Android non sono replicate; i dati di prova sono memorizzati nel localStorage del browser e non sincronizzati con SQLite sul telefono.
+La cartella `docs/` contiene l'anteprima browser funzionante di **OggiSiMangia...**, separata dall'app Android. Si possono provare calendario, ricettario, creazione delle ricette con foto compressa, ingredienti richiesti tutti insieme, clonazione e modifica dei pasti, gestione delle fonti e backup JSON. Le funzioni native Android e la ricerca ricette online non sono replicate: i dati sono locali al browser e **non** sincronizzati con l'APK.
 
-La GitHub Action `.github/workflows/pages.yml` valida JavaScript e funzionalità web, quindi pubblica `docs/` a ogni push sul ramo `main` quando GitHub Pages è abilitato. **Attivazione necessaria**: repository → Settings → Pages → Build and deployment → Source: GitHub Actions. GitHub Pages in repository privato richiede un piano GitHub idoneo (Pro/Team/Enterprise); con GitHub Free è disponibile nei repository pubblici. Non modificare la visibilità del progetto senza autorizzazione.
+**Provider di anteprima preferito: Vercel**. Il file `vercel.json` nella radice del repository specifica framework statico, nessun comando di build e cartella pubblicata `docs`. Il repository GitHub rimane privato. Per l'attivazione una tantum, in Vercel aprire **Add New → Project**, importare `alfiericristiano-bit/OggiSiMangia` (GitHub già connesso), impostare **Root Directory `./`** / radice del repository e fare **Deploy**. Vercel legge `vercel.json` e pubblica direttamente `docs/index.html`. Una volta importato, i commit su `main` aggiorneranno automaticamente il medesimo indirizzo di produzione `.vercel.app`.
 
-Istruzioni dettagliate: `docs/README.md`. URL previsto per una pubblicazione standard: `https://alfiericristiano-bit.github.io/OggiSiMangia/` (da considerare attivo soltanto dopo conferma di GitHub Pages).
+La GitHub Action `.github/workflows/pages.yml` ora verifica l'anteprima e `vercel.json`, ma **non** pubblica su GitHub Pages. Non è necessario attivare GitHub Pages né rendere pubblico il repository. Il nome URL effettivo viene attribuito e mostrato da Vercel solo dopo il primo Deploy; non presumere che un indirizzo sia già attivo.
+
+Istruzioni: `docs/README.md`. La compilazione APK rimane separata e il recupero del file avviene **solo su richiesta «apk»**.
 
 ## Regola permanente di distribuzione APK nella chat
 
