@@ -54,6 +54,8 @@ jobs:
         with:
           api-level: 29
           arch: x86_64
+          disk-size: 2048M
+          emulator-boot-timeout: 180
           script: bash scripts/verify_update.sh
       - name: Package verified release
         id: version
