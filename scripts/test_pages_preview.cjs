@@ -27,7 +27,7 @@ function element(id) {
   if(!lookup.has(id))lookup.set(id,{
     id,innerHTML:"",textContent:"",value:"",open:false,
     classList:{toggle(){},add(){},remove(){}},
-    addEventListener(){},scrollIntoView(){},
+    addEventListener(){},scrollIntoView(){},insertAdjacentHTML(where,markup){this.innerHTML=markup+this.innerHTML;},
     showModal(){this.open=true;},close(){this.open=false;}
   });
   return lookup.get(id);
@@ -65,7 +65,11 @@ function clickView(view) {
   listeners.click({target:{closest(sel){return sel==="[data-view]"?{dataset:{view}}:null;}}});
 }
 clickView("archive");
+assert(element("app").innerHTML.includes("← Indietro"),"Back control missing from archive");
 assert(element("app").innerHTML.includes("Pasta alle zucchine"),"Recipes not displayed");
+clickAction("go-back");
+assert(element("app").innerHTML.includes("Il tuo calendario"),"Back did not return to calendar");
+clickView("archive");
 dom.filters=[{value:"riso"},{value:"funghi"}];
 listeners.submit({target:{id:"archive-form"},preventDefault(){}});
 assert(element("app").innerHTML.includes("Risotto ai funghi"),"All-ingredient match missing");
@@ -73,6 +77,9 @@ assert(!element("app").innerHTML.includes('<h3>Pasta alle zucchine</h3>'),"AND i
 
 clickView("sources");
 assert(element("app").innerHTML.includes("GialloZafferano"),"Default sources missing");
+clickAction("go-back");
+assert(element("app").innerHTML.includes("Ricettario"),"Sources back did not return to archive");
+clickView("sources");
 clickAction("remove-source",{index:"0"});
 assert(element("modal").open,"Delete source confirmation missing");
 clickAction("confirm-remove-source",{index:"0"});
@@ -110,5 +117,24 @@ recipe=recipes.find(r=>r.id==="demo-pasta");
 assert.equal(recipe.assignments.length,2,"Clone did not preserve original");
 assert(recipe.assignments.some(a=>a.date==="2026-10-21"&&a.meal==="Pranzo"),"Original planning was replaced");
 assert(recipe.assignments.some(a=>a.date==="2026-10-23"&&a.meal==="Cena"&&a.alternative),"Clone meal and role lost");
+clickAction("reset-day");
+assert(element("modal").open,"Reset day should request confirmation");
+clickAction("confirm-reset-day");
+recipes=JSON.parse(storage.get("oggisimangia_web_preview_v1")).recipes;
+recipe=recipes.find(r=>r.id==="demo-pasta");
+assert.equal(recipe.assignments.length,1,"Reset day did not remove only that day's entries");
+assert.equal(recipe.assignments[0].date,"2026-10-21","Reset day deleted assignments from a different day");
+assert(recipes.some(r=>r.id==="demo-pasta"),"Reset day must retain recipe in archive");
+clickAction("select-day",{date:"2026-10-21"});
+assert(element("app").innerHTML.includes("Pasta alle zucchine"),"Collapsed meal title should be visible");
+assert(!element("app").innerHTML.includes('data-action="delete-plan"'),"Meal controls should be collapsed");
+clickAction("toggle-meal",{meal:"Pranzo"});
+assert(element("app").innerHTML.includes('data-action="delete-plan"'),"Expanding meal should reveal removal control");
+clickAction("delete-plan",{id:"demo-pasta",aid:recipe.assignments[0].id});
+assert(element("modal").open,"Removing a single day requires confirmation");
+clickAction("confirm-delete-plan",{id:"demo-pasta",aid:recipe.assignments[0].id});
+recipes=JSON.parse(storage.get("oggisimangia_web_preview_v1")).recipes;
+assert.equal(recipes.find(r=>r.id==="demo-pasta").assignments.length,0,"Single day unplanning failed");
+assert(recipes.some(r=>r.id==="demo-pasta"),"Unplanning must not delete the recipe");
 
-console.log("PASS: Pages assets, initial calendar, recipe archive AND filtering, persistent site removal, day planning and cloning.");
+console.log("PASS: Pages assets, back navigation, compact meals, day reset/unplan, archive filtering, persistent site deletion, planning and cloning.");
