@@ -542,6 +542,11 @@ class MainActivity : Activity() {
             dialog.show()
         }
         val entries = RecipeSources.sites.entries.toList()
+        if (entries.isEmpty()) {
+            label("Nessuna fonte attiva. Aggiungi un sito o ripristina quelli iniziali per cercare nuove ricette.", 14f)
+        }
+        label("Puoi eliminare singolarmente qualsiasi sito: non verrà più consultato. " +
+            "La modifica rimane anche dopo il riavvio e gli aggiornamenti.", 13f)
         val names = entries.map { it.key }.toTypedArray()
         entries.forEachIndexed { position, entry ->
             val spinner = dropdown("${position+1}ª priorità", names, entry.key)
@@ -556,8 +561,22 @@ class MainActivity : Activity() {
                     showSourceSettings()
                 }
             }
+            action("🗑️ Elimina sito · " + entry.key) {
+                AlertDialog.Builder(this)
+                    .setTitle("Eliminare questo sito di ricerca?")
+                    .setMessage(entry.key + "\n" + entry.value +
+                        "\nNon sarà più consultato nelle ricerche. Potrai aggiungerlo nuovamente o ripristinare i siti iniziali.")
+                    .setPositiveButton("Elimina sito") { _, _ ->
+                        val remaining = LinkedHashMap(RecipeSources.sites)
+                        remaining.remove(entry.key)
+                        sourcePreferences.save(remaining)
+                        showSourceSettings()
+                    }
+                    .setNegativeButton("Annulla", null)
+                    .show()
+            }
         }
-        action("Ripristina ordine iniziale") {
+        action("Ripristina siti e ordine iniziali") {
             val restored = LinkedHashMap(RecipeSources.defaults)
             RecipeSources.sites.forEach { (name,domain) -> if (domain !in restored.values) restored[name] = domain }
             sourcePreferences.save(restored); showSourceSettings()
