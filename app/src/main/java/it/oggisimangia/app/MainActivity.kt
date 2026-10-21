@@ -32,6 +32,8 @@ class MainActivity : Activity() {
     private lateinit var content: LinearLayout
     private var selectedDate = LocalDate.now()
     private var selectedMeal = "Pranzo"
+    private var selectedAlternative = false
+    private var searchForDay = false
     private var selectedCategory = "Primo"
     private var searchIngredients = ""
     private var searchDifficulty = "Facile"
@@ -162,10 +164,13 @@ class MainActivity : Activity() {
 
     private fun showCalendar() {
         screen("Il calendario dei pasti", "Organizza pranzo e cena, anche per i prossimi giorni.")
-        val calendar = MealCalendar(this, selectedDate, { month -> db.monthMarkers(month) }) { day ->
+        searchForDay = false
+        selectedAlternative = false
+        label("Tocca un giorno per vederne i pasti. Tieni premuto oltre 2 secondi per aggiungere una ricetta.", 13f)
+        val calendar = MealCalendar(this, selectedDate, { month -> db.monthMarkers(month) }, { day ->
             selectedDate = day
-            showSearch()
-        }
+            showCalendar()
+        }, { day -> confirmDaySearch(day) })
         content.addView(calendar, LinearLayout.LayoutParams(-1, -2))
         label(selectedDate.format(dateFormatter).replaceFirstChar { it.uppercase() }, 18f, true)
         action("◀ Giorno precedente") { selectedDate = selectedDate.minusDays(1); showCalendar() }
@@ -185,8 +190,45 @@ class MainActivity : Activity() {
                 selectedMeal = meal
                 showEditor()
             }
+            action("＋ Cerca alternativa per " + meal.lowercase()) { startMealSearch(meal, true) }
         }
         action("🔎 Cerca una nuova ricetta") { showSearch() }
+    }
+
+    private fun confirmDaySearch(day: LocalDate) {
+        AlertDialog.Builder(this).setTitle("Aggiungi ricetta a questo giorno?")
+            .setMessage(day.format(dateFormatter))
+            .setNegativeButton("No", null)
+            .setPositiveButton("Sì") { _, _ ->
+                AlertDialog.Builder(this).setTitle("Per quale pasto?")
+                    .setItems(arrayOf("Pranzo", "Cena")) { _, index ->
+                        selectedDate = day
+                        val meal = if (index == 0) "Pranzo" else "Cena"
+                        val hasMain = db.onDay(day.toString()).any { !it.alternative && (it.meal == meal || it.meal == "Entrambi") }
+                        var alternative = hasMain
+                        AlertDialog.Builder(this).setTitle("$meal · Tipo di ricetta")
+                            .setSingleChoiceItems(arrayOf("Principale", "Alternativa"), if (hasMain) 1 else 0) { _, choice -> alternative = choice == 1 }
+                            .setPositiveButton("Cerca ricetta") { _, _ -> startMealSearch(meal, alternative) }
+                            .setNegativeButton("Annulla", null).show()
+                    }
+                    .setNegativeButton("Annulla", null).show()
+            }.show()
+    }
+
+    private fun startMealSearch(meal: String, alternative: Boolean) {
+        selectedMeal = meal
+        selectedAlternative = alternative
+        searchForDay = true
+        showSearch()
+    }
+
+    private fun ingredientHelp(field: EditText) {
+        val message = "Separa gli ingredienti con una virgola: ingrediente 1, ingrediente 2, … fino a 10 ingredienti."
+        field.tooltipText = message
+        field.setOnFocusChangeListener { _, focused ->
+            if (focused) Toast.makeText(this, message, Toast.LENGTH_LONG).show()
+        }
+        label("Separa gli ingredienti con la virgola. Massimo 10 ingredienti.", 13f)
     }
 
     private fun showEditor(existing: Recipe? = null, initialAlternative: Boolean = false,
@@ -198,7 +240,7 @@ class MainActivity : Activity() {
         val mealPicker = dropdown("Pasto", arrayOf("Pranzo", "Cena", "Entrambi"), existing?.meal ?: selectedMeal)
         val categoryPicker = dropdown("Categoria", categories, existing?.category ?: selectedCategory)
         val alternativePicker = dropdown("Tipo di scelta", arrayOf("Principale", "Alternativa"),
-            if (existing?.alternative == true || initialAlternative) "Alternativa" else "Principale")
+            if (existing?.alternative == true || initialAlternative || (existing == null && selectedAlternative)) "Alternativa" else "Principale")
         val titleField = input("Nome della ricetta *", existing?.title ?: suggestedTitle)
         val ingredientsField = input("Ingredienti (uno per riga)", existing?.ingredients ?: searchIngredients, true)
         val modePicker = dropdown("Versione da conservare", arrayOf("Semplificata", "Originale", "Entrambe"),
@@ -305,10 +347,12 @@ class MainActivity : Activity() {
     private fun showSearch() {
         screen("Trova cosa cucinare", "Scopri le proposte senza uscire dall'app.")
         label("Giorno scelto: " + selectedDate.format(dateFormatter), 16f, true)
+        if (searchForDay) label(selectedMeal + " · " + if (selectedAlternative) "Alternativa" else "Principale", 16f, true)
         action("Ho già trovato la ricetta da aggiungere") { showRecipeLink() }
         action("📅 Vedi i pasti del giorno scelto") { showCalendar() }
         label("Quali ingredienti hai a disposizione?", 17f, true)
-        val ingredients = input("Es. pasta, zucchine, uova, parmigiano", searchIngredients, true)
+        val ingredients = input("Ingrediente 1, ingrediente 2, … (massimo 10)", searchIngredients, true)
+        ingredientHelp(ingredients)
         val category = dropdown("Cerchi un...", categories, searchCategory)
         val difficulty = dropdown("Difficoltà desiderata", difficulties, searchDifficulty)
         val duration = dropdown("Tempo a disposizione", durations, searchDuration)
@@ -328,6 +372,10 @@ class MainActivity : Activity() {
             searchDuration = duration.selectedItem.toString()
             if (searchIngredients.isBlank()) {
                 ingredients.error = "Indica almeno un ingrediente"
+                return@action
+            }
+            if (RecipeRanking.terms(searchIngredients).size > 10) {
+                ingredients.error = "Inserisci al massimo 10 ingredienti, separati da virgola"
                 return@action
             }
             val progress = AlertDialog.Builder(this)
@@ -595,8 +643,14 @@ class MainActivity : Activity() {
 
     private fun chooseMeal(after: (String, Boolean) -> Unit) {
         val choices = arrayOf("Pranzo · Principale", "Pranzo · Alternativa", "Cena · Principale", "Cena · Alternativa")
+        var selection = (if (selectedMeal == "Cena") 2 else 0) + (if (selectedAlternative) 1 else 0)
         AlertDialog.Builder(this).setTitle("Inserisci il " + selectedDate.format(dateFormatter))
-            .setItems(choices) { _, index -> after(if (index < 2) "Pranzo" else "Cena", index % 2 == 1) }
+            .setSingleChoiceItems(choices, selection) { _, index -> selection = index }
+            .setPositiveButton("Aggiungi") { _, _ ->
+                selectedMeal = if (selection < 2) "Pranzo" else "Cena"
+                selectedAlternative = selection % 2 == 1
+                after(selectedMeal, selectedAlternative)
+            }
             .setNegativeButton("Annulla", null).show()
     }
 
@@ -611,13 +665,13 @@ class MainActivity : Activity() {
     }
 
     private fun onlineDraft(recipe: WebRecipe, text: RecipeText, mode: String) = Recipe(
-        day = "", meal = selectedMeal,
+        day = if (searchForDay) selectedDate.toString() else "", meal = selectedMeal,
         category = recipe.category.takeIf { it in categories } ?: searchCategory,
         title = recipe.title, ingredients = text.ingredients,
         instructions = if (mode != "Originale") text.summary.ifBlank { recipe.summary } else "",
         difficulty = recipe.difficulty.takeIf { it in difficulties } ?: "Non disponibile",
         duration = text.totalTime.ifBlank { text.time }.ifBlank { recipe.minutes?.let { "$it min" } ?: "Non disponibile" },
-        url = recipe.url, alternative = false, imagePath = "",
+        url = recipe.url, alternative = selectedAlternative, imagePath = "",
         originalInstructions = if (mode != "Semplificata") text.original else "", saveMode = mode,
         prepTime = text.prepTime, cookTime = text.cookTime, totalTime = text.totalTime,
         restTime = text.restTime, portions = text.portions,
@@ -663,10 +717,15 @@ class MainActivity : Activity() {
         val queryField = input("Cerca per nome o parola chiave", search)
         label("Ingredienti: basta che la ricetta ne contenga almeno uno", 14f, true)
         val ingredientField = input("Es. uova, zucchine, riso (separati da virgola)", ingredientQuery, true)
+        ingredientHelp(ingredientField)
         val categoryPicker = dropdown("Categoria", arrayOf("Tutte") + categories, category)
         val difficultyPicker = dropdown("Difficoltà", arrayOf("Tutte") + difficulties, difficulty)
         val orderPicker = dropdown("Ordina", arrayOf("Nome A–Z", "Data (recenti)", "Difficoltà"), order)
         action("Applica filtri") {
+            if (RecipeRanking.terms(ingredientField.text.toString()).size > 10) {
+                ingredientField.error = "Inserisci al massimo 10 ingredienti, separati da virgola"
+                return@action
+            }
             showArchive(queryField.text.toString().trim(),
                 categoryPicker.selectedItem.toString(),
                 difficultyPicker.selectedItem.toString(),

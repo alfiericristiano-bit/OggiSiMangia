@@ -14,7 +14,8 @@ import java.util.Locale
 /** Accessible month grid with separate meal markers; data comes from SQLite. */
 class MealCalendar(context: Context, private val selected: LocalDate,
                    private val markers: (YearMonth) -> Map<String, Set<String>>,
-                   private val onSelect: (LocalDate) -> Unit) : LinearLayout(context) {
+                   private val onSelect: (LocalDate) -> Unit,
+                   private val onAdd: (LocalDate) -> Unit) : LinearLayout(context) {
     private var month = YearMonth.from(selected)
     private val lunch = Color.rgb(215, 112, 0)
     private val dinner = Color.rgb(31, 102, 191)
@@ -49,14 +50,17 @@ class MealCalendar(context: Context, private val selected: LocalDate,
         for (number in 1..month.lengthOfMonth()) {
             val date = month.atDay(number)
             val meals = occupied[date.toString()].orEmpty()
-            val dayCell = LinearLayout(context).apply {
+            val dayCell = DayCell(context).apply {
                 orientation = VERTICAL; gravity = Gravity.CENTER; isFocusable = true; isClickable = true
+                isSelected = date == selected
                 contentDescription = date.format(DateTimeFormatter.ofPattern("d MMMM yyyy", Locale.ITALIAN)) +
                     if (meals.isEmpty()) ", nessun pasto pianificato" else ", " + meals.joinToString(" e ")
                 if (date == selected) background = GradientDrawable().apply {
                     setColor(Color.rgb(222, 240, 219)); cornerRadius = dp(10).toFloat()
                 }
                 setOnClickListener { onSelect(date) }
+                setOnLongClickListener { onAdd(date); true }
+                tooltipText = "Tocca per vedere il giorno; tieni premuto oltre 2 secondi per aggiungere una ricetta"
             }
             dayCell.addView(TextView(context).apply {
                 text = number.toString(); textSize = 16f; gravity = Gravity.CENTER
@@ -80,4 +84,41 @@ class MealCalendar(context: Context, private val selected: LocalDate,
         }
         addView(legend)
     }
+}
+
+/** Owns the physical hold threshold instead of Android's default short long-click delay. */
+private class DayCell(context: Context) : LinearLayout(context) {
+    private var downX = 0f
+    private var downY = 0f
+    private var tracking = false
+    private var held = false
+    private val slop = android.view.ViewConfiguration.get(context).scaledTouchSlop
+    private val hold = Runnable {
+        if (tracking && isAttachedToWindow) {
+            held = true
+            isPressed = false
+            performLongClick()
+        }
+    }
+    override fun onTouchEvent(event: android.view.MotionEvent): Boolean {
+        when (event.actionMasked) {
+            android.view.MotionEvent.ACTION_DOWN -> {
+                downX = event.x; downY = event.y; tracking = true; held = false; isPressed = true
+                postDelayed(hold, 2100L)
+            }
+            android.view.MotionEvent.ACTION_MOVE -> {
+                if (kotlin.math.abs(event.x - downX) > slop || kotlin.math.abs(event.y - downY) > slop) cancelHold()
+            }
+            android.view.MotionEvent.ACTION_UP -> {
+                val click = tracking && !held
+                cancelHold()
+                if (click) performClick()
+            }
+            android.view.MotionEvent.ACTION_CANCEL, android.view.MotionEvent.ACTION_POINTER_DOWN -> cancelHold()
+        }
+        return true
+    }
+    override fun performClick(): Boolean = super.performClick()
+    private fun cancelHold() { removeCallbacks(hold); tracking = false; isPressed = false }
+    override fun onDetachedFromWindow() { cancelHold(); super.onDetachedFromWindow() }
 }

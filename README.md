@@ -1,8 +1,10 @@
 # 🍽️ OggiSiMangia...
 
-Android 1.3.2 (versionCode 9).
+Android 1.3.3 (versionCode 10).
 
-- Tocco su un giorno della home: apre la ricerca mantenendo la data scelta, con accesso ai pasti già pianificati.
+- Tocco breve su un giorno: seleziona il giorno e mostra i pasti nella home. Pressione ferma oltre 2 secondi (2100 ms): conferma Sì/No, poi pranzo/cena e principale/alternativa. No non modifica selezione o dati. Movimento, scorrimento e annullamento interrompono la pressione.
+- Se il pasto ha già una ricetta principale, viene preselezionata Alternativa. Il contesto giorno/pasto/tipo è mantenuto nella ricerca, importazione link, editor e conferma di pianificazione. Le alternative salvate appaiono nella home sotto il relativo pasto con etichetta Alternativa; pulsanti dedicati permettono di cercarne altre.
+- Suggerimento sugli ingredienti al focus e testo persistente: separazione tramite virgola, massimo 10 ingredienti. Controllo del limite sia nella ricerca online che nel ricettario; ricerca diretta aggiornata da 6 a 10 ingredienti.
 - "Ho già trovato la ricetta da aggiungere": importazione da un link HTTPS pubblico, anche di altri siti, nella stessa scheda interna della ricerca. Titolo, foto, ingredienti, procedimento e metadati provengono dai dati pubblicati; in assenza di dati si può salvare il link e completare la scheda manualmente.
 - Risultati sfogliabili in gruppi di dieci: Prossime 10, Precedenti 10 e indicazione dell'intervallo. Nessun doppione della stessa URL; l'ultima pagina può contenerne meno di dieci. Tornando dalla scheda si ritrova il gruppo consultato. La navigazione usa le ricette leggibili già raccolte nella ricerca, senza nuove attese di rete a ogni pagina.\n- Foto della fonte nella scheda e copia offline compressa (JPEG, dimensione massima 960 px) al salvataggio. Se il download fallisce viene conservata comunque la ricetta.
 - Preparazione, cottura, totale, eventuale riposo, dosi e valori nutrizionali vengono conservati separatamente quando pubblicati dalla fonte. Tempi mancanti non vengono dedotti.

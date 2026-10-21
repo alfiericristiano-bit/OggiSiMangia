@@ -35,7 +35,7 @@ object RecipeFinder {
         duration: String
     ): List<WebRecipe> {
         val terms = ingredients.split(',', ';', '\n')
-            .map { it.trim() }.filter { it.isNotBlank() }.take(6)
+            .map { it.trim() }.filter { it.isNotBlank() }.take(10)
         if (terms.isEmpty()) return emptyList()
 
         val query = terms.joinToString(" ")
