@@ -320,8 +320,25 @@ class MainActivity : Activity() {
             val selectedDuration = searchDuration
             Thread {
                 val results = try {
-                    RecipeFinder.search(selectedIngredients, selectedCategory,
+                    val primary = RecipeFinder.search(selectedIngredients, selectedCategory,
                         selectedDifficulty, selectedDuration)
+                    val backup = if (primary.size < 10) {
+                        try {
+                            RecipeDiscovery.search(selectedIngredients, selectedCategory,
+                                selectedDifficulty, selectedDuration).map { r ->
+                                WebRecipe(r.title, r.description, r.url, r.site,
+                                    r.photoUrl, selectedCategory, r.difficulty,
+                                    r.minutes, r.rating, r.feedbackCount)
+                            }
+                        } catch (_: Exception) { emptyList() }
+                    } else emptyList()
+                    (primary + backup).distinctBy { it.url.substringBefore('?') }
+                        .sortedWith(compareByDescending<WebRecipe> { it.feedbackCount ?: -1 }
+                            .thenByDescending {
+                                val title = it.title.lowercase()
+                                selectedIngredients.split(',', ';', '\n')
+                                    .count { term -> title.contains(term.trim().lowercase()) }
+                            }).take(10)
                 } catch (_: Exception) { emptyList() }
                 runOnUiThread {
                     if (isFinishing || isDestroyed) return@runOnUiThread
