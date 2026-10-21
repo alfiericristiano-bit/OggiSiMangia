@@ -909,31 +909,53 @@ class MainActivity : Activity() {
             "La modifica rimane anche dopo il riavvio e gli aggiornamenti.", 13f)
         val names = entries.map { it.key }.toTypedArray()
         entries.forEachIndexed { position, entry ->
-            val spinner = dropdown("${position+1}ª priorità", names, entry.key)
-            spinner.contentDescription = "Priorità ${position+1}"
+            val card = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+                setPadding(dp(8), dp(5), dp(5), dp(5))
+                background = outlined(Color.WHITE, 16f)
+            }
+            val caption = TextView(this).apply {
+                text = "${position + 1}°"; textSize = 13f
+                setTextColor(familyDeep); setTypeface(null, Typeface.BOLD)
+                gravity = Gravity.CENTER
+            }
+            card.addView(caption, LinearLayout.LayoutParams(dp(30), dp(46)))
+            val spinner = Spinner(this).apply {
+                adapter = ArrayAdapter(this@MainActivity,
+                    android.R.layout.simple_spinner_dropdown_item, names)
+                setSelection(position)
+                contentDescription = "Priorità ${position + 1}: ${entry.key}"
+                setPadding(dp(4), 0, dp(4), 0)
+            }
+            card.addView(spinner, LinearLayout.LayoutParams(0, dp(46), 1f))
+            val remove = Button(this).apply {
+                text = "✕"; isAllCaps = false; textSize = 17f
+                contentDescription = "Elimina sito ${entry.key}"
+                setTextColor(Color.rgb(168, 67, 65))
+                background = outlined(familyPale, 14f)
+                setOnClickListener {
+                    AlertDialog.Builder(this@MainActivity)
+                        .setTitle("Eliminare questo sito?")
+                        .setMessage("${entry.key}\n${entry.value}\nNon verrà più cercato; potrai ripristinarlo.")
+                        .setPositiveButton("Elimina") { _, _ ->
+                            sourcePreferences.save(LinkedHashMap(RecipeSources.sites).apply { remove(entry.key) })
+                            showSourceSettings()
+                        }
+                        .setNegativeButton("Annulla", null).show()
+                }
+            }
+            card.addView(remove, LinearLayout.LayoutParams(dp(44), dp(44)))
+            content.addView(card, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(5) })
             spinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
                 override fun onNothingSelected(parent: AdapterView<*>?) { }
                 override fun onItemSelected(parent: AdapterView<*>?, view: View?, selected: Int, id: Long) {
                     if (selected == position) return
                     val reordered = entries.toMutableList()
-                    java.util.Collections.swap(reordered,position,selected)
+                    java.util.Collections.swap(reordered, position, selected)
                     sourcePreferences.save(reordered.associateTo(linkedMapOf()) { it.key to it.value })
                     showSourceSettings()
                 }
-            }
-            action("🗑️ Elimina sito · " + entry.key) {
-                AlertDialog.Builder(this)
-                    .setTitle("Eliminare questo sito di ricerca?")
-                    .setMessage(entry.key + "\n" + entry.value +
-                        "\nNon sarà più consultato nelle ricerche. Potrai aggiungerlo nuovamente o ripristinare i siti iniziali.")
-                    .setPositiveButton("Elimina sito") { _, _ ->
-                        val remaining = LinkedHashMap(RecipeSources.sites)
-                        remaining.remove(entry.key)
-                        sourcePreferences.save(remaining)
-                        showSourceSettings()
-                    }
-                    .setNegativeButton("Annulla", null)
-                    .show()
             }
         }
         action("Ripristina siti e ordine iniziali") {
