@@ -770,7 +770,7 @@ class MainActivity : Activity() {
             "Categoria, difficoltà e tempi sono preferenze: gli scostamenti vengono segnalati.", 13f)
 
         primaryAction("🔎 CERCA RICETTE NEI SITI") {
-            searchIngredients = ingredients.query() ?: return@action
+            searchIngredients = ingredients.query() ?: return@primaryAction
             searchCategory = category.selectedItem.toString()
             searchDifficulty = difficulty.selectedItem.toString()
             searchDuration = duration.selectedItem.toString()
