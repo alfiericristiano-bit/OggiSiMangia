@@ -58,8 +58,9 @@ object RecipeDiscovery {
         if (title.isBlank()) return null
         val reader = RecipeReader.parse(recipe)
         val description = clean(recipe.optString("description")).take(240)
-        val relevance = RecipeRanking.relevance(title + " " + description + " " + reader.ingredients, ingredients)
-        if (relevance == 0) return null
+        if (!RecipeValidation.isDish(title, reader.ingredients, reader.original) ||
+            !RecipeValidation.containsEvery(reader.ingredients, ingredients)) return null
+        val relevance = RecipeRanking.relevance(reader.ingredients, ingredients)
         val aggregate = recipe.optJSONObject("aggregateRating")
         fun number(key: String) = aggregate?.optString(key)?.replace(',', '.')?.toDoubleOrNull()
         val raw = number("ratingValue")
@@ -88,7 +89,7 @@ object RecipeDiscovery {
         }
         val image = try { if (reader.imageUrl.isBlank()) "" else java.net.URL(java.net.URL(link), reader.imageUrl).toString().takeIf { it.startsWith("https://") }.orEmpty() }
             catch (_: Exception) { "" }
-        return WebRecipe(title, description, link, site, image, category, difficulty, mins, rating, count, relevance)
+        return WebRecipe(title, description, link, site, image, category, difficulty, mins, rating, count, relevance, reader.ingredients)
     }
 
     fun search(ingredients: String, category: String, difficulty: String, duration: String): List<WebRecipe> {
