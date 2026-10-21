@@ -184,7 +184,7 @@ class MainActivity : Activity() {
         if (key != "calendar") {
             val back = Button(this).apply {
                 text = "← Indietro"; isAllCaps = false; textSize = 13f
-                setTextColor(familyDeep); background = outlined(Color.WHITE, 17f)
+                setTextColor(familyDeep); this.background = outlined(Color.WHITE, 17f)
                 setOnClickListener { backToPage() }
             }
             content.addView(back, LinearLayout.LayoutParams(-1, dp(46)).apply { bottomMargin = dp(5) })
