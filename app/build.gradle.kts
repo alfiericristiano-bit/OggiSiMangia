@@ -10,8 +10,20 @@ android {
         applicationId = "it.oggisimangia.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 3
-        versionName = "1.1.1"
+        versionCode = 4
+        versionName = "1.2.0"
+    }
+    val signingPath = System.getenv("ANDROID_KEYSTORE_PATH")
+    if (!signingPath.isNullOrBlank()) {
+        signingConfigs.create("persistent") {
+            storeFile = file(signingPath)
+            storePassword = System.getenv("ANDROID_STORE_PASSWORD")
+            keyAlias = System.getenv("ANDROID_KEY_ALIAS")
+            keyPassword = System.getenv("ANDROID_KEY_PASSWORD")
+        }
+        buildTypes.getByName("release") {
+            signingConfig = signingConfigs.getByName("persistent")
+        }
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
@@ -21,5 +33,7 @@ android {
 }
 
 dependencies {
+    testImplementation("junit:junit:4.13.2")
+    testImplementation("org.json:json:20240303")
     implementation("org.jsoup:jsoup:1.18.3")
 }

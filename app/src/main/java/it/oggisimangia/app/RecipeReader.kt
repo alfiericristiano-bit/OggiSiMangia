@@ -1,0 +1,80 @@
+package it.oggisimangia.app
+
+import org.json.JSONArray
+import org.json.JSONObject
+import org.json.JSONTokener
+import org.jsoup.Jsoup
+
+data class RecipeText(
+    val ingredients: String = "",
+    val original: String = "",
+    val summary: String = "",
+    val portions: String = "",
+    val time: String = "",
+    val notice: String = ""
+)
+
+/** Reads only explicitly published Recipe data; never guesses quantities or temperatures. */
+object RecipeReader {
+    fun read(url: String): RecipeText {
+        require(RecipeFinder.isTrusted(url))
+        var address = url
+        var response = Jsoup.connect(address).userAgent("Mozilla/5.0 (Android; OggiSiMangia/1.2)")
+            .timeout(12000).maxBodySize(3_000_000).followRedirects(false).execute()
+        var redirects = 0
+        while (response.statusCode() in 300..399 && redirects++ < 3) {
+            address = java.net.URL(java.net.URL(address), response.header("Location") ?: error("Redirect senza destinazione")).toString()
+            require(RecipeFinder.isTrusted(address))
+            response = Jsoup.connect(address).userAgent("Mozilla/5.0 (Android; OggiSiMangia/1.2)")
+                .timeout(12000).maxBodySize(3_000_000).followRedirects(false).execute()
+        }
+        require(response.statusCode() in 200..299)
+        val doc = response.parse()
+        val recipes = mutableListOf<JSONObject>()
+        fun visit(value: Any?) {
+            when (value) {
+                is JSONArray -> for (i in 0 until value.length()) visit(value.opt(i))
+                is JSONObject -> {
+                    val type = value.opt("@type")
+                    val types = if (type is JSONArray) (0 until type.length()).map { type.optString(it) }
+                        else listOf(type?.toString().orEmpty())
+                    if (types.any { it.substringAfterLast('/').equals("Recipe", true) }) recipes.add(value)
+                    val keys = value.keys()
+                    while (keys.hasNext()) visit(value.opt(keys.next()))
+                }
+            }
+        }
+        for (script in doc.select("script[type=application/ld+json]")) {
+            try { visit(JSONTokener(script.data()).nextValue()) } catch (_: Exception) { }
+        }
+        val recipe = recipes.maxByOrNull { it.optJSONArray("recipeIngredient")?.length() ?: 0 }
+            ?: return RecipeText(notice = "Il sito non fornisce una ricetta leggibile automaticamente. Puoi salvare il link.")
+        return parse(recipe)
+    }
+
+    internal fun parse(recipe: JSONObject): RecipeText {
+        fun clean(value: String) = Jsoup.parse(value).text().trim()
+        fun strings(value: Any?): List<String> = when (value) {
+            is JSONArray -> (0 until value.length()).flatMap { strings(value.opt(it)) }
+            is String -> listOf(clean(value)).filter { it.isNotBlank() }
+            is JSONObject -> strings(value.opt("text")).ifEmpty { strings(value.opt("itemListElement")) }
+            else -> emptyList()
+        }
+        val ingredients = strings(recipe.opt("recipeIngredient")).joinToString("\n")
+        val steps = strings(recipe.opt("recipeInstructions"))
+        val original = steps.mapIndexed { i, step -> "${i + 1}. $step" }.joinToString("\n\n")
+        // Extractive outline: each complete first sentence is preserved, with the full text available.
+        val summary = steps.mapIndexed { i, step ->
+            val sentences = step.split(Regex("(?<=[.!?])\\s+(?=[A-ZÀ-Ü])"))
+            val essential = Regex("[0-9]|cuoc|cottura|forno|fuoco|minut|raffredd|frigg|boll", RegexOption.IGNORE_CASE)
+            "${i + 1}. " + sentences.filterIndexed { index, sentence -> index == 0 || essential.containsMatchIn(sentence) }.joinToString(" ")
+        }.joinToString("\n\n")
+        return RecipeText(ingredients, original, summary,
+            strings(recipe.opt("recipeYield")).joinToString(", "),
+            recipe.optString("totalTime").ifBlank { recipe.optString("cookTime") }.let { raw ->
+                try { "${java.time.Duration.parse(raw).toMinutes()} min" } catch (_: Exception) { raw }
+            },
+            if (steps.isEmpty()) "Procedimento non disponibile: consulta l'originale."
+            else "Sintesi automatica: consulta il testo completo per tutti i dettagli e le indicazioni di cottura.")
+    }
+}

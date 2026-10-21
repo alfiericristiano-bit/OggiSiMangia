@@ -18,10 +18,12 @@ data class Recipe(
     val duration: String,
     val url: String,
     val alternative: Boolean,
-    val imagePath: String
+    val imagePath: String,
+    val originalInstructions: String = "",
+    val saveMode: String = "Semplificata"
 )
 
-class RecipeDb(context: Context) : SQLiteOpenHelper(context, "oggisimangia.db", null, 1) {
+class RecipeDb(context: Context) : SQLiteOpenHelper(context, "oggisimangia.db", null, 2) {
     override fun onCreate(db: SQLiteDatabase) {
         db.execSQL("""
             CREATE TABLE recipes (
@@ -36,7 +38,9 @@ class RecipeDb(context: Context) : SQLiteOpenHelper(context, "oggisimangia.db", 
                 duration TEXT NOT NULL DEFAULT 'Veloce',
                 url TEXT NOT NULL DEFAULT '',
                 alternative INTEGER NOT NULL DEFAULT 0,
-                imagePath TEXT NOT NULL DEFAULT ''
+                imagePath TEXT NOT NULL DEFAULT '',
+                originalInstructions TEXT NOT NULL DEFAULT '',
+                saveMode TEXT NOT NULL DEFAULT 'Semplificata'
             )
         """.trimIndent())
         db.execSQL("CREATE INDEX by_day ON recipes(day)")
@@ -44,7 +48,10 @@ class RecipeDb(context: Context) : SQLiteOpenHelper(context, "oggisimangia.db", 
     }
 
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
-        // La versione 1 dello schema non richiede migrazioni.
+        if (oldVersion < 2) {
+            db.execSQL("ALTER TABLE recipes ADD COLUMN originalInstructions TEXT NOT NULL DEFAULT ''")
+            db.execSQL("ALTER TABLE recipes ADD COLUMN saveMode TEXT NOT NULL DEFAULT 'Semplificata'")
+        }
     }
 
     private fun parse(c: Cursor): Recipe = Recipe(
@@ -59,7 +66,9 @@ class RecipeDb(context: Context) : SQLiteOpenHelper(context, "oggisimangia.db", 
         duration = c.getString(c.getColumnIndexOrThrow("duration")),
         url = c.getString(c.getColumnIndexOrThrow("url")),
         alternative = c.getInt(c.getColumnIndexOrThrow("alternative")) == 1,
-        imagePath = c.getString(c.getColumnIndexOrThrow("imagePath"))
+        imagePath = c.getString(c.getColumnIndexOrThrow("imagePath")),
+        originalInstructions = c.getString(c.getColumnIndexOrThrow("originalInstructions")),
+        saveMode = c.getString(c.getColumnIndexOrThrow("saveMode"))
     )
 
     fun save(r: Recipe): Long {
@@ -75,6 +84,8 @@ class RecipeDb(context: Context) : SQLiteOpenHelper(context, "oggisimangia.db", 
             put("url", r.url)
             put("alternative", if (r.alternative) 1 else 0)
             put("imagePath", r.imagePath)
+            put("originalInstructions", r.originalInstructions)
+            put("saveMode", r.saveMode)
         }
         return if (r.id == 0L) writableDatabase.insertOrThrow("recipes", null, v)
         else {
@@ -113,3 +124,4 @@ class RecipeDb(context: Context) : SQLiteOpenHelper(context, "oggisimangia.db", 
     fun remove(id: Long): Boolean =
         writableDatabase.delete("recipes", "id=?", arrayOf(id.toString())) > 0
 }
+

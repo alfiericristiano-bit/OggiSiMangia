@@ -1,29 +1,22 @@
 # 🍽️ OggiSiMangia...
 
-**Android 1.1.0 — anteprime ricette integrate (versione di prova)**
+Android 1.2.0 (versionCode 4).
 
-App Android per organizzare i pasti (pranzo e cena) con ricetta principale e alternativa, e conservare un ricettario locale.
+- Un solo Cerca consulta GialloZafferano, Il Cucchiaio d'Argento e Fatto in Casa da Benedetta, mostrando fino a dieci risultati nel popup.
+- Scheda interna con ingredienti, dosi, tempo e sintesi estrattiva dei passaggi pubblicati in formato Recipe JSON-LD. La sintesi conserva frasi con quantità, tempi e riferimenti di cottura; il testo completo resta consultabile.
+- Vedi ricetta originale sul sito apre il browser su richiesta.
+- Salvataggio Semplificata / Originale / Entrambe, con ingredienti e link. Originale significa testo del procedimento leggibile offline, non copia grafica dell'intera pagina.
+- Portate: antipasto, primo, secondo, contorno, piatto unico e dolce. Pasto: pranzo, cena o entrambi. Calendario facoltativo, con scelta principale o alternativa.
+- Migrazione SQLite v1 → v2 senza eliminare le ricette esistenti.
 
-## Novità 1.1.0
-- Ricerca per ingredienti, categoria, difficoltà e tempo: fino a **10 schede** dentro un popup dell'app.
-- Ogni scheda prova a mostrare **nome, fonte, sintesi, foto, tempo, difficoltà e valutazioni/feedback quando effettivamente pubblicati**.
-- L'ordinamento dà precedenza al numero di feedback *quando verificabile* e poi all'attinenza con gli ingredienti.
-- Pulsante **Leggi**: pagina originale aperta nel visualizzatore WebView **interno** all'app, senza lanciare Chrome.
-- Pulsante **Scegli**: specifica pranzo/cena e ricetta principale/alternativa, poi apre la scheda da completare e salvare nel calendario.
-- Se una fonte non restituisce schede leggibili, è disponibile la **ricerca diretta nel WebView interno** dei siti selezionati.
+## Limiti
 
-## Fonti e limiti
-Ricerca on-demand tra pagine pubbliche di **GialloZafferano**, **Il Cucchiaio d'Argento** e **Fatto in Casa da Benedetta**. Le anteprime sono sperimentali: le strutture delle pagine possono cambiare o i siti possono bloccare l'estrazione, quindi **non è garantito** trovare 10 risultati, tutte le foto, tutte le valutazioni o un ordinamento per feedback completo. L'app non inventa dati assenti.
+Le fonti possono bloccare richieste o cambiare struttura. Non sono garantiti dieci risultati né recensioni per ogni ricetta. I conteggi pubblicati orientano l'ordinamento; non certificano la ricetta. Dati mancanti e riassunti non disponibili vengono dichiarati. Non vengono aggirati accessi riservati. Ingredienti e testi salvati dall'utente sono conservati localmente; le immagini dei siti non vengono archiviate automaticamente.
 
-Gli ingredienti e i procedimenti integrali di altre testate **non vengono copiati automaticamente**. Si salva il titolo e il link originale; i tuoi ingredienti, appunti e foto personali possono essere aggiunti nell'editor. Le fotografie delle anteprime sono caricate temporaneamente e non archiviate senza autorizzazione.
+## Build e firma
 
-## Funzioni conservate dalla 1.0.0
-- Calendario mensile, pranzo/cena, primi/secondi/piatti unici/dolci.
-- Ricetta principale e alternativa per ogni pasto.
-- Archivio SQLite locale con filtri per categoria e difficoltà, ricerca e riutilizzo.
-- Foto dalla galleria compresse automaticamente in JPEG per il ricettario personale.
+Actions esegue test del lettore, verifica della migrazione, lint e assembleDebug e pubblica APK e report. L'APK debug è una compilazione di prova: la firma temporanea non garantisce aggiornamento sopra gli APK precedenti.
 
-## Build solo su GitHub
-Le compilazioni sono nella scheda [Actions](../../actions/workflows/android.yml). Quando una build è verde, GitHub pubblica l'Artifact `OggiSiMangia-v1.1.0-APK` con `OggiSiMangia-v1.1.0-debug.apk`.
+La build release supporta una chiave persistente fornita esclusivamente tramite i secret GitHub Actions ANDROID_KEYSTORE_BASE64, ANDROID_STORE_PASSWORD, ANDROID_KEY_ALIAS e ANDROID_KEY_PASSWORD. Nessuna chiave viene aggiunta al repository. Quando tutti i secret sono configurati viene pubblicato anche l'APK release.
 
-**Attenzione:** gli APK debug generati da runner diversi possono avere firme differenti e richiedere la disinstallazione prima di aggiornare. **Non disinstallare** una versione con ricette importanti senza un backup: l'esportazione dati e la firma persistente non sono ancora state implementate.
+L'applicationId resta it.oggisimangia.app e il versionCode aumenta. Per aggiornare l'app installata servono la stessa chiave privata e il medesimo certificato della versione già presente. La chiave delle vecchie build effimere potrebbe non essere recuperabile: non disinstallare l'app con dati importanti per superare un errore di firma. Configurazione dei secret, confronto dei certificati e prova di aggiornamento in-place restano necessari prima di distribuire un aggiornamento come compatibile.

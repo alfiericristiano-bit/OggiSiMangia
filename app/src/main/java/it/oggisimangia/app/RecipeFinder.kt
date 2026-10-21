@@ -58,7 +58,7 @@ object RecipeFinder {
 
         val collected = linkedMapOf<String, WebRecipe>()
         // Prima fonte: pagine di ricerca editoriali con dati di recensione quando esposti.
-        // Le altre due vengono interrogate solo se servono ancora risultati.
+        // Consulta sempre tutte e tre le fonti prima di ordinare i risultati.
         for ((name, address) in sources) {
             try {
                 val document = Jsoup.connect(address)
@@ -75,7 +75,6 @@ object RecipeFinder {
             } catch (_: Exception) {
                 // Una fonte può non consentire lettura automatica: nessun dato inventato.
             }
-            if (collected.size >= 20) break
         }
 
         val maxMinutes = when (duration) {
@@ -131,6 +130,8 @@ object RecipeFinder {
             val diff = Regex("molto facile|facile|media|difficile", RegexOption.IGNORE_CASE)
                 .find(snippet)?.value.orEmpty().replaceFirstChar { it.uppercase() }
             val recipeCategory = when {
+                snippet.contains("Antipasti", true) -> "Antipasto"
+                snippet.contains("Contorni", true) -> "Contorno"
                 snippet.contains("Primi piatti", true) -> "Primo"
                 snippet.contains("Secondi piatti", true) -> "Secondo"
                 snippet.contains("Piatti unici", true) -> "Piatto unico"
@@ -165,3 +166,4 @@ object RecipeFinder {
         return anchor.parent() ?: anchor
     }
 }
+
