@@ -61,7 +61,7 @@ def hold(node, duration):
     time.sleep(0.4)
 
 def text_node(nodes, text):
-    return next(n for n in nodes if n.attrib.get('text') == text)
+    return next(n for n in nodes if n.attrib.get('text','').casefold() == text.casefold())
 
 def find_scrolling(text, name):
     for attempt in range(12):
