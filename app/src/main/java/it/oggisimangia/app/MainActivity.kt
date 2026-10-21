@@ -769,8 +769,8 @@ class MainActivity : Activity() {
         label("Ingredienti obbligatori, anche singolare/plurale e preparazioni equivalenti. " +
             "Categoria, difficoltà e tempi sono preferenze: gli scostamenti vengono segnalati.", 13f)
 
-        primaryAction("🔎 CERCA RICETTE NEI SITI") {
-            searchIngredients = ingredients.query() ?: return@primaryAction
+        primaryAction("🔎 CERCA RICETTE NEI SITI") search@{
+            searchIngredients = ingredients.query() ?: return@search
             searchCategory = category.selectedItem.toString()
             searchDifficulty = difficulty.selectedItem.toString()
             searchDuration = duration.selectedItem.toString()
