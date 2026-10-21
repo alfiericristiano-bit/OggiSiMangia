@@ -22,6 +22,15 @@ class RecipeValidationTest {
         assertNotNull(RecipeDiscovery.preview(html,url,"Il Cucchiaio d'Argento","riso, carciofi"))
     }
 
+    @Test fun italianFormsAndProcessedIngredientsAreAccepted() {
+        val lines = "150 g lenticchie rosse\n200 ml passata di pomodoro\n1 cipolla"
+        assertTrue(RecipeValidation.containsEvery(lines, "lenticchia, pomodori"))
+        assertTrue(RecipeValidation.containsEvery(lines, "lenticchie, pomodoro"))
+        assertTrue(RecipeValidation.containsEvery(lines, "lenticchia, cipolle"))
+        assertFalse(RecipeValidation.containsEvery(lines, "lenticchia, carciofi"))
+        assertTrue(RecipeValidation.containsEvery("100 g crema di pomodoro\n200 g lenticchie", "pomodori"))
+    }
+
     @Test fun genericGuidesAndIncompleteRecipesAreRejected() {
         assertFalse(RecipeValidation.isDish("Come congelare i carciofi", "carciofi\nacqua", "Congelare"))
         assertFalse(RecipeValidation.isDish("Come fare un risotto", "riso\nacqua", "Cuocere"))

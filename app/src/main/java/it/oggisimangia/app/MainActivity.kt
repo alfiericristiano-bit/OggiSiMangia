@@ -661,8 +661,8 @@ class MainActivity : Activity() {
             searchDuration = duration.selectedItem.toString()
             showSourceSettings()
         }
-        label("Solo ricette di piatti con preparazione verificata: tutti gli ingredienti " +
-            "indicati devono comparire nella lista degli ingredienti della fonte.", 13f)
+        label("Ingredienti obbligatori, anche singolare/plurale e preparazioni equivalenti. " +
+            "Categoria, difficoltà e tempi sono preferenze: gli scostamenti vengono segnalati.", 13f)
 
         action("🔎 Mostra fino a 10 ricette") {
             searchIngredients = ingredients.query() ?: return@action
@@ -706,7 +706,8 @@ class MainActivity : Activity() {
                             .setTitle("Nessuna ricetta verificata")
                             .setMessage("Non sono stati trovati piatti con tutti gli ingredienti richiesti " +
                                 "nell'elenco ingredienti e con un procedimento leggibile. " +
-                                "Prova a cambiare ingredienti o categoria.")
+                                "Alcuni siti potrebbero impedire la lettura automatica. " +
+                                "Controlla le fonti attive o riprova più tardi.")
                             .setPositiveButton("Chiudi", null).show()
                     } else showRecipeResults(results)
                 }
@@ -863,6 +864,15 @@ class MainActivity : Activity() {
                 setTextColor(Color.rgb(21, 103, 91))
             }
             row.addView(heading)
+            val differences = RecipePreferences.notices(recipe, searchCategory, searchDifficulty, searchDuration)
+            if (differences.isNotEmpty()) {
+                row.addView(TextView(this).apply {
+                    text = differences.joinToString("\n") { "⚠ " + it }
+                    textSize = 13f
+                    setTextColor(Color.rgb(139, 79, 15))
+                    setPadding(0, dp(4), 0, dp(4))
+                })
+            }
             if (recipe.imageUrl.isNotBlank()) {
                 val preview = ImageView(this).apply {
                     scaleType = ImageView.ScaleType.CENTER_CROP
@@ -941,6 +951,10 @@ class MainActivity : Activity() {
                     category = "", difficulty = "Non disponibile"
                 ) else sourceRecipe
                 screen(recipe.title, recipe.source)
+                if (!imported) {
+                    RecipePreferences.notices(recipe, searchCategory, searchDifficulty, searchDuration)
+                        .forEach { label("⚠ " + it, 13f) }
+                }
                 label("Giorno scelto: " + selectedDate.format(dateFormatter), 14f)
                 val imageUrl = result.imageUrl.ifBlank { recipe.imageUrl }
                 if (imageUrl.isNotBlank()) {
