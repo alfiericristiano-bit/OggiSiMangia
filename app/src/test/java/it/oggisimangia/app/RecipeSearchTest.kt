@@ -6,7 +6,8 @@ import org.junit.Test
 class RecipeSearchTest {
     @org.junit.After fun resetSources() { RecipeSources.configure(RecipeSources.defaults) }
     private fun item(title: String, url: String, rating: Double? = null, count: Int? = null) =
-        WebRecipe(title, "", url, "Fonte", rating = rating, feedbackCount = count)
+        WebRecipe(title, "", url, "Fonte", rating = rating, feedbackCount = count,
+            ingredients = if (title.contains("zucchine", true)) "100 g pasta\n200 g zucchine" else "100 g cioccolato")
 
     @Test fun allElevenSourcesAreAllowedButNotHostedBlogsOrLookalikes() {
         assertEquals(11, RecipeSources.sites.size)
@@ -38,7 +39,8 @@ class RecipeSearchTest {
     }
     @Test fun structuredRecipeProvidesNormalizedRatingVoteCountAndIngredients() {
         val html = """<script type="application/ld+json">{"@graph":[{"@type":"Recipe",
-            "name":"Pasta verde", "recipeIngredient":["200 g zucchine"],"recipeCategory":"Primi piatti",
+            "name":"Pasta verde", "recipeIngredient":["200 g zucchine","100 g pasta"],
+            "recipeInstructions":["Cuocere la pasta e unire le zucchine."], "recipeCategory":"Primi piatti",
             "totalTime":"PT25M", "aggregateRating":{"ratingValue":9,"worstRating":1,"bestRating":10,"ratingCount":120}}]}</script>"""
         val r = RecipeDiscovery.preview(html,"https://www.tavolartegusto.it/ricetta/pasta/","Tavolartegusto","zucchine")!!
         assertEquals(1,r.relevance)
@@ -51,9 +53,7 @@ class RecipeSearchTest {
     @Test fun articlesAndCommentsCannotBecomeRatedRecipes() {
         assertNull(RecipeDiscovery.preview("<title>Pasta</title>","https://www.agrodolce.it/pasta","Agrodolce","pasta"))
         val html = """<script type="application/ld+json">{"@type":"Recipe","name":"Pasta zucchine","commentCount":500}</script>"""
-        val r = RecipeDiscovery.preview(html,"https://www.agrodolce.it/pasta","Agrodolce","zucchine")!!
-        assertNull(r.rating)
-        assertNull(r.feedbackCount)
+        assertNull(RecipeDiscovery.preview(html,"https://www.agrodolce.it/pasta","Agrodolce","zucchine"))
     }
     @Test fun userPriorityOverridesDefaultAndNewDomainsParticipate() {
         val sites = linkedMapOf("Nuova fonte" to "ricette.example.org", "Misya" to "misya.info")

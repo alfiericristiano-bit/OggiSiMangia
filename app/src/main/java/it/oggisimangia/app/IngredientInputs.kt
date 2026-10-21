@@ -20,6 +20,19 @@ class IngredientInputs(context: Context, initial: String, private val changed: (
         val field = EditText(context).apply {
             hint = "Ingrediente ${fields.size+1}"; contentDescription = hint
             setSingleLine(true); textSize = 16f
+            imeOptions = android.view.inputmethod.EditorInfo.IME_ACTION_DONE
+            setOnEditorActionListener { view, actionId, event ->
+                if (actionId == android.view.inputmethod.EditorInfo.IME_ACTION_DONE ||
+                    actionId == android.view.inputmethod.EditorInfo.IME_ACTION_NEXT ||
+                    (event?.keyCode == android.view.KeyEvent.KEYCODE_ENTER &&
+                        event.action == android.view.KeyEvent.ACTION_UP)) {
+                    (context.getSystemService(Context.INPUT_METHOD_SERVICE) as
+                        android.view.inputmethod.InputMethodManager)
+                        .hideSoftInputFromWindow(view.windowToken, 0)
+                    view.clearFocus()
+                    true
+                } else false
+            }
             inputType = android.text.InputType.TYPE_CLASS_TEXT
             setText(value)
             setPadding(dp(8),dp(8),dp(8),dp(8))
@@ -33,8 +46,12 @@ class IngredientInputs(context: Context, initial: String, private val changed: (
         val add = Button(context).apply {
             text = "Aggiungi ingrediente"; isAllCaps = false; textSize = 12f
             setOnClickListener {
+                (context.getSystemService(Context.INPUT_METHOD_SERVICE) as
+                    android.view.inputmethod.InputMethodManager)
+                    .hideSoftInputFromWindow(field.windowToken, 0)
+                field.clearFocus()
                 if (field.text.toString().isBlank()) { field.error = "Scrivi prima l'ingrediente"; return@setOnClickListener }
-                if (fields.size < 10) { append(); fields.last().requestFocus() }
+                if (fields.size < 10) append()
             }
         }
         row.addView(field, LayoutParams(0,dp(60),1f))

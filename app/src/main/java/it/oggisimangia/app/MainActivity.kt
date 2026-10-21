@@ -13,6 +13,11 @@ import android.net.Uri
 import android.os.Bundle
 import android.provider.MediaStore
 import android.view.Gravity
+import android.view.MotionEvent
+import android.graphics.Rect
+import android.view.KeyEvent
+import android.view.inputmethod.EditorInfo
+import android.view.inputmethod.InputMethodManager
 import android.view.View
 import android.widget.*
 import android.webkit.WebResourceRequest
@@ -67,6 +72,26 @@ class MainActivity : Activity() {
 
     private fun dp(n: Int) = (n * resources.displayMetrics.density).toInt()
 
+    private fun hideKeyboard(view: View? = currentFocus) {
+        val focus = view ?: return
+        (getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager)
+            .hideSoftInputFromWindow(focus.windowToken, 0)
+        if (focus is EditText) focus.clearFocus()
+    }
+
+    /** Dismiss the keyboard whenever tapping outside the current entry field. */
+    override fun dispatchTouchEvent(ev: MotionEvent): Boolean {
+        if (ev.actionMasked == MotionEvent.ACTION_DOWN) {
+            val focused = currentFocus
+            if (focused is EditText) {
+                val bounds = Rect()
+                focused.getGlobalVisibleRect(bounds)
+                if (!bounds.contains(ev.rawX.toInt(), ev.rawY.toInt())) hideKeyboard(focused)
+            }
+        }
+        return super.dispatchTouchEvent(ev)
+    }
+
     private fun shape(color: Int, radius: Float = 16f): GradientDrawable =
         GradientDrawable().apply { setColor(color); cornerRadius = dp(radius.toInt()).toFloat() }
 
@@ -103,7 +128,7 @@ class MainActivity : Activity() {
             text = value; isAllCaps = false; textSize = 15f
             setTextColor(Color.rgb(22, 59, 35))
             background = shape(Color.rgb(226, 241, 226), 13f)
-            setOnClickListener { onClick() }
+            setOnClickListener { hideKeyboard(); onClick() }
         }
         content.addView(btn, LinearLayout.LayoutParams(-1, dp(53)).apply {
             bottomMargin = dp(9)
@@ -126,6 +151,15 @@ class MainActivity : Activity() {
             } else {
                 inputType = android.text.InputType.TYPE_CLASS_TEXT or
                     android.text.InputType.TYPE_TEXT_FLAG_CAP_SENTENCES
+                setSingleLine(true)
+                imeOptions = EditorInfo.IME_ACTION_DONE
+                setOnEditorActionListener { view, actionId, event ->
+                    if (actionId == EditorInfo.IME_ACTION_DONE || actionId == EditorInfo.IME_ACTION_NEXT ||
+                        (event?.keyCode == KeyEvent.KEYCODE_ENTER && event.action == KeyEvent.ACTION_UP)) {
+                        hideKeyboard(view)
+                        true
+                    } else false
+                }
             }
             content.addView(this, LinearLayout.LayoutParams(-1, -2).apply {
                 bottomMargin = dp(12)
@@ -148,6 +182,7 @@ class MainActivity : Activity() {
                 text = name; isAllCaps = false; textSize = 11f
                 setPadding(0, 0, 0, 0)
                 setOnClickListener {
+                    hideKeyboard()
                     when (index) {
                         0 -> showCalendar()
                         1 -> showSearch()
@@ -172,11 +207,23 @@ class MainActivity : Activity() {
         searchForDay = false
         selectedAlternative = false
         label("Tocca un giorno per vederne i pasti. Tieni premuto oltre 2 secondi per aggiungere una ricetta.", 13f)
+        action("ⓘ Come funziona il calendario") {
+            AppHints.showAgain(this, "calendar_long_press", "Come funziona il calendario",
+                "Tocca una data per scegliere il giorno e vedere pranzo e cena. " +
+                "Tieni premuta la data per più di 2 secondi per aggiungere una ricetta: " +
+                "potrai scegliere pranzo, cena e principale o alternativa.")
+        }
         val calendar = MealCalendar(this, selectedDate, { month -> db.monthMarkers(month) }, { day ->
             selectedDate = day
             showCalendar()
         }, { day -> confirmDaySearch(day) })
         content.addView(calendar, LinearLayout.LayoutParams(-1, -2))
+        content.post {
+            AppHints.showOnce(this, "calendar_long_press", "Come funziona il calendario",
+                "Tocca una data per scegliere il giorno e vedere pranzo e cena. " +
+                "Tieni premuta la data per più di 2 secondi per aggiungere una ricetta: " +
+                "potrai scegliere pranzo, cena e principale o alternativa.")
+        }
         label(selectedDate.format(dateFormatter).replaceFirstChar { it.uppercase() }, 18f, true)
         action("◀ Giorno precedente") { selectedDate = selectedDate.minusDays(1); showCalendar() }
         action("Giorno successivo ▶") { selectedDate = selectedDate.plusDays(1); showCalendar() }
@@ -190,6 +237,8 @@ class MainActivity : Activity() {
                     recipe.category + " · " + recipe.title) {
                     showDetail(recipe.id)
                 }
+                action("✏️ Cambia assegnazione · " + recipe.title) { changePlanning(recipe) }
+                action("📋 Clona su altri giorni · " + recipe.title) { cloneRecipeToDay(recipe) }
             }
             action("＋ Aggiungi ricetta per " + meal.lowercase()) {
                 selectedMeal = meal
@@ -199,6 +248,54 @@ class MainActivity : Activity() {
         }
         action("🔎 Cerca una nuova ricetta") { showSearch() }
         action("PDF e stampa del giorno") { report("Menu del giorno", selectedDate.format(dateFormatter), db.onDay(selectedDate.toString())) }
+    }
+
+    /** Update a saved appointment in place, preserving the recipe and its photographs. */
+    private fun changePlanning(recipe: Recipe) {
+        val meals = arrayOf("Pranzo", "Cena", "Entrambi")
+        val types = arrayOf("Principale", "Alternativa")
+        val form = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(18), dp(10), dp(18), dp(10))
+        }
+        fun picker(title: String, choices: Array<String>, initial: String): Spinner {
+            form.addView(TextView(this).apply { text = title; textSize = 16f })
+            return Spinner(this).apply {
+                adapter = ArrayAdapter(this@MainActivity, android.R.layout.simple_spinner_dropdown_item, choices)
+                setSelection(choices.indexOf(initial).coerceAtLeast(0))
+                form.addView(this, LinearLayout.LayoutParams(-1, dp(54)))
+            }
+        }
+        val meal = picker("Pasto", meals, recipe.meal)
+        val type = picker("Tipo", types, if (recipe.alternative) "Alternativa" else "Principale")
+        val category = picker("Categoria del piatto", categories, recipe.category)
+        AlertDialog.Builder(this).setTitle("Modifica assegnazione")
+            .setMessage(recipe.title + "\n" + recipe.day)
+            .setView(form)
+            .setPositiveButton("Salva") { _, _ ->
+                db.save(recipe.copy(meal = meal.selectedItem.toString(),
+                    alternative = type.selectedItem.toString() == "Alternativa",
+                    category = category.selectedItem.toString()))
+                Toast.makeText(this, "Assegnazione aggiornata", Toast.LENGTH_SHORT).show()
+                if (recipe.day.isNotBlank()) selectedDate = LocalDate.parse(recipe.day)
+                showCalendar()
+            }.setNegativeButton("Annulla", null).show()
+    }
+
+    /** Make independent copies on another calendar date, repeating as often as desired. */
+    private fun cloneRecipeToDay(recipe: Recipe) {
+        chooseDate {
+            val destination = selectedDate.toString()
+            chooseMeal { meal, alternative ->
+                db.save(recipe.copy(id = 0L, day = destination, meal = meal, alternative = alternative))
+                AlertDialog.Builder(this).setTitle("Ricetta copiata")
+                    .setMessage(recipe.title + "\n" + destination + " · " + meal +
+                        " · " + (if (alternative) "Alternativa" else "Principale"))
+                    .setPositiveButton("Copia in un altro giorno") { _, _ -> cloneRecipeToDay(recipe) }
+                    .setNegativeButton("Torna al calendario") { _, _ -> showCalendar() }
+                    .show()
+            }
+        }
     }
 
     private fun confirmDaySearch(day: LocalDate) {
@@ -263,7 +360,7 @@ class MainActivity : Activity() {
         val dateButton = Button(this).apply {
             text = "📅 " + selectedDate.format(dateFormatter) + " · Cambia giorno"
             isAllCaps = false
-            setOnClickListener { chooseDate { text = "📅 " + selectedDate.format(dateFormatter) + " · Cambia giorno" } }
+            setOnClickListener { hideKeyboard(); chooseDate { text = "📅 " + selectedDate.format(dateFormatter) + " · Cambia giorno" } }
         }
         content.addView(dateButton)
         action("✅ Salva ricetta") {
@@ -361,8 +458,8 @@ class MainActivity : Activity() {
             searchDuration = duration.selectedItem.toString()
             showSourceSettings()
         }
-        label("Le schede mostrano solo le informazioni disponibili sui siti originali. " +
-            "I filtri vengono applicati quando i dati sono presenti.", 13f)
+        label("Solo ricette di piatti con preparazione verificata: tutti gli ingredienti " +
+            "indicati devono comparire nella lista degli ingredienti della fonte.", 13f)
 
         action("🔎 Mostra fino a 10 ricette") {
             searchIngredients = ingredients.query() ?: return@action
@@ -403,13 +500,11 @@ class MainActivity : Activity() {
                     progress.dismiss()
                     if (results.isEmpty()) {
                         AlertDialog.Builder(this)
-                            .setTitle("Nessuna scheda disponibile")
-                            .setMessage("I siti non hanno restituito schede compatibili. " +
-                                "Puoi comunque consultare la loro ricerca all'interno dell'app.")
-                            .setPositiveButton("Apri ricerca interna") { _, _ ->
-                                showSitePicker(selectedIngredients)
-                            }
-                            .setNegativeButton("Chiudi", null).show()
+                            .setTitle("Nessuna ricetta verificata")
+                            .setMessage("Non sono stati trovati piatti con tutti gli ingredienti richiesti " +
+                                "nell'elenco ingredienti e con un procedimento leggibile. " +
+                                "Prova a cambiare ingredienti o categoria.")
+                            .setPositiveButton("Chiudi", null).show()
                     } else showRecipeResults(results)
                 }
             }.start()
@@ -694,27 +789,21 @@ class MainActivity : Activity() {
     }
 
     private fun chooseMeal(after: (String, Boolean) -> Unit) {
-        val choices = arrayOf("Pranzo · Principale", "Pranzo · Alternativa", "Cena · Principale", "Cena · Alternativa")
-        var selection = (if (selectedMeal == "Cena") 2 else 0) + (if (selectedAlternative) 1 else 0)
+        val choices = arrayOf("Pranzo · Principale", "Pranzo · Alternativa",
+            "Cena · Principale", "Cena · Alternativa", "Entrambi · Principale", "Entrambi · Alternativa")
+        var selection = (when (selectedMeal) { "Cena" -> 2; "Entrambi" -> 4; else -> 0 }) +
+            (if (selectedAlternative) 1 else 0)
         AlertDialog.Builder(this).setTitle("Inserisci il " + selectedDate.format(dateFormatter))
             .setSingleChoiceItems(choices, selection) { _, index -> selection = index }
             .setPositiveButton("Aggiungi") { _, _ ->
-                selectedMeal = if (selection < 2) "Pranzo" else "Cena"
+                selectedMeal = when (selection / 2) { 1 -> "Cena"; 2 -> "Entrambi"; else -> "Pranzo" }
                 selectedAlternative = selection % 2 == 1
                 after(selectedMeal, selectedAlternative)
             }
             .setNegativeButton("Annulla", null).show()
     }
 
-    private fun planSavedRecipe(recipe: Recipe) {
-        chooseDate {
-            chooseMeal { meal, alternative ->
-                db.save(recipe.copy(id = 0L, day = selectedDate.toString(), meal = meal, alternative = alternative))
-                Toast.makeText(this, "Ricetta aggiunta al calendario", Toast.LENGTH_SHORT).show()
-                showCalendar()
-            }
-        }
-    }
+    private fun planSavedRecipe(recipe: Recipe) { cloneRecipeToDay(recipe) }
 
     private fun onlineDraft(recipe: WebRecipe, text: RecipeText, mode: String) = Recipe(
         day = if (searchForDay) selectedDate.toString() else "", meal = selectedMeal,
@@ -767,7 +856,7 @@ class MainActivity : Activity() {
                             difficulty: String = "Tutte", order: String = "Nome A–Z", ingredientQuery: String = "") {
         screen("Il mio ricettario", "Ricette salvate sul telefono, consultabili anche offline.")
         val queryField = input("Cerca per nome o parola chiave", search)
-        label("Ingredienti: basta che la ricetta ne contenga almeno uno", 14f, true)
+        label("Ingredienti: la ricetta deve contenerli tutti", 14f, true)
         label("Una casella per ingrediente. Massimo 10 ingredienti.", 13f)
         val ingredientField = IngredientInputs(this, ingredientQuery)
         content.addView(ingredientField)
@@ -829,7 +918,8 @@ class MainActivity : Activity() {
             if (r.day.isNotBlank()) selectedDate = LocalDate.parse(r.day)
             showEditor(r)
         }
-        action("📅 Aggiungi al calendario") { planSavedRecipe(r) }
+        if (r.day.isNotBlank()) action("✏️ Cambia pranzo / cena / tipo / categoria") { changePlanning(r) }
+        action("📋 Clona su altri giorni del calendario") { cloneRecipeToDay(r) }
         action("🗑️ Elimina questa voce") {
             AlertDialog.Builder(this).setTitle("Eliminare la ricetta?")
                 .setMessage("La voce sarà rimossa dal calendario e dal ricettario. Operazione non reversibile.")

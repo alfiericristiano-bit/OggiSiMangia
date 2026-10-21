@@ -22,7 +22,8 @@ data class WebRecipe(
     val minutes: Int? = null,
     val rating: Double? = null,
     val feedbackCount: Int? = null,
-    val relevance: Int = 0
+    val relevance: Int = 0,
+    val ingredients: String = ""
 )
 
 object RecipeFinder {
@@ -61,7 +62,7 @@ object RecipeFinder {
                     .maxBodySize(1_800_000)
                     .followRedirects(true)
                     .get()
-                for (recipe in extract(document, name)) {
+                for (recipe in extract(document, name).take(10)) {
                     if (collected.size >= 60) break
                     collected.putIfAbsent(recipe.url.substringBefore('?'), recipe)
                 }
@@ -70,6 +71,22 @@ object RecipeFinder {
             }
         }
 
+        // Do not trust search cards: verify each page's Recipe JSON-LD ingredients and steps.
+        val pool = java.util.concurrent.Executors.newFixedThreadPool(6)
+        val verified = try {
+            val calls = collected.values.map { candidate -> java.util.concurrent.Callable {
+                try {
+                    val html = Jsoup.connect(candidate.url)
+                        .userAgent("Mozilla/5.0 (Android; OggiSiMangia/1.4.1)")
+                        .timeout(7500).maxBodySize(2_000_000).get().outerHtml()
+                    RecipeDiscovery.preview(html, candidate.url, candidate.source, ingredients)
+                } catch (_: Exception) { null }
+            } }
+            pool.invokeAll(calls, 35, java.util.concurrent.TimeUnit.SECONDS).mapNotNull {
+                try { if (it.isCancelled) null else it.get() } catch (_: Exception) { null }
+            }
+        } finally { pool.shutdownNow() }
+
         val maxMinutes = when (duration) {
             "Volante" -> 15
             "Veloce" -> 30
@@ -77,13 +94,12 @@ object RecipeFinder {
             else -> Int.MAX_VALUE
         }
         fun rank(r: WebRecipe): Int {
-            val text = (r.title + " " + r.summary).lowercase()
-            return terms.count { t -> text.contains(t.lowercase()) }
+            return RecipeRanking.relevance(r.ingredients, ingredients)
         }
         // I dati di difficoltà e tempo non sempre sono forniti dalla fonte.
         // In quel caso la scheda resta visibile con l'attributo "non disponibile".
-        return collected.values.filter { r ->
-            rank(r) > 0 && (r.minutes == null || r.minutes <= maxMinutes) &&
+        return verified.filter { r ->
+            RecipeValidation.containsEvery(r.ingredients, ingredients) && (r.minutes == null || r.minutes <= maxMinutes) &&
                 (r.difficulty.isBlank() || difficulty == "Non disponibile" ||
                     r.difficulty.equals(difficulty, true) ||
                     (difficulty == "Facile" && r.difficulty == "Molto facile")) &&

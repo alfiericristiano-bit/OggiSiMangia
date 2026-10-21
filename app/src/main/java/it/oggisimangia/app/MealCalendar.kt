@@ -60,7 +60,6 @@ class MealCalendar(context: Context, private val selected: LocalDate,
                 }
                 setOnClickListener { onSelect(date) }
                 setOnLongClickListener { onAdd(date); true }
-                tooltipText = "Tocca per vedere il giorno; tieni premuto oltre 2 secondi per aggiungere una ricetta"
             }
             dayCell.addView(TextView(context).apply {
                 text = number.toString(); textSize = 16f; gravity = Gravity.CENTER
