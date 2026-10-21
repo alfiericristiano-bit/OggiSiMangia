@@ -703,11 +703,12 @@ class MainActivity : Activity() {
                     progress.dismiss()
                     if (results.isEmpty()) {
                         AlertDialog.Builder(this)
-                            .setTitle("Nessuna ricetta verificata")
+                            .setTitle("Nessuna ricetta verificabile")
                             .setMessage("Non ho potuto verificare ricette con tutti gli ingredienti richiesti. " +
                                 "Questo non significa che non esistano: alcuni siti potrebbero " +
                                 "non rispondere o bloccare la consultazione automatica. " +
-                                "Puoi riprovare, controllare le fonti oppure importare un link.")
+                                "Puoi riprovare, cercare direttamente sui siti oppure importare un link.")
+                            .setNeutralButton("Cerca sui siti") { _, _ -> showSitePicker(selectedIngredients) }
                             .setPositiveButton("Chiudi", null).show()
                     } else showRecipeResults(results)
                 }
@@ -819,6 +820,10 @@ class MainActivity : Activity() {
     private fun showSitePicker(query: String) {
         val encoded = java.net.URLEncoder.encode(query, "UTF-8")
         val choices = RecipeSources.sites.keys.toTypedArray()
+        if (choices.isEmpty()) {
+            Toast.makeText(this, "Aggiungi almeno una fonte nelle impostazioni", Toast.LENGTH_LONG).show()
+            return
+        }
         val links = RecipeSources.sites.values.map { domain ->
             "https://www.bing.com/search?q=" + java.net.URLEncoder.encode("site:$domain ricetta $query", "UTF-8")
         }
