@@ -57,6 +57,9 @@
   let state=load(), view="calendar", selected=todayISO(), month=fromISO(todayISO());
   let editingId=null,photoDraft="",formIngredients=[""],formSteps=[""];
   let archiveSearch="",archiveCategory="Tutte",archiveIngredientFields=[""];
+  let expandedMeals=new Set();
+  const pageHistory=[];
+  let previousView=null,previousRecipeId=null,restoringPage=false;
   // Web equivalent of the Android default long press. Native APK uses OS-configured delay.
   const WEB_LONG_PRESS_MS=500;
   let toastTimer=0,pressTimer=0,pressedLong=false,pressPoint=null;
@@ -92,7 +95,19 @@
     render();
     document.getElementById("app").scrollIntoView({behavior:"smooth",block:"start"});
   }
+  function goBack() {
+    const page=pageHistory.pop();
+    restoringPage=true;
+    view=page?.view||"calendar";
+    editingId=page?.recipeId||null;
+    render();
+    restoringPage=false;
+  }
   function render() {
+    if(previousView!==null && view!==previousView && !restoringPage) {
+      pageHistory.push({view:previousView,recipeId:previousRecipeId});
+      if(pageHistory.length>20)pageHistory.shift();
+    }
     document.body.classList.toggle("dark",state.dark);
     document.querySelectorAll("[data-view]").forEach(btn=>btn.classList.toggle("active",btn.dataset.view===view));
     document.getElementById("today-caption").textContent=formatDate(todayISO(),{weekday:"long",day:"numeric",month:"long",year:"numeric"});
@@ -102,6 +117,10 @@
     else if(view==="detail") renderDetail();
     else if(view==="sources") renderSources();
     else renderAbout();
+    if(view!=="calendar") {
+      app.insertAdjacentHTML("afterbegin",'<div class="app-backbar">'+button("‹ Indietro","go-back","back-pill")+'</div>');
+    }
+    previousView=view;previousRecipeId=editingId;
   }
   function assignmentsFor(day,meal) {
     const out=[];
@@ -125,17 +144,21 @@
     }
     function mealCard(meal) {
       const items=assignmentsFor(selected,meal).sort((a,b)=>Number(a.assignment.alternative)-Number(b.assignment.alternative));
-      return '<div class="meal-section"><div class="meal-title"><h3><span class="emoji">'+(meal==="Pranzo"?"☀️":"🌙")+'</span>'+meal+'</h3>'+
-        button("＋ Aggiungi","add-to-day","tiny", 'data-meal="'+meal+'"')+'</div>'+
+      const expanded=expandedMeals.has(meal);
+      return '<section class="meal-section"><button type="button" class="meal-disclosure" data-action="toggle-meal" data-meal="'+meal+'" aria-expanded="'+expanded+'">'+
+        '<span>'+(meal==="Pranzo"?"☀️":"🌙")+' '+meal+'</span><span>'+items.length+' '+(items.length===1?"piatto":"piatti")+' '+(expanded?"⌃":"⌄")+'</span></button>'+
         (items.length?items.map(function(x) {
           const a=x.assignment, r=x.recipe;
-          return '<div class="meal-entry"><strong>'+escape(r.title)+'</strong><span class="meal-meta">'+escape(r.category||"Piatto")+' · '+(a.alternative?"Alternativa":"Principale")+' · '+escape(r.totalTime||r.cookTime||"")+'</span><div class="actions">'+
-            button("Apri","open-recipe","tiny", 'data-id="'+escape(r.id)+'"')+
-            button("Modifica","edit-plan","tiny", 'data-id="'+escape(r.id)+'" data-aid="'+escape(a.id)+'"')+
-            button("Clona","clone-plan","tiny", 'data-id="'+escape(r.id)+'" data-aid="'+escape(a.id)+'"')+
-            button("✕","delete-plan","tiny danger", 'data-id="'+escape(r.id)+'" data-aid="'+escape(a.id)+'"')+
-            '</div></div>';
-        }).join(""):'<div class="empty">Nessuna ricetta assegnata a '+meal.toLowerCase()+'.</div>')+'</div>';
+          return '<div class="meal-entry compact-meal"><button class="meal-recipe-title" type="button" data-action="open-recipe" data-id="'+escape(r.id)+'">'+
+            (a.alternative?"↪ ":"")+escape(r.title)+'</button>'+
+            (expanded?'<div class="meal-meta">'+escape(r.category||"Piatto")+' · '+(a.alternative?"Alternativa":"Principale")+' · '+escape(r.totalTime||r.cookTime||"")+'</div><div class="actions">'+
+              button("Apri","open-recipe","tiny", 'data-id="'+escape(r.id)+'"')+
+              button("Modifica","edit-plan","tiny", 'data-id="'+escape(r.id)+'" data-aid="'+escape(a.id)+'"')+
+              button("Clona","clone-plan","tiny", 'data-id="'+escape(r.id)+'" data-aid="'+escape(a.id)+'"')+
+              button("Rimuovi dal giorno","delete-plan","tiny danger", 'data-id="'+escape(r.id)+'" data-aid="'+escape(a.id)+'"')+
+              '</div>':"")+'</div>';
+        }).join(""):'<div class="empty">Nessuna ricetta assegnata a '+meal.toLowerCase()+'.</div>')+
+        (expanded?'<div class="meal-add">'+button("＋ Aggiungi a "+meal,"add-to-day","soft",'data-meal="'+meal+'"')+'</div>':"")+'</section>';
     }
     app.innerHTML=
       '<section class="headline calendar-hero"><div><p class="kicker">Calendario dei pasti</p><h1>Organizza i tuoi pasti</h1><p class="subtitle">Tocca un giorno per selezionarlo; tienilo premuto a lungo per aggiungere un piatto.</p></div>'+
@@ -146,7 +169,8 @@
       '<div class="legend"><span><i class="dot"></i> Pranzo</span><span><i class="dot dinner"></i> Cena</span></div>'+
       '<p class="card-hint">💡 Tieni premuto a lungo un giorno per aggiungere una ricetta; un tocco breve seleziona il giorno.</p></section>'+
       '<section class="card"><div class="card-head"><h2 class="selected-day-title">'+escape(formatDate(selected))+'</h2>'+
-      button("Oggi","go-today","tiny")+'</div>'+mealCard("Pranzo")+mealCard("Cena")+
+      '<div class="head-actions">'+button("↻ Oggi","go-today","tiny")+button("🗑 Svuota giorno","clear-day","tiny danger")+'</div></div>'+
+      mealCard("Pranzo")+mealCard("Cena")+
       '<div class="head-actions">'+button("＋ Crea ricetta per questo giorno","new-for-day","soft")+'</div></section></div>'+
       '<div class="quick-stat"><div class="stat"><strong>'+state.recipes.length+'</strong><span>Ricette nel browser</span></div>'+
       '<div class="stat"><strong>'+days.size+'</strong><span>Giorni pianificati nel mese</span></div>'+
@@ -166,8 +190,10 @@
       field("search","Nome del piatto",archiveSearch,{placeholder:"Es. pasta alle zucchine"})+
       field("category","Categoria",archiveCategory,{select:["Tutte"].concat(CATEGORIES)})+'</div>'+
       '<div class="field"><label>Ingredienti richiesti — tutti devono essere presenti</label><div id="filter-ingredient-rows" class="select-ingredients">'+archiveIngredientFields.map((x,i)=>ingredientFilterLine(x,i)).join("")+'</div></div>'+
-      '<div class="head-actions" style="margin-top:12px">'+button("＋ Aggiungi ingrediente","add-filter-ingredient","soft")+
-      '<button type="submit" class="btn primary">🔎 Cerca</button>'+button("Azzera filtri","reset-filters")+'</div></form></section>'+
+      '<div class="head-actions archive-search-actions" style="margin-top:12px">'+button("＋ Ingrediente","add-filter-ingredient","soft")+
+      button("↻ Azzera ingredienti","reset-ingredients","soft")+'</div>'+
+      '<button type="submit" class="btn primary search-cta">🔎 CERCA RICETTE NEL RICETTARIO</button>'+
+      '<div class="head-actions" style="margin-top:7px">'+button("Azzera tutti i filtri","reset-filters")+'</div></form></section>'+
       '<div class="card-head"><h2>'+filtered.length+' '+(filtered.length===1?"ricetta":"ricette")+'</h2><span class="muted">Solo piatti, non guide generiche</span></div>'+
       (filtered.length?'<div class="recipe-grid">'+filtered.map(recipeTile).join("")+'</div>':
         '<section class="card empty">Non ci sono ricette che contengono <strong>tutti</strong> gli ingredienti richiesti. Prova a modificare i filtri oppure scrivi una nuova ricetta.</section>');
@@ -312,7 +338,7 @@
       button("◐ Tema chiaro / scuro","toggle-theme")+
       button("ⓘ Rivedi guida","show-help")+
       button("Reimposta i dati di prova","reset-data","danger")+'</div>'+
-      '<p class="muted" style="font-size:12px;margin-top:18px">Ultima versione Android di riferimento: 1.5.0. Le modifiche del browser non passano automaticamente all’APK.</p></section>';
+      '<p class="muted" style="font-size:12px;margin-top:18px">Ultima versione Android di riferimento: 1.5.4. Le modifiche del browser non passano automaticamente all’APK.</p></section>';
   }
   function showHelp(force) {
     if(!force&&state.tipsHidden)return;
@@ -363,13 +389,29 @@
     const b=e.target.closest("[data-action]");if(!b)return;
     const action=b.dataset.action,id=b.dataset.id,aid=b.dataset.aid,idx=Number(b.dataset.index);
     if(action==="close-modal"){closeModal();return;}
+    if(action==="go-back"){goBack();return;}
+    if(action==="toggle-meal"){
+      if(expandedMeals.has(b.dataset.meal))expandedMeals.delete(b.dataset.meal);else expandedMeals.add(b.dataset.meal);
+      render();return;
+    }
+    if(action==="clear-day"){
+      const count=assignmentsFor(selected).length;
+      if(!count){toast("Il giorno non contiene ricette.");return;}
+      modal("Svuotare questo giorno?",'<p>Rimuovere <strong>'+count+'</strong> assegnazioni dal '+escape(formatDate(selected))+
+        '? Le ricette rimarranno nel ricettario.</p><div class="modal-actions">'+button("Annulla","close-modal")+
+        button("Svuota giorno","confirm-clear-day","danger")+'</div>');return;
+    }
+    if(action==="confirm-clear-day"){
+      for(const recipe of state.recipes)recipe.assignments=(recipe.assignments||[]).filter(a=>a.date!==selected);
+      persist();closeModal();expandedMeals.clear();render();toast("Giorno svuotato. Ricette conservate.");return;
+    }
     if(action==="show-help"){showHelp(true);return;}
     if(action==="accept-help"){state.tipsHidden=!!document.getElementById("hide-help")?.checked;persist();closeModal();return;}
     if(action==="prev-month"||action==="next-month"){month=new Date(month.getFullYear(),month.getMonth()+(action==="prev-month"?-1:1),1);render();return;}
-    if(action==="go-today"){selected=todayISO();month=fromISO(selected);render();return;}
+    if(action==="go-today"){selected=todayISO();month=fromISO(selected);expandedMeals.clear();render();return;}
     if(action==="select-day"){
       if(pressedLong){pressedLong=false;return;}
-      selected=b.dataset.date;render();return;
+      selected=b.dataset.date;expandedMeals.clear();render();return;
     }
     if(action==="new-recipe"){beginEditor(null,false);return;}
     if(action==="new-for-day"){beginEditor(null,true);return;}
@@ -421,6 +463,7 @@
       archiveIngredientFields.length>1?archiveIngredientFields.splice(idx,1):archiveIngredientFields=[""];
       render();return;
     }
+    if(action==="reset-ingredients"){currentArchiveValues();archiveIngredientFields=[""];render();return;}
     if(action==="reset-filters"){archiveSearch="";archiveCategory="Tutte";archiveIngredientFields=[""];render();return;}
     if(action==="add-source"){sourceDialog();return;}
     if(action==="move-source"){
