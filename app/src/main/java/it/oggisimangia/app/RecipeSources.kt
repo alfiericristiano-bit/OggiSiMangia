@@ -46,9 +46,9 @@ object RecipeRanking {
         return (rating * count.toDouble() + 3.5 * 20) / (count.toDouble() + 20)
     }
     fun order(items: List<WebRecipe>, ingredients: String): List<WebRecipe> = items
-        .filter { maxOf(it.relevance, relevance(it.title + " " + it.summary, ingredients)) > 0 }
+        .filter { it.ingredients.isNotBlank() && RecipeValidation.containsEvery(it.ingredients, ingredients) }
         .sortedWith(compareBy<WebRecipe> { RecipeSources.priority(it.url) }
-            .thenByDescending { maxOf(it.relevance, relevance(it.title + " " + it.summary, ingredients)) }
+            .thenByDescending { relevance(it.ingredients, ingredients) }
             .thenByDescending { confidence(it.rating, it.feedbackCount) }
             .thenByDescending { it.feedbackCount ?: -1 }
             .thenBy { it.title.lowercase() })
