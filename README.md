@@ -2,6 +2,10 @@
 
 Android 1.4.1 (versionCode 12).
 
+- Nelle impostazioni delle fonti si possono eliminare singolarmente siti predefiniti o aggiunti dall'utente con conferma. Non vengono più interrogati, nemmeno dalla ricerca diretta; le eliminazioni restano dopo riavvii e aggiornamenti. L'elenco vuoto è consentito; il comando di ripristino riporta i siti iniziali.
+- Regola consegna: dopo le modifiche continuare compilazione e verifiche GitHub, ma **NON scaricare, estrarre o allegare APK automaticamente**. Recuperare e allegare direttamente il file .apk in chat esclusivamente quando l'utente scrive «apk». La versione resta nel nome; il collegamento alla pagina GitHub non sostituisce l'APK scaricabile quando richiesto.
+
+
 - Le spiegazioni facoltative sono popup compatti con «Ho capito» e casella «Non mostrare più questo messaggio». Le scelte sono memorizzate nelle SharedPreferences dell'app (resistono a riavvii e aggiornamenti senza cancellazione dati); ogni spiegazione appare al più una volta a sessione, salvo richiamo manuale. Il tooltip nativo dei giorni è rimosso; una voce «Come funziona il calendario» permette di rileggere le istruzioni. La regola si estende ai futuri tooltip; non riguarda conferme, avvisi ed errori.
 
 
