@@ -4,7 +4,7 @@ Questa directory è l'anteprima browser interattiva del progetto Android. **Non*
 
 ## Funzioni provabili
 
-Calendario pranzo/cena (compreso tocco prolungato di oltre 2 secondi), ricettario, filtro con TUTTI gli ingredienti richiesti, ricette manuali con passaggi numerati e fotografie compresse, modifica/duplicazione delle assegnazioni in altri giorni, fonti di ricerca aggiungibili/riordinabili/eliminabili, tema chiaro/scuro, salvataggio locale, import/export JSON e stampa dal browser.
+Calendario pranzo/cena (compreso tocco prolungato secondo il tempo standard del dispositivo (circa 500 ms nell'anteprima web)), ricettario, filtro con TUTTI gli ingredienti richiesti, ricette manuali con passaggi numerati e fotografie compresse, modifica/duplicazione delle assegnazioni in altri giorni, fonti di ricerca aggiungibili/riordinabili/eliminabili, tema chiaro/scuro, salvataggio locale, import/export JSON e stampa dal browser.
 
 La ricerca automatica online sui siti esterni e le API native Android (es. stampa Android e storage SQLite) **non** sono disponibili nella versione web. I dati inseriti nell'anteprima rimangono nel `localStorage` di quel browser. Non sono salvati su Vercel: se si cancellano i dati del browser si possono perdere, quindi usare «Esporta backup JSON» per conservarli. L'importazione JSON riguarda soltanto la versione web.
 
