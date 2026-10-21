@@ -13,10 +13,14 @@ Android 1.2.0 (versionCode 4).
 
 Le fonti possono bloccare richieste o cambiare struttura. Non sono garantiti dieci risultati né recensioni per ogni ricetta. I conteggi pubblicati orientano l'ordinamento; non certificano la ricetta. Dati mancanti e riassunti non disponibili vengono dichiarati. Non vengono aggirati accessi riservati. Ingredienti e testi salvati dall'utente sono conservati localmente; le immagini dei siti non vengono archiviate automaticamente.
 
-## Build e firma
+## Build e firma persistente (1.2.1)
 
-Actions esegue test del lettore, verifica della migrazione, lint e assembleDebug e pubblica APK e report. L'APK debug è una compilazione di prova: la firma temporanea non garantisce aggiornamento sopra gli APK precedenti.
+La distribuzione pubblica soltanto APK release firmati con la chiave persistente, dopo test, lint e prova di aggiornamento in-place su emulatore. Il controllo installa due versioni firmate con la stessa chiave e verifica che un file nel sandbox dell'app resti presente dopo adb install -r.
 
-La build release supporta una chiave persistente fornita esclusivamente tramite i secret GitHub Actions ANDROID_KEYSTORE_BASE64, ANDROID_STORE_PASSWORD, ANDROID_KEY_ALIAS e ANDROID_KEY_PASSWORD. Nessuna chiave viene aggiunta al repository. Quando tutti i secret sono configurati viene pubblicato anche l'APK release.
+Sono obbligatori cinque secret Actions: ANDROID_KEYSTORE_BASE64, ANDROID_STORE_PASSWORD, ANDROID_KEY_ALIAS, ANDROID_KEY_PASSWORD e ANDROID_CERT_SHA256. Quest'ultimo contiene il fingerprint pubblico SHA-256 del certificato e impedisce di pubblicare accidentalmente con un'altra chiave. Secret assenti o certificato diverso bloccano la distribuzione; non esiste fallback a firma temporanea.
 
-L'applicationId resta it.oggisimangia.app e il versionCode aumenta. Per aggiornare l'app installata servono la stessa chiave privata e il medesimo certificato della versione già presente. La chiave delle vecchie build effimere potrebbe non essere recuperabile: non disinstallare l'app con dati importanti per superare un errore di firma. Configurazione dei secret, confronto dei certificati e prova di aggiornamento in-place restano necessari prima di distribuire un aggiornamento come compatibile.
+La chiave privata non deve essere inserita nel repository, nei log, nelle cache Actions o negli artifact. Conservare una copia di sicurezza cifrata indipendente, con password gestita in modo sicuro. La chiave viene estratta in un file temporaneo del runner con permessi limitati ed eliminata al termine della build.
+
+L'applicationId resta it.oggisimangia.app. Il versionCode di distribuzione aumenta; la proprietà verificationVersionCode è riservata al test su emulatore. La prima installazione con questa nuova chiave richiede di rimuovere le precedenti build debug firmate diversamente, con perdita dei dati: l'utente ha autorizzato questa transizione. Gli aggiornamenti successivi devono mantenere la stessa chiave e aumentare il versionCode.
+
+Stato: configurazione della chiave e prova di aggiornamento ancora da completare prima del rilascio 1.2.1.

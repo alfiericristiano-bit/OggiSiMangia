@@ -10,8 +10,8 @@ android {
         applicationId = "it.oggisimangia.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 4
-        versionName = "1.2.0"
+        versionCode = providers.gradleProperty("verificationVersionCode").orNull?.toInt() ?: 5
+        versionName = "1.2.1"
     }
     val signingPath = System.getenv("ANDROID_KEYSTORE_PATH")
     if (!signingPath.isNullOrBlank()) {
@@ -21,8 +21,10 @@ android {
             keyAlias = System.getenv("ANDROID_KEY_ALIAS")
             keyPassword = System.getenv("ANDROID_KEY_PASSWORD")
         }
-        buildTypes.getByName("release") {
-            signingConfig = signingConfigs.getByName("persistent")
+        listOf("debug", "release").forEach { variant ->
+            buildTypes.getByName(variant) {
+                signingConfig = signingConfigs.getByName("persistent")
+            }
         }
     }
     compileOptions {
