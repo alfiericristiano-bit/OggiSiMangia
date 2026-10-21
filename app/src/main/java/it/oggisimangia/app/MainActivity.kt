@@ -20,11 +20,6 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 import java.net.HttpURLConnection
 import java.net.URL
-import android.webkit.WebView
-import android.webkit.WebViewClient
-import android.webkit.WebResourceRequest
-import java.net.URL
-import java.net.HttpURLConnection
 import java.io.File
 import java.io.FileOutputStream
 import java.time.LocalDate
@@ -43,7 +38,6 @@ class MainActivity : Activity() {
     private var searchDuration = "Veloce"
     private var searchCategory = "Primo"
     private var selectedPhoto = ""
-    private var lastResults: List<OnlineRecipe> = emptyList()
     private var photoLabel: TextView? = null
     private val dateFormatter = DateTimeFormatter.ofPattern("EEEE d MMMM yyyy", java.util.Locale.ITALIAN)
 
@@ -557,7 +551,7 @@ class MainActivity : Activity() {
         label("PREPARAZIONE", 17f, true)
         label(r.instructions.ifBlank { "Consulta la ricetta originale, se disponibile." })
         if (r.url.isNotBlank() && trusted(r.url)) {
-            action("🌐 Leggi la ricetta nell’app") { openInside(r.url, r.title) }
+            action("🌐 Leggi la ricetta nell’app") { openWeb(r.url) }
         }
         action("✏️ Modifica questa ricetta") {
             selectedDate = LocalDate.parse(r.day)
