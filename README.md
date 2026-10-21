@@ -1,6 +1,10 @@
 # 🍽️ OggiSiMangia...
 
-Android 1.5.0 (versionCode 13).
+Android 1.5.1 (versionCode 14).
+
+- Restyling di Android e anteprima web ispirato al progetto FamilyChat: gradiente verde acqua #147D72 → #20A58C, navigazione orizzontale compatta, superfici chiare arrotondate, pulsanti e moduli coerenti. Nessun cambiamento al database o ai dati delle ricette.
+- Pressione prolungata calendario: su Android viene usato il gesto nativo con tempo gestito dal sistema e dalle impostazioni di accessibilità (senza timer personalizzato di 2 secondi); la versione Vercel usa il tempo web equivalente di circa 500 ms.
+
 
 - Ricette personali: editor completo con titolo, descrizione, portata, difficoltà, provenienza, porzioni, autore, costo, etichette, allergeni, ingredienti in righe con quantità/unità, procedimento numerato aggiungibile ed eliminabile, tempi di preparazione/cottura/riposo/totale, temperatura, attrezzatura, consigli, varianti, conservazione, valori nutrizionali e note personali. Obbligatori nome, un ingrediente e un passaggio; possibilità di salvare solo nel ricettario o anche nel calendario.
 - Foto personali da fotocamera Android (FileProvider privato, senza salvare l'originale esternamente) o selezione dalla galleria; compressione JPEG massima 960 px; rimozione e anteprima nell'editor; le foto delle vecchie ricette restano valide.
@@ -19,7 +23,7 @@ Android 1.5.0 (versionCode 13).
 - Su una ricetta già presente in un giorno del calendario, Cambia assegnazione modifica pasto (Pranzo/Cena/Entrambi), principale/alternativa e categoria, senza duplicare. Clona su altri giorni crea copie indipendenti, scegliendo data e pasto/tipo, e permette di ripetere per più giorni.
 
 
-- Tocco breve su un giorno: seleziona il giorno e mostra i pasti nella home. Pressione ferma oltre 2 secondi (2100 ms): conferma Sì/No, poi pranzo/cena e principale/alternativa. No non modifica selezione o dati. Movimento, scorrimento e annullamento interrompono la pressione.
+- Tocco breve su un giorno: seleziona il giorno e mostra i pasti nella home. Pressione lunga standard Android (durata definita dal sistema): conferma Sì/No, poi pranzo/cena e principale/alternativa. No non modifica selezione o dati. Movimento, scorrimento e annullamento interrompono la pressione.
 - Se il pasto ha già una ricetta principale, viene preselezionata Alternativa. Il contesto giorno/pasto/tipo è mantenuto nella ricerca, importazione link, editor e conferma di pianificazione. Le alternative salvate appaiono nella home sotto il relativo pasto con etichetta Alternativa; pulsanti dedicati permettono di cercarne altre.
 - Ingredienti in caselle separate: una inizialmente, pulsante Aggiungi ingrediente accanto all’ultima casella, fino a 10. Una sola voce per casella; vale sia per ricerca online sia per ricettario.
 - Priorità fonti configurabile con un menu a tendina per ciascuna posizione. Scelta di un sito già assegnato: scambio automatico, senza duplicati. Ordine e siti aggiunti dall’utente sono salvati in SharedPreferences; all’avvio vengono ripristinati prima delle ricerche. GialloZafferano rimane primo nell’ordine iniziale. Nuovi domini HTTPS entrano nella ricerca per dominio e nel parser Recipe JSON-LD; disponibilità e dati dipendono dal sito. Nessun accesso riservato viene aggirato.
