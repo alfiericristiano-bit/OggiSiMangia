@@ -1,0 +1,57 @@
+name: APK firmato 1.5.4 - consegna diretta
+on:
+  push:
+    branches:
+      - artifact/v1.5.4-direct-apk
+permissions:
+  contents: read
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+      ANDROID_STORE_PASSWORD: ${{ secrets.ANDROID_STORE_PASSWORD }}
+      ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+      ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+      ANDROID_CERT_SHA256: ${{ secrets.ANDROID_CERT_SHA256 }}
+      ANDROID_KEYSTORE_PATH: ${{ github.workspace }}/../oggisimangia.jks
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
+      - name: Verifica certificato di firma persistente
+        run: bash scripts/check_signing.sh
+      - name: Compila APK release firmato
+        run: gradle --no-daemon :app:testDebugUnitTest :app:lintDebug :app:assembleRelease
+      - name: Controlla APK, versione e firma
+        shell: bash
+        run: |
+          set -euo pipefail
+          apk="app/build/outputs/apk/release/app-release.apk"
+          test -s "$apk"
+          sdk="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-/usr/local/lib/android/sdk}}"
+          apksigner=$(find "$sdk/build-tools" -name apksigner -type f | sort -V | tail -1)
+          aapt=$(find "$sdk/build-tools" -name aapt -type f | sort -V | tail -1)
+          "$apksigner" verify --verbose "$apk"
+          "$aapt" dump badging "$apk" | head -n1 | tee /tmp/apk-package.txt
+          grep -F "versionName='1.5.4'" /tmp/apk-package.txt
+          grep -F "versionCode='17'" /tmp/apk-package.txt
+          grep -F "name='it.oggisimangia.app'" /tmp/apk-package.txt
+          mkdir -p dist
+          cp "$apk" "dist/OggiSiMangia-v1.5.4.apk"
+          sha256sum dist/*.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: OggiSiMangia-v1.5.4-APK
+          path: dist/*.apk
+          if-no-files-found: error
+          retention-days: 90
+      - name: Pulisci certificato privato
+        if: always()
+        run: rm -f "$ANDROID_KEYSTORE_PATH" "$RUNNER_TEMP/signing-cert.der"
