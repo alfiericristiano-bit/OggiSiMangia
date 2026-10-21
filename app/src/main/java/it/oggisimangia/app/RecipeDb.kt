@@ -27,10 +27,23 @@ data class Recipe(
     val restTime: String = "",
     val portions: String = "",
     val sourceImageUrl: String = "",
-    val nutrition: String = ""
+    val nutrition: String = "",
+    val description: String = "",
+    val cuisine: String = "",
+    val equipment: String = "",
+    val tips: String = "",
+    val notes: String = "",
+    val storage: String = "",
+    val variations: String = "",
+    val allergens: String = "",
+    val tags: String = "",
+    val temperature: String = "",
+    val author: String = "",
+    val cost: String = "",
+    val isPersonal: Boolean = false
 )
 
-class RecipeDb(context: Context) : SQLiteOpenHelper(context, "oggisimangia.db", null, 3) {
+class RecipeDb(context: Context) : SQLiteOpenHelper(context, "oggisimangia.db", null, 4) {
     override fun onCreate(db: SQLiteDatabase) {
         db.execSQL("""
             CREATE TABLE recipes (
@@ -54,7 +67,20 @@ class RecipeDb(context: Context) : SQLiteOpenHelper(context, "oggisimangia.db", 
                 restTime TEXT NOT NULL DEFAULT '',
                 portions TEXT NOT NULL DEFAULT '',
                 sourceImageUrl TEXT NOT NULL DEFAULT '',
-                nutrition TEXT NOT NULL DEFAULT ''
+                nutrition TEXT NOT NULL DEFAULT '',
+                description TEXT NOT NULL DEFAULT '',
+                cuisine TEXT NOT NULL DEFAULT '',
+                equipment TEXT NOT NULL DEFAULT '',
+                tips TEXT NOT NULL DEFAULT '',
+                notes TEXT NOT NULL DEFAULT '',
+                storage TEXT NOT NULL DEFAULT '',
+                variations TEXT NOT NULL DEFAULT '',
+                allergens TEXT NOT NULL DEFAULT '',
+                tags TEXT NOT NULL DEFAULT '',
+                temperature TEXT NOT NULL DEFAULT '',
+                author TEXT NOT NULL DEFAULT '',
+                cost TEXT NOT NULL DEFAULT '',
+                isPersonal INTEGER NOT NULL DEFAULT 0
             )
         """.trimIndent())
         db.execSQL("CREATE INDEX by_day ON recipes(day)")
@@ -74,6 +100,21 @@ class RecipeDb(context: Context) : SQLiteOpenHelper(context, "oggisimangia.db", 
             db.execSQL("ALTER TABLE recipes ADD COLUMN portions TEXT NOT NULL DEFAULT ''")
             db.execSQL("ALTER TABLE recipes ADD COLUMN sourceImageUrl TEXT NOT NULL DEFAULT ''")
             db.execSQL("ALTER TABLE recipes ADD COLUMN nutrition TEXT NOT NULL DEFAULT ''")
+        }
+        if (oldVersion < 4) {
+            db.execSQL("ALTER TABLE recipes ADD COLUMN description TEXT NOT NULL DEFAULT ''")
+            db.execSQL("ALTER TABLE recipes ADD COLUMN cuisine TEXT NOT NULL DEFAULT ''")
+            db.execSQL("ALTER TABLE recipes ADD COLUMN equipment TEXT NOT NULL DEFAULT ''")
+            db.execSQL("ALTER TABLE recipes ADD COLUMN tips TEXT NOT NULL DEFAULT ''")
+            db.execSQL("ALTER TABLE recipes ADD COLUMN notes TEXT NOT NULL DEFAULT ''")
+            db.execSQL("ALTER TABLE recipes ADD COLUMN storage TEXT NOT NULL DEFAULT ''")
+            db.execSQL("ALTER TABLE recipes ADD COLUMN variations TEXT NOT NULL DEFAULT ''")
+            db.execSQL("ALTER TABLE recipes ADD COLUMN allergens TEXT NOT NULL DEFAULT ''")
+            db.execSQL("ALTER TABLE recipes ADD COLUMN tags TEXT NOT NULL DEFAULT ''")
+            db.execSQL("ALTER TABLE recipes ADD COLUMN temperature TEXT NOT NULL DEFAULT ''")
+            db.execSQL("ALTER TABLE recipes ADD COLUMN author TEXT NOT NULL DEFAULT ''")
+            db.execSQL("ALTER TABLE recipes ADD COLUMN cost TEXT NOT NULL DEFAULT ''")
+            db.execSQL("ALTER TABLE recipes ADD COLUMN isPersonal INTEGER NOT NULL DEFAULT 0")
         }
     }
 
@@ -98,7 +139,20 @@ class RecipeDb(context: Context) : SQLiteOpenHelper(context, "oggisimangia.db", 
         restTime = c.getString(c.getColumnIndexOrThrow("restTime")),
         portions = c.getString(c.getColumnIndexOrThrow("portions")),
         sourceImageUrl = c.getString(c.getColumnIndexOrThrow("sourceImageUrl")),
-        nutrition = c.getString(c.getColumnIndexOrThrow("nutrition"))
+        nutrition = c.getString(c.getColumnIndexOrThrow("nutrition")),
+        description = c.getString(c.getColumnIndexOrThrow("description")),
+        cuisine = c.getString(c.getColumnIndexOrThrow("cuisine")),
+        equipment = c.getString(c.getColumnIndexOrThrow("equipment")),
+        tips = c.getString(c.getColumnIndexOrThrow("tips")),
+        notes = c.getString(c.getColumnIndexOrThrow("notes")),
+        storage = c.getString(c.getColumnIndexOrThrow("storage")),
+        variations = c.getString(c.getColumnIndexOrThrow("variations")),
+        allergens = c.getString(c.getColumnIndexOrThrow("allergens")),
+        tags = c.getString(c.getColumnIndexOrThrow("tags")),
+        temperature = c.getString(c.getColumnIndexOrThrow("temperature")),
+        author = c.getString(c.getColumnIndexOrThrow("author")),
+        cost = c.getString(c.getColumnIndexOrThrow("cost")),
+        isPersonal = c.getInt(c.getColumnIndexOrThrow("isPersonal")) == 1
     )
 
     fun save(r: Recipe): Long {
@@ -123,6 +177,19 @@ class RecipeDb(context: Context) : SQLiteOpenHelper(context, "oggisimangia.db", 
             put("portions", r.portions)
             put("sourceImageUrl", r.sourceImageUrl)
             put("nutrition", r.nutrition)
+            put("description", r.description)
+            put("cuisine", r.cuisine)
+            put("equipment", r.equipment)
+            put("tips", r.tips)
+            put("notes", r.notes)
+            put("storage", r.storage)
+            put("variations", r.variations)
+            put("allergens", r.allergens)
+            put("tags", r.tags)
+            put("temperature", r.temperature)
+            put("author", r.author)
+            put("cost", r.cost)
+            put("isPersonal", if (r.isPersonal) 1 else 0)
         }
         return if (r.id == 0L) writableDatabase.insertOrThrow("recipes", null, v)
         else {

@@ -1,6 +1,11 @@
 # 🍽️ OggiSiMangia...
 
-Android 1.4.1 (versionCode 12).
+Android 1.5.0 (versionCode 13).
+
+- Ricette personali: editor completo con titolo, descrizione, portata, difficoltà, provenienza, porzioni, autore, costo, etichette, allergeni, ingredienti in righe con quantità/unità, procedimento numerato aggiungibile ed eliminabile, tempi di preparazione/cottura/riposo/totale, temperatura, attrezzatura, consigli, varianti, conservazione, valori nutrizionali e note personali. Obbligatori nome, un ingrediente e un passaggio; possibilità di salvare solo nel ricettario o anche nel calendario.
+- Foto personali da fotocamera Android (FileProvider privato, senza salvare l'originale esternamente) o selezione dalla galleria; compressione JPEG massima 960 px; rimozione e anteprima nell'editor; le foto delle vecchie ricette restano valide.
+- Database SQLite v4 aggiunge campi conservativi e migra automaticamente da v1/v2/v3. I nuovi dati sono visualizzati anche nella scheda ricetta e nei report PDF. La firma e l'identificativo Android rimangono invariati.
+
 
 - Nelle impostazioni delle fonti si possono eliminare singolarmente siti predefiniti o aggiunti dall'utente con conferma. Non vengono più interrogati, nemmeno dalla ricerca diretta; le eliminazioni restano dopo riavvii e aggiornamenti. L'elenco vuoto è consentito; il comando di ripristino riporta i siti iniziali.
 - Regola consegna: dopo le modifiche continuare compilazione e verifiche GitHub, ma **NON scaricare, estrarre o allegare APK automaticamente**. Recuperare e allegare direttamente il file .apk in chat esclusivamente quando l'utente scrive «apk». La versione resta nel nome; il collegamento alla pagina GitHub non sostituisce l'APK scaricabile quando richiesto.

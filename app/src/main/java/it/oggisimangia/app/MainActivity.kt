@@ -47,6 +47,8 @@ class MainActivity : Activity() {
     private var searchDuration = "Veloce"
     private var searchCategory = "Primo"
     private var selectedPhoto = ""
+    private var photoPreview: ImageView? = null
+    private var pendingCameraPath: String? = null
     private var lastSearchResults: List<WebRecipe> = emptyList()
     private var lastSearchOffset = 0
     private var photoLabel: TextView? = null
@@ -54,6 +56,7 @@ class MainActivity : Activity() {
 
     companion object {
         private const val PHOTO_REQUEST = 401
+        private const val CAMERA_REQUEST = 403
         private const val PDF_REQUEST = 402
         private val categories = arrayOf("Antipasto", "Primo", "Secondo", "Contorno", "Piatto unico", "Dolce")
         private val difficulties = arrayOf("Facile", "Media", "Difficile", "Non disponibile")
@@ -62,12 +65,18 @@ class MainActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        pendingCameraPath = savedInstanceState?.getString("pending_camera_path")
         db = RecipeDb(this)
         sourcePreferences = SourcePreferences(this)
         RecipeSources.configure(sourcePreferences.load())
         window.statusBarColor = Color.rgb(31, 78, 49)
         window.navigationBarColor = Color.rgb(31, 78, 49)
         showCalendar()
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        outState.putString("pending_camera_path", pendingCameraPath)
+        super.onSaveInstanceState(outState)
     }
 
     private fun dp(n: Int) = (n * resources.displayMetrics.density).toInt()
@@ -242,7 +251,7 @@ class MainActivity : Activity() {
             }
             action("＋ Aggiungi ricetta per " + meal.lowercase()) {
                 selectedMeal = meal
-                showEditor()
+                showEditor(planByDefault = true)
             }
             action("＋ Cerca alternativa per " + meal.lowercase()) { startMealSearch(meal, true) }
         }
@@ -326,79 +335,202 @@ class MainActivity : Activity() {
     }
 
     private fun showEditor(existing: Recipe? = null, initialAlternative: Boolean = false,
-                           suggestedTitle: String = "", suggestedUrl: String = "") {
+                           suggestedTitle: String = "", suggestedUrl: String = "",
+                           planByDefault: Boolean = false) {
         selectedPhoto = existing?.imagePath ?: ""
-        screen(if (existing == null || existing.id == 0L) "Nuova ricetta" else "Modifica ricetta",
-            "Le ricette pianificate vengono conservate nel ricettario.")
-        existing?.let { showRecipeMetadata(it) }
-        val mealPicker = dropdown("Pasto", arrayOf("Pranzo", "Cena", "Entrambi"), existing?.meal ?: selectedMeal)
-        val categoryPicker = dropdown("Categoria", categories, existing?.category ?: selectedCategory)
-        val alternativePicker = dropdown("Tipo di scelta", arrayOf("Principale", "Alternativa"),
-            if (existing?.alternative == true || initialAlternative || (existing == null && selectedAlternative)) "Alternativa" else "Principale")
-        val titleField = input("Nome della ricetta *", existing?.title ?: suggestedTitle)
-        val ingredientsField = input("Ingredienti (uno per riga)", existing?.ingredients ?: searchIngredients, true)
-        val modePicker = dropdown("Versione da conservare", arrayOf("Semplificata", "Originale", "Entrambe"),
-            existing?.saveMode ?: "Semplificata")
-        val instructionsField = input("Preparazione semplificata / appunti", existing?.instructions ?: "", true)
-        val originalField = input("Procedimento originale (testo disponibile)", existing?.originalInstructions ?: "", true)
-        label("L'originale offline conserva il testo leggibile, non l'impaginazione del sito. Il link resta sempre disponibile.", 13f)
+        photoPreview = null
+        screen(if (existing == null || existing.id == 0L) "Scrivi la tua ricetta" else "Modifica ricetta",
+            "Compila i campi che conosci. Nome, ingredienti e preparazione sono obbligatori.")
+        label("INFORMAZIONI GENERALI", 20f, true)
+        val titleField = input("Nome del piatto *", existing?.title ?: suggestedTitle)
+        val descriptionField = input("Descrizione breve / presentazione", existing?.description.orEmpty(), true)
+        val categoryPicker = dropdown("Portata", categories, existing?.category ?: selectedCategory)
         val difficultyPicker = dropdown("Difficoltà", difficulties, existing?.difficulty ?: searchDifficulty)
+        val cuisineField = input("Tipo di cucina / provenienza (es. italiana)", existing?.cuisine.orEmpty())
+        val portionsField = input("Dosi / numero persone (es. 4 persone)", existing?.portions.orEmpty())
+        val authorField = input("Autore della ricetta (facoltativo)", existing?.author.orEmpty())
+        val costField = input("Costo indicativo (facoltativo)", existing?.cost.orEmpty())
+        val tagsField = input("Etichette (es. vegetariano, senza glutine)", existing?.tags.orEmpty())
+        val allergensField = input("Allergeni (facoltativo)", existing?.allergens.orEmpty())
+
+        label("INGREDIENTI *", 20f, true)
+        label("Una riga per ingrediente, con quantità e unità di misura. Puoi aggiungere o togliere righe.", 13f)
+        val ingredientRows = RecipeListFields(this, existing?.ingredients ?: searchIngredients, false)
+        content.addView(ingredientRows)
+
+        label("PREPARAZIONE · PASSAGGI NUMERATI *", 20f, true)
+        label("Inserisci ogni passaggio separatamente. L'app mantiene la numerazione anche se ne elimini uno.", 13f)
+        val stepRows = RecipeListFields(this, existing?.instructions.orEmpty(), true)
+        content.addView(stepRows)
+
+        label("TEMPI E COTTURA", 20f, true)
+        val prepField = input("Tempo di preparazione (es. 15 min)", existing?.prepTime.orEmpty())
+        val cookField = input("Tempo di cottura (es. 25 min)", existing?.cookTime.orEmpty())
+        val restField = input("Riposo / lievitazione (es. 2 ore)", existing?.restTime.orEmpty())
+        val totalField = input("Tempo totale (facoltativo)", existing?.totalTime.orEmpty())
+        val temperatureField = input("Temperatura forno / cottura (es. 180 °C)", existing?.temperature.orEmpty())
         val savedDuration = existing?.duration ?: searchDuration
-        val durationPicker = dropdown("Tempo di preparazione", (durations.toList() + savedDuration).distinct().toTypedArray(), savedDuration)
-        val urlField = input("Link originale (facoltativo)", existing?.url ?: suggestedUrl)
-        photoLabel = label(if (selectedPhoto.isBlank()) "Nessuna foto selezionata" else "📷 Foto compressa e salvata", 14f)
-        if (selectedPhoto.isNotBlank()) addPhotoPreview(selectedPhoto)
-        action("📷 Scegli foto dal telefono (compressione automatica)") {
-            val intent = Intent(Intent.ACTION_GET_CONTENT).apply { type = "image/*" }
-            startActivityForResult(Intent.createChooser(intent, "Seleziona foto"), PHOTO_REQUEST)
+        val durationPicker = dropdown("Fascia di tempo", (durations.toList() + savedDuration).distinct().toTypedArray(), savedDuration)
+
+        label("CONSIGLI E ALTRE INFORMAZIONI", 20f, true)
+        val equipmentField = input("Attrezzatura / utensili necessari", existing?.equipment.orEmpty(), true)
+        val tipsField = input("Consigli e accorgimenti", existing?.tips.orEmpty(), true)
+        val variationsField = input("Varianti e sostituzioni", existing?.variations.orEmpty(), true)
+        val storageField = input("Conservazione e possibilità di congelare", existing?.storage.orEmpty(), true)
+        val nutritionField = input("Valori nutrizionali (se conosciuti)", existing?.nutrition.orEmpty(), true)
+        val notesField = input("Note personali", existing?.notes.orEmpty(), true)
+        val urlField = input("Link di riferimento (facoltativo)", existing?.url ?: suggestedUrl)
+        val hasImportedText = !existing?.originalInstructions.isNullOrBlank()
+        var originalField: EditText? = null
+        var modePicker: Spinner? = null
+        if (hasImportedText) {
+            label("PROCEDIMENTO IMPORTATO DALLA FONTE", 18f, true)
+            originalField = input("Testo originale della ricetta", existing?.originalInstructions.orEmpty(), true)
+            modePicker = dropdown("Modalità di salvataggio", arrayOf("Semplificata","Originale","Entrambe"),
+                existing?.saveMode ?: "Entrambe")
         }
+
+        label("FOTOGRAFIA DEL PIATTO", 20f, true)
+        photoLabel = label("La foto viene compressa in JPEG (massimo 960 px) e salvata sul telefono.", 13f)
+        photoPreview = ImageView(this).apply {
+            scaleType = ImageView.ScaleType.CENTER_CROP
+            contentDescription = "Anteprima della foto della ricetta"
+        }
+        content.addView(photoPreview, LinearLayout.LayoutParams(-1, dp(180)).apply { bottomMargin = dp(8) })
+        refreshPhotoPreview()
+        action("📷 Scatta una foto") { launchCamera() }
+        action("🖼️ Scegli foto dalla galleria") {
+            startActivityForResult(Intent(Intent.ACTION_GET_CONTENT).apply {
+                type = "image/*"; addCategory(Intent.CATEGORY_OPENABLE)
+            }, PHOTO_REQUEST)
+        }
+        action("✕ Rimuovi foto dalla ricetta") {
+            selectedPhoto = ""
+            refreshPhotoPreview()
+        }
+
+        label("ARCHIVIAZIONE E CALENDARIO", 20f, true)
+        val mealPicker = dropdown("Pasto", arrayOf("Pranzo","Cena","Entrambi"), existing?.meal ?: selectedMeal)
+        val alternativePicker = dropdown("Tipo di scelta", arrayOf("Principale","Alternativa"),
+            if (existing?.alternative == true || initialAlternative ||
+                (existing == null && selectedAlternative)) "Alternativa" else "Principale")
         val planned = CheckBox(this).apply {
-            text = "Inserisci anche nel calendario"
-            isChecked = existing == null || existing.day.isNotBlank()
+            text = "Aggiungi anche al calendario"
+            isChecked = existing?.day?.isNotBlank() == true || (existing == null && (planByDefault || searchForDay))
         }
         content.addView(planned)
+        if (existing?.day?.isNotBlank() == true) {
+            try { selectedDate = LocalDate.parse(existing.day) } catch (_: Exception) { }
+        }
         val dateButton = Button(this).apply {
             text = "📅 " + selectedDate.format(dateFormatter) + " · Cambia giorno"
             isAllCaps = false
-            setOnClickListener { hideKeyboard(); chooseDate { text = "📅 " + selectedDate.format(dateFormatter) + " · Cambia giorno" } }
+            setOnClickListener {
+                hideKeyboard()
+                chooseDate { text = "📅 " + selectedDate.format(dateFormatter) + " · Cambia giorno" }
+            }
         }
         content.addView(dateButton)
-        action("✅ Salva ricetta") {
+
+        action("✅ Salva ricetta nel ricettario") {
             val title = titleField.text.toString().trim()
-            val url = urlField.text.toString().trim()
             if (title.isBlank()) {
-                titleField.error = "Inserisci il nome della ricetta"
+                titleField.error = "Indica il nome del piatto"
+                titleField.requestFocus()
                 return@action
             }
+            if (!ingredientRows.requireOne("Aggiungi almeno un ingrediente")) return@action
+            if (stepRows.entries().isEmpty() && originalField?.text.isNullOrBlank()) {
+                stepRows.requireOne("Inserisci almeno un passaggio della preparazione")
+                return@action
+            }
+            val url = urlField.text.toString().trim()
             if (url.isNotBlank() && !trusted(url)) {
-                urlField.error = "Inserisci un link HTTPS completo alla ricetta"
+                urlField.error = "Inserisci un link HTTPS pubblico e completo"
+                urlField.requestFocus()
                 return@action
             }
-            db.save(Recipe(
+            val mode = modePicker?.selectedItem?.toString() ?: existing?.saveMode ?: "Semplificata"
+            val record = Recipe(
                 id = existing?.id ?: 0L,
                 day = if (planned.isChecked) selectedDate.toString() else "",
                 meal = mealPicker.selectedItem.toString(),
                 category = categoryPicker.selectedItem.toString(),
                 title = title,
-                ingredients = ingredientsField.text.toString().trim(),
-                instructions = if (modePicker.selectedItem.toString() != "Originale") instructionsField.text.toString().trim() else "",
+                ingredients = ingredientRows.value(),
+                instructions = stepRows.value(),
                 difficulty = difficultyPicker.selectedItem.toString(),
                 duration = durationPicker.selectedItem.toString(),
                 url = url,
                 alternative = alternativePicker.selectedItem.toString() == "Alternativa",
                 imagePath = selectedPhoto,
-                originalInstructions = if (modePicker.selectedItem.toString() != "Semplificata") originalField.text.toString().trim() else "",
-                saveMode = modePicker.selectedItem.toString(),
-                prepTime = existing?.prepTime.orEmpty(), cookTime = existing?.cookTime.orEmpty(),
-                totalTime = existing?.totalTime.orEmpty(), restTime = existing?.restTime.orEmpty(),
-                portions = existing?.portions.orEmpty(), sourceImageUrl = existing?.sourceImageUrl.orEmpty(),
-                nutrition = existing?.nutrition.orEmpty()
-            ))
-            Toast.makeText(this, "Ricetta salvata", Toast.LENGTH_SHORT).show()
-            searchIngredients = ""
-            showCalendar()
+                originalInstructions = originalField?.text?.toString()?.trim() ?: existing?.originalInstructions.orEmpty(),
+                saveMode = mode,
+                prepTime = prepField.text.toString().trim(),
+                cookTime = cookField.text.toString().trim(),
+                totalTime = totalField.text.toString().trim(),
+                restTime = restField.text.toString().trim(),
+                portions = portionsField.text.toString().trim(),
+                sourceImageUrl = existing?.sourceImageUrl.orEmpty(),
+                nutrition = nutritionField.text.toString().trim(),
+                description = descriptionField.text.toString().trim(),
+                cuisine = cuisineField.text.toString().trim(),
+                equipment = equipmentField.text.toString().trim(),
+                tips = tipsField.text.toString().trim(),
+                notes = notesField.text.toString().trim(),
+                storage = storageField.text.toString().trim(),
+                variations = variationsField.text.toString().trim(),
+                allergens = allergensField.text.toString().trim(),
+                tags = tagsField.text.toString().trim(),
+                temperature = temperatureField.text.toString().trim(),
+                author = authorField.text.toString().trim(),
+                cost = costField.text.toString().trim(),
+                isPersonal = existing?.isPersonal ?: (suggestedUrl.isBlank() && existing?.url.isNullOrBlank())
+            )
+            try {
+                db.save(record)
+                Toast.makeText(this, "Ricetta salvata nel ricettario", Toast.LENGTH_SHORT).show()
+                searchIngredients = ""
+                showCalendar()
+            } catch (_: Exception) {
+                Toast.makeText(this, "Salvataggio non riuscito: riprova senza uscire dalla scheda", Toast.LENGTH_LONG).show()
+            }
         }
-        action("← Indietro") { showCalendar() }
+        action("← Torna indietro senza salvare") { showCalendar() }
+    }
+
+    private fun refreshPhotoPreview() {
+        val file = selectedPhoto.takeIf { it.isNotBlank() }?.let { File(it) }
+        if (file != null && file.isFile) {
+            val image = BitmapFactory.decodeFile(file.absolutePath)
+            photoPreview?.setImageBitmap(image)
+            photoPreview?.visibility = if (image != null) View.VISIBLE else View.GONE
+            photoLabel?.text = if (image != null) "📷 Foto compressa, pronta da salvare" else "Foto non leggibile"
+        } else {
+            photoPreview?.setImageDrawable(null)
+            photoPreview?.visibility = View.GONE
+            photoLabel?.text = "Nessuna foto selezionata (opzionale)"
+        }
+    }
+
+    private fun launchCamera() {
+        try {
+            val folder = File(cacheDir, "camera").apply { mkdirs() }
+            val file = File(folder, UUID.randomUUID().toString() + ".jpg")
+            val uri = androidx.core.content.FileProvider.getUriForFile(
+                this, packageName + ".fileprovider", file)
+            pendingCameraPath = file.absolutePath
+            val capture = Intent(MediaStore.ACTION_IMAGE_CAPTURE).apply {
+                putExtra(MediaStore.EXTRA_OUTPUT, uri)
+                clipData = android.content.ClipData.newRawUri("photo", uri)
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
+            }
+            startActivityForResult(capture, CAMERA_REQUEST)
+        } catch (_: Exception) {
+            pendingCameraPath?.let { File(it).delete() }
+            pendingCameraPath = null
+            Toast.makeText(this, "Fotocamera non disponibile su questo dispositivo", Toast.LENGTH_LONG).show()
+        }
     }
 
     private fun trusted(url: String): Boolean = RecipeLink.isValid(url)
@@ -791,7 +923,10 @@ class MainActivity : Activity() {
         val details = listOf(
             "Dosi" to recipe.portions, "Preparazione" to recipe.prepTime,
             "Cottura" to recipe.cookTime, "Tempo totale" to recipe.totalTime, "Riposo / attesa" to recipe.restTime,
-            "Valori nutrizionali pubblicati" to recipe.nutrition
+            "Valori nutrizionali" to recipe.nutrition,
+            "Cucina / provenienza" to recipe.cuisine, "Autore" to recipe.author,
+            "Temperatura" to recipe.temperature, "Costo indicativo" to recipe.cost,
+            "Etichette" to recipe.tags, "Allergeni" to recipe.allergens
         ).filter { it.second.isNotBlank() }
         details.forEach { (caption, value) -> label("$caption: $value", 14f) }
         if (details.isEmpty()) label("Dosi e tempi dettagliati non disponibili dalla fonte.", 14f)
@@ -920,6 +1055,7 @@ class MainActivity : Activity() {
         if (r.imagePath.isNotBlank()) addPhotoPreview(r.imagePath)
         label("📅 " + r.day.ifBlank { "Solo ricettario" } + "   ⏱ " + r.duration + "   👩‍🍳 " + r.difficulty, 15f)
         showRecipeMetadata(r)
+        if (r.description.isNotBlank()) { label("DESCRIZIONE", 17f, true); label(r.description) }
         label("INGREDIENTI", 17f, true)
         label(r.ingredients.ifBlank { "Non annotati" })
         label("PREPARAZIONE", 17f, true)
@@ -929,6 +1065,11 @@ class MainActivity : Activity() {
             label(r.originalInstructions)
         }
         if (r.instructions.isBlank() && r.originalInstructions.isBlank()) label("Consulta la ricetta originale, se disponibile.")
+        listOf("ATTREZZATURA" to r.equipment, "CONSIGLI" to r.tips,
+            "VARIANTI" to r.variations, "CONSERVAZIONE" to r.storage,
+            "NOTE PERSONALI" to r.notes).forEach { (heading, value) ->
+            if (value.isNotBlank()) { label(heading, 17f, true); label(value) }
+        }
         if (r.url.isNotBlank() && trusted(r.url)) {
             action("🌐 Leggi la ricetta nell’app") { openWeb(r.url) }
         }
@@ -968,11 +1109,26 @@ class MainActivity : Activity() {
             val uri = data?.data ?: return
             try {
                 selectedPhoto = compressPhoto(uri)
-                photoLabel?.text = "📷 Foto salvata e compressa (max 960 px, JPEG)"
-                Toast.makeText(this, "Foto acquisita", Toast.LENGTH_SHORT).show()
+                refreshPhotoPreview()
+                Toast.makeText(this, "Foto compressa e pronta", Toast.LENGTH_SHORT).show()
             } catch (_: Exception) {
                 Toast.makeText(this, "Impossibile leggere la foto", Toast.LENGTH_LONG).show()
             }
+        }
+        if (requestCode == CAMERA_REQUEST) {
+            val temporary = pendingCameraPath?.let { File(it) }
+            pendingCameraPath = null
+            try {
+                if (resultCode == RESULT_OK && temporary?.isFile == true && temporary.length() > 0L) {
+                    selectedPhoto = compressPhoto(Uri.fromFile(temporary))
+                    refreshPhotoPreview()
+                    Toast.makeText(this, "Foto scattata, compressa e pronta", Toast.LENGTH_SHORT).show()
+                } else if (resultCode == RESULT_OK) {
+                    Toast.makeText(this, "La fotocamera non ha restituito una foto", Toast.LENGTH_LONG).show()
+                }
+            } catch (_: Exception) {
+                Toast.makeText(this, "Impossibile elaborare la foto della fotocamera", Toast.LENGTH_LONG).show()
+            } finally { temporary?.delete() }
         }
     }
 
