@@ -186,6 +186,11 @@ address=next(n for n in form if n.attrib.get('content-desc')=='Indirizzo del sit
 tap(address);adb('shell','input','text','https://example.org')
 adb('shell','input','keyevent','KEYCODE_BACK')
 tap(text_node(snapshot('source-filled'),'Memorizza'))
+# A disliked source can be deleted and stays gone after the app process restarts.
+tap(find_scrolling('🗑️ Elimina sito · GialloZafferano','source-delete'))
+confirm_delete=snapshot('source-delete-confirm')
+assert any(n.attrib.get('text') == 'Eliminare questo sito di ricerca?' for n in confirm_delete)
+tap(text_node(confirm_delete,'Elimina sito'))
 adb('shell','am','force-stop',package)
 adb('shell','am','start','-W','-n',package+'/.MainActivity')
 home=snapshot('persist-home')
@@ -215,7 +220,8 @@ root=ET.fromstring(prefs)
 import json
 ordered=json.loads(next(e.text for e in root if e.attrib.get('name')=='ordered'))
 assert ordered[0]['name']=='Misya',ordered
+assert all(r['domain']!='giallozafferano.it' for r in ordered), 'Deleted source restored on restart'
 assert any(r['domain']=='example.org' and r['name']=='FonteTest' for r in ordered)
 assert first is not None
-print('PASS: source priority and custom domain survive process restart; ingredient fields grow from one to ten and stop at the limit.')
+print('PASS: source priority, added and deleted domains survive process restart; ingredient fields reach ten.')
 print('PASS: calendar guidance popup can be dismissed with Ho capito; do-not-show choice survives restart.')
