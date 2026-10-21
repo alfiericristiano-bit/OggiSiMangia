@@ -15,6 +15,11 @@ import android.provider.MediaStore
 import android.view.Gravity
 import android.view.View
 import android.widget.*
+import android.webkit.WebView
+import android.webkit.WebViewClient
+import android.webkit.WebResourceRequest
+import java.net.URL
+import java.net.HttpURLConnection
 import java.io.File
 import java.io.FileOutputStream
 import java.time.LocalDate
@@ -33,6 +38,7 @@ class MainActivity : Activity() {
     private var searchDuration = "Veloce"
     private var searchCategory = "Primo"
     private var selectedPhoto = ""
+    private var lastResults: List<OnlineRecipe> = emptyList()
     private var photoLabel: TextView? = null
     private val dateFormatter = DateTimeFormatter.ofPattern("EEEE d MMMM yyyy", java.util.Locale.ITALIAN)
 
@@ -187,7 +193,8 @@ class MainActivity : Activity() {
         action("🔎 Cerca una nuova ricetta") { showSearch() }
     }
 
-    private fun showEditor(existing: Recipe? = null, initialAlternative: Boolean = false) {
+    private fun showEditor(existing: Recipe? = null, initialAlternative: Boolean = false,
+                           suggestedTitle: String = "", suggestedUrl: String = "") {
         selectedPhoto = existing?.imagePath ?: ""
         screen(if (existing == null) "Nuova ricetta" else "Modifica ricetta",
             "Le ricette pianificate vengono conservate nel ricettario.")
@@ -198,12 +205,12 @@ class MainActivity : Activity() {
         val categoryPicker = dropdown("Categoria", categories, existing?.category ?: selectedCategory)
         val alternativePicker = dropdown("Tipo di scelta", arrayOf("Principale", "Alternativa"),
             if (existing?.alternative == true || initialAlternative) "Alternativa" else "Principale")
-        val titleField = input("Nome della ricetta *", existing?.title ?: "")
+        val titleField = input("Nome della ricetta *", existing?.title ?: suggestedTitle)
         val ingredientsField = input("Ingredienti (uno per riga)", existing?.ingredients ?: searchIngredients, true)
         val instructionsField = input("Preparazione / procedimento", existing?.instructions ?: "", true)
         val difficultyPicker = dropdown("Difficoltà", difficulties, existing?.difficulty ?: searchDifficulty)
         val durationPicker = dropdown("Tempo di preparazione", durations, existing?.duration ?: searchDuration)
-        val urlField = input("Link originale (facoltativo)", existing?.url ?: "")
+        val urlField = input("Link originale (facoltativo)", existing?.url ?: suggestedUrl)
         photoLabel = label(if (selectedPhoto.isBlank()) "Nessuna foto selezionata" else "📷 Foto compressa e salvata", 14f)
         if (selectedPhoto.isNotBlank()) addPhotoPreview(selectedPhoto)
         action("📷 Scegli foto dal telefono (compressione automatica)") {
@@ -255,44 +262,230 @@ class MainActivity : Activity() {
         }
     }
 
+    private fun searchUrl(domain: String, query: String): String =
+        Uri.parse("https://www.bing.com/search").buildUpon()
+            .appendQueryParameter("q", "site:$domain ricette $query")
+            .build().toString()
+
+    /** WebView con navigazione consentita sui siti selezionati e sul motore di ricerca. */
+    private fun openInside(url: String, title: String = "Ricetta originale") {
+        if (!trusted(url) && !url.startsWith("https://www.bing.com/search?")) {
+            Toast.makeText(this, "Link non autorizzato", Toast.LENGTH_LONG).show()
+            return
+        }
+        val root = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setBackgroundColor(Color.rgb(249, 250, 245))
+        }
+        val header = TextView(this).apply {
+            text = "🍽️ $title"; textSize = 18f
+            setTextColor(Color.rgb(33, 65, 43))
+            setPadding(dp(15), dp(10), dp(15), dp(8))
+            setTypeface(null, Typeface.BOLD)
+        }
+        root.addView(header)
+        val toolbar = LinearLayout(this)
+        val view = WebView(this).apply {
+            settings.javaScriptEnabled = true
+            settings.domStorageEnabled = true
+            settings.mixedContentMode = android.webkit.WebSettings.MIXED_CONTENT_NEVER_ALLOW
+            webViewClient = object : WebViewClient() {
+                override fun shouldOverrideUrlLoading(v: WebView?, request: WebResourceRequest?): Boolean {
+                    val link = request?.url?.toString() ?: return true
+                    val host = request.url.host?.lowercase() ?: ""
+                    val allowedSearch = request.url.scheme == "https" &&
+                        (host == "www.bing.com" || host == "bing.com")
+                    if (trusted(link) || allowedSearch) return false
+                    Toast.makeText(this@MainActivity,
+                        "Sono consentiti solo i siti di cucina selezionati", Toast.LENGTH_SHORT).show()
+                    return true
+                }
+                override fun onPageFinished(v: WebView?, url: String?) {
+                    if (url != null && trusted(url)) {
+                        header.text = "🍽️ " + (v?.title ?: title).take(95)
+                    }
+                }
+            }
+        }
+        fun toolbarButton(caption: String, callback: () -> Unit) {
+            val button = Button(this).apply {
+                text = caption; textSize = 12f; isAllCaps = false
+                setOnClickListener { callback() }
+            }
+            toolbar.addView(button, LinearLayout.LayoutParams(0, dp(55), 1f))
+        }
+        toolbarButton("← Indietro") {
+            view.destroy()
+            if (lastResults.isNotEmpty()) showRecipeChoices(lastResults) else showSearch()
+        }
+        toolbarButton("＋ Aggiungi al menù") {
+            val current = view.url ?: url
+            if (trusted(current)) {
+                val candidateTitle = view.title?.substringBefore(" - ")?.trim()
+                    ?.takeIf { it.isNotBlank() } ?: title
+                view.destroy()
+                showMealChoice(candidateTitle, current)
+            } else {
+                Toast.makeText(this, "Apri prima una ricetta di uno dei siti consentiti",
+                    Toast.LENGTH_LONG).show()
+            }
+        }
+        root.addView(toolbar)
+        root.addView(view, LinearLayout.LayoutParams(-1, 0, 1f))
+        setContentView(root)
+        view.loadUrl(url)
+    }
+
+    private fun showMealChoice(title: String, link: String) {
+        val options = arrayOf("Pranzo · Principale", "Pranzo · Alternativa",
+            "Cena · Principale", "Cena · Alternativa")
+        AlertDialog.Builder(this).setTitle("Dove inserire la ricetta?")
+            .setItems(options) { _, position ->
+                selectedMeal = if (position < 2) "Pranzo" else "Cena"
+                showEditor(initialAlternative = position % 2 == 1,
+                    suggestedTitle = title, suggestedUrl = link)
+            }.setNegativeButton("Annulla", null).show()
+    }
+
+    private fun showRecipeChoices(items: List<OnlineRecipe>) {
+        lastResults = items
+        val scroll = ScrollView(this)
+        val column = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(12), dp(8), dp(12), dp(12))
+        }
+        scroll.addView(column)
+        items.forEachIndexed { index, recipe ->
+            val card = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                setPadding(dp(13), dp(12), dp(13), dp(12))
+                background = shape(Color.rgb(241, 247, 235), 12f)
+            }
+            column.addView(card, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(12) })
+            fun rowLabel(value: String, big: Boolean = false) {
+                val label = TextView(this).apply {
+                    text = value
+                    textSize = if (big) 17f else 13f
+                    if (big) setTypeface(null, Typeface.BOLD)
+                    setTextColor(Color.rgb(31, 78, 49))
+                    setPadding(0, dp(3), 0, dp(3))
+                }
+                card.addView(label)
+            }
+            rowLabel("${index + 1}. ${recipe.title}", true)
+            rowLabel(recipe.site + " · " + (recipe.minutes?.let { "$it min" } ?: "Tempo n.d.") +
+                " · " + recipe.difficulty.ifBlank { "Difficoltà n.d." })
+            if (recipe.rating != null) {
+                rowLabel("⭐ ${recipe.rating}/5 · " +
+                    (recipe.feedbackCount?.let { "$it feedback" } ?: "Feedback non indicati"))
+            } else rowLabel("Valutazioni non disponibili")
+            if (recipe.description.isNotBlank()) rowLabel(recipe.description)
+            if (recipe.photoUrl.startsWith("https://")) {
+                val image = ImageView(this).apply {
+                    scaleType = ImageView.ScaleType.CENTER_CROP
+                    contentDescription = "Foto della ricetta ${recipe.title}"
+                }
+                card.addView(image, LinearLayout.LayoutParams(-1, dp(145)))
+                // Anteprima temporanea: nessuna copia persistente delle fotografie di terzi.
+                Thread {
+                    try {
+                        val connection = URL(recipe.photoUrl).openConnection() as HttpURLConnection
+                        connection.connectTimeout = 6500; connection.readTimeout = 6500
+                        val buffer = java.io.ByteArrayOutputStream()
+                        connection.inputStream.use { stream ->
+                            val chunk = ByteArray(8192)
+                            while (buffer.size() < 800_000) {
+                                val n = stream.read(chunk)
+                                if (n < 0) break
+                                buffer.write(chunk, 0, n)
+                            }
+                        }
+                        connection.disconnect()
+                        val bytes = buffer.toByteArray()
+                        val photo = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+                        if (photo != null) runOnUiThread { image.setImageBitmap(photo) }
+                    } catch (_: Exception) { /* fotografia non disponibile */ }
+                }.start()
+            }
+            val open = Button(this).apply {
+                text = "👁 Leggi dentro l'app"; isAllCaps = false
+                setOnClickListener { openInside(recipe.url, recipe.title) }
+            }
+            card.addView(open)
+            val add = Button(this).apply {
+                text = "＋ Scegli per il calendario"; isAllCaps = false
+                setOnClickListener { showMealChoice(recipe.title, recipe.url) }
+            }
+            card.addView(add)
+        }
+        AlertDialog.Builder(this).setTitle("🍽️ Ricette trovate (${items.size}/10)")
+            .setView(scroll).setPositiveButton("Chiudi", null)
+            .setNeutralButton("Nuova ricerca") { _, _ -> showSearch() }
+            .show()
+    }
+
     private fun showSearch() {
-        screen("Trova cosa cucinare", "Ricerca guidata solo su siti selezionati e affidabili.")
+        screen("Trova cosa cucinare", "Risultati e ricette consultabili dentro OggiSiMangia...")
         label("Quali ingredienti hai a disposizione?", 17f, true)
         val ingredients = input("Es. pasta, zucchine, uova, parmigiano", searchIngredients, true)
         val category = dropdown("Cerchi un...", categories, searchCategory)
         val difficulty = dropdown("Difficoltà desiderata", difficulties, searchDifficulty)
         val duration = dropdown("Tempo a disposizione", durations, searchDuration)
-        label("Scegli il sito da consultare:", 17f, true)
-        val sites = listOf(
+        fun remember(): Boolean {
+            searchIngredients = ingredients.text.toString().trim()
+            searchCategory = category.selectedItem.toString()
+            searchDifficulty = difficulty.selectedItem.toString()
+            searchDuration = duration.selectedItem.toString()
+            if (searchIngredients.isBlank()) {
+                ingredients.error = "Indica almeno un ingrediente"
+                return false
+            }
+            return true
+        }
+        action("🔎 Trova fino a 10 ricette con foto e valutazioni") {
+            if (!remember()) return@action
+            val progress = ProgressBar(this)
+            val dialog = AlertDialog.Builder(this).setTitle("Ricerca ricette in corso")
+                .setMessage("Consulto le fonti selezionate. La disponibilità dei dati dipende dai siti.")
+                .setView(progress)
+                .setNegativeButton("Annulla", null).create()
+            dialog.show()
+            val query = searchIngredients
+            val cat = searchCategory
+            val diff = searchDifficulty
+            val dur = searchDuration
+            Thread {
+                val results = try { RecipeDiscovery.search(query, cat, diff, dur) }
+                    catch (_: Exception) { emptyList() }
+                runOnUiThread {
+                    if (!dialog.isShowing) return@runOnUiThread
+                    dialog.dismiss()
+                    if (results.isNotEmpty()) showRecipeChoices(results)
+                    else AlertDialog.Builder(this)
+                        .setTitle("Nessuna anteprima disponibile")
+                        .setMessage("I siti o il servizio di ricerca non hanno restituito dati leggibili. Puoi comunque cercare e leggere le ricette senza uscire dall'app.")
+                        .setPositiveButton("Apri ricerca interna") { _, _ ->
+                            openInside(searchUrl("giallozafferano.it", query + " " + cat),
+                                "Ricerca ricette")
+                        }.setNegativeButton("Chiudi", null).show()
+                }
+            }.start()
+        }
+        label("Le ricette con più feedback verificabili appaiono per prime. I tempi e le valutazioni mancanti sono indicati come non disponibili.", 13f)
+        label("Oppure scegli dove cercare (sempre dentro l'app):", 15f, true)
+        listOf(
             "GialloZafferano" to "giallozafferano.it",
             "Il Cucchiaio d'Argento" to "cucchiaio.it",
             "Fatto in Casa da Benedetta" to "fattoincasadabenedetta.it"
-        )
-        sites.forEach { (name, domain) ->
-            action("🔎 Cerca su " + name) {
-                searchIngredients = ingredients.text.toString().trim()
-                searchCategory = category.selectedItem.toString()
-                searchDifficulty = difficulty.selectedItem.toString()
-                searchDuration = duration.selectedItem.toString()
-                if (searchIngredients.isBlank()) {
-                    ingredients.error = "Indica almeno un ingrediente"
-                    return@action
-                }
-                val minutes = when (searchDuration) {
-                    "Volante" -> "10 minuti"
-                    "Veloce" -> "20 minuti"
-                    "Media" -> "45 minuti"
-                    else -> "ricetta elaborata"
-                }
-                val query = "site:" + domain + " ricette " + searchIngredients +
-                    " " + searchCategory + " " + minutes + " " + searchDifficulty
-                val url = Uri.parse("https://www.google.com/search").buildUpon()
-                    .appendQueryParameter("q", query).build().toString()
-                openWeb(url)
+        ).forEach { (name, domain) ->
+            action("🔎 Cerca su $name") {
+                if (remember()) openInside(searchUrl(domain, searchIngredients + " " + searchCategory),
+                    "Ricerca $name")
             }
         }
-        label("La ricerca apre il browser. Scegli una ricetta verificando foto, recensioni e ingredienti sul sito originale, poi registrala nel calendario.", 14f)
-        action("＋ Registra una ricetta che hai trovato") { showEditor() }
+        action("＋ Inserisci una ricetta manualmente") {
+            if (remember()) showEditor()
+        }
         action("📚 Apri ricettario") { showArchive() }
     }
 
