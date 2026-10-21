@@ -28,6 +28,7 @@ function element(id) {
     id,innerHTML:"",textContent:"",value:"",open:false,
     classList:{toggle(){},add(){},remove(){}},
     addEventListener(){},scrollIntoView(){},
+    insertAdjacentHTML(where,html){if(where==="afterbegin")this.innerHTML=html+this.innerHTML;else this.innerHTML+=html;},
     showModal(){this.open=true;},close(){this.open=false;}
   });
   return lookup.get(id);
@@ -65,11 +66,18 @@ function clickView(view) {
   listeners.click({target:{closest(sel){return sel==="[data-view]"?{dataset:{view}}:null;}}});
 }
 clickView("archive");
+assert(element("app").innerHTML.includes("‹ Indietro"),"Back navigation missing on archive");
+assert(element("app").innerHTML.includes("search-cta"),"Highlighted search missing");
 assert(element("app").innerHTML.includes("Pasta alle zucchine"),"Recipes not displayed");
+clickAction("go-back");
+assert(element("app").innerHTML.includes("Il tuo calendario"),"Back did not return to calendar");
+clickView("archive");
 dom.filters=[{value:"riso"},{value:"funghi"}];
 listeners.submit({target:{id:"archive-form"},preventDefault(){}});
 assert(element("app").innerHTML.includes("Risotto ai funghi"),"All-ingredient match missing");
 assert(!element("app").innerHTML.includes('<h3>Pasta alle zucchine</h3>'),"AND ingredient filter returned an unrelated recipe");
+clickAction("reset-ingredients");
+assert(element("app").innerHTML.includes("Pasta alle zucchine"),"Ingredient reset did not restore archive results");
 
 clickView("sources");
 assert(element("app").innerHTML.includes("GialloZafferano"),"Default sources missing");
@@ -96,6 +104,10 @@ let recipe=recipes.find(r=>r.id==="demo-pasta");
 assert.equal(recipe.assignments.length,1,"Meal assignment not saved");
 assert.equal(recipe.assignments[0].date,"2026-10-21");
 assert(element("app").innerHTML.includes("Pasta alle zucchine"),"Meal did not appear in calendar");
+assert(element("app").innerHTML.includes('aria-expanded="false"'),"Collapsed meal sections missing");
+clickAction("toggle-meal",{meal:"Pranzo"});
+assert(element("app").innerHTML.includes('aria-expanded="true"'),"Meal accordion did not expand");
+assert(element("app").innerHTML.includes("Rimuovi dal giorno"),"Expanded meal removal missing");
 clickAction("clone-plan",{id:"demo-pasta",aid:recipe.assignments[0].id});
 dom.getElementById=id=>{
   if(id==="plan-recipe")return {value:"demo-pasta"};
@@ -110,5 +122,13 @@ recipe=recipes.find(r=>r.id==="demo-pasta");
 assert.equal(recipe.assignments.length,2,"Clone did not preserve original");
 assert(recipe.assignments.some(a=>a.date==="2026-10-21"&&a.meal==="Pranzo"),"Original planning was replaced");
 assert(recipe.assignments.some(a=>a.date==="2026-10-23"&&a.meal==="Cena"&&a.alternative),"Clone meal and role lost");
+clickAction("clear-day");
+assert(element("modal").open,"Clear day confirmation missing");
+clickAction("confirm-clear-day");
+recipes=JSON.parse(storage.get("oggisimangia_web_preview_v1")).recipes;
+recipe=recipes.find(r=>r.id==="demo-pasta");
+assert(recipe,"Clear day deleted the stored recipe");
+assert(recipe.assignments.some(a=>a.date==="2026-10-21"),"Clear day also removed other days");
+assert(!recipe.assignments.some(a=>a.date==="2026-10-23"),"Clear day failed to remove selected day");
 
-console.log("PASS: Pages assets, initial calendar, recipe archive AND filtering, persistent site removal, day planning and cloning.");
+console.log("PASS: smartphone preview, back navigation, highlighted search, ingredient reset, meal accordion, site deletion, planning, cloning and safe day reset.");

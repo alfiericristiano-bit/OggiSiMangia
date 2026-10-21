@@ -52,6 +52,11 @@ class MainActivity : Activity() {
     private var lastSearchResults: List<WebRecipe> = emptyList()
     private var lastSearchOffset = 0
     private var photoLabel: TextView? = null
+    private val expandedMeals = mutableSetOf<String>()
+    private var currentPageKey = ""
+    private var currentPageRestore: (() -> Unit)? = null
+    private val pageHistory = ArrayDeque<() -> Unit>()
+    private var goingBack = false
     private val dateFormatter = DateTimeFormatter.ofPattern("EEEE d MMMM yyyy", java.util.Locale.ITALIAN)
 
     companion object {
@@ -111,7 +116,13 @@ class MainActivity : Activity() {
     private fun outlined(color: Int = Color.WHITE, radius: Float = 12f): GradientDrawable =
         shape(color, radius).apply { setStroke(dp(1), Color.rgb(199, 216, 210)) }
 
-    private fun screen(title: String, subtitle: String) {
+    private fun screen(title: String, subtitle: String, key: String, restore: () -> Unit) {
+        if (!goingBack && currentPageKey.isNotEmpty() && currentPageKey != key) {
+            currentPageRestore?.let { pageHistory.addLast(it) }
+            if (pageHistory.size > 16) pageHistory.removeFirst()
+        }
+        currentPageKey = key
+        currentPageRestore = restore
         val background = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setBackgroundColor(Color.rgb(244, 247, 247))
@@ -153,9 +164,31 @@ class MainActivity : Activity() {
             setTextColor(Color.rgb(235, 251, 244)); maxLines = 3
         })
         hero.addView(headerText, LinearLayout.LayoutParams(0, -2, 1f))
-        content.addView(hero, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(8) })
+        content.addView(hero, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(7) })
+        if (key != "calendar") {
+            val back = Button(this).apply {
+                text = "‹  Indietro"
+                textSize = 14f; isAllCaps = false; gravity = Gravity.CENTER_VERTICAL
+                setTextColor(familyDeep)
+                this.background = outlined(Color.WHITE, 16f)
+                setOnClickListener { goBack() }
+            }
+            content.addView(back, LinearLayout.LayoutParams(-1, dp(44)).apply { bottomMargin = dp(6) })
+        }
         navigation(title)
     }
+
+    private fun goBack() {
+        hideKeyboard()
+        val previous = if (pageHistory.isEmpty()) null else pageHistory.removeLast()
+        goingBack = true
+        try {
+            if (previous != null) previous() else showCalendar()
+        } finally { goingBack = false }
+    }
+
+    @Deprecated("Android back navigation")
+    override fun onBackPressed() { goBack() }
 
     private fun label(value: String, size: Float = 16f, bold: Boolean = false): TextView =
         TextView(this).apply {
@@ -170,12 +203,29 @@ class MainActivity : Activity() {
         val btn = Button(this).apply {
             text = value; isAllCaps = false; textSize = 14f
             setTextColor(familyDeep)
-            background = outlined(familyPale, 12f)
+            background = outlined(familyPale, 17f)
             elevation = dp(1).toFloat()
             setOnClickListener { hideKeyboard(); onClick() }
         }
-        content.addView(btn, LinearLayout.LayoutParams(-1, dp(48)).apply {
-            bottomMargin = dp(6)
+        content.addView(btn, LinearLayout.LayoutParams(-1, dp(44)).apply {
+            bottomMargin = dp(5)
+        })
+    }
+
+    private fun primaryAction(value: String, onClick: () -> Unit) {
+        val btn = Button(this).apply {
+            text = value; isAllCaps = false; textSize = 16f
+            setTypeface(null, Typeface.BOLD)
+            setTextColor(Color.WHITE)
+            background = GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT,
+                intArrayOf(familyDeep, Color.rgb(20, 150, 126))).apply {
+                cornerRadius = dp(19).toFloat()
+            }
+            elevation = dp(4).toFloat()
+            setOnClickListener { hideKeyboard(); onClick() }
+        }
+        content.addView(btn, LinearLayout.LayoutParams(-1, dp(54)).apply {
+            topMargin = dp(7); bottomMargin = dp(9)
         })
     }
 
@@ -189,10 +239,10 @@ class MainActivity : Activity() {
                 maxLines = 2
                 ellipsize = android.text.TextUtils.TruncateAt.END
                 setTextColor(familyDeep)
-                background = outlined(familyPale, 12f)
+                background = outlined(familyPale, 17f)
                 setOnClickListener { hideKeyboard(); entry.second() }
             }
-            row.addView(button, LinearLayout.LayoutParams(0, dp(48), 1f).apply {
+            row.addView(button, LinearLayout.LayoutParams(0, dp(44), 1f).apply {
                 if (index == 0) marginEnd = dp(6)
             })
         }
@@ -207,7 +257,7 @@ class MainActivity : Activity() {
             setText(initial)
             textSize = 16f
             setPadding(dp(12), dp(8), dp(12), dp(8))
-            background = outlined(Color.WHITE, 11f)
+            background = outlined(Color.WHITE, 15f)
             setTextColor(familyInk)
             setHintTextColor(Color.rgb(105,129,120))
             if (multi) {
@@ -239,9 +289,9 @@ class MainActivity : Activity() {
         val spinner = Spinner(this)
         spinner.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, choices)
         spinner.setSelection(choices.indexOf(value).coerceAtLeast(0))
-        spinner.background = outlined(Color.WHITE, 11f)
+        spinner.background = outlined(Color.WHITE, 15f)
         spinner.setPadding(dp(9), 0, dp(9), 0)
-        content.addView(spinner, LinearLayout.LayoutParams(-1, dp(48)).apply { bottomMargin = dp(6) })
+        content.addView(spinner, LinearLayout.LayoutParams(-1, dp(44)).apply { bottomMargin = dp(5) })
         return spinner
     }
 
@@ -273,7 +323,7 @@ class MainActivity : Activity() {
                     }
                 }
             }
-            nav.addView(b, LinearLayout.LayoutParams(0, dp(48), 1f))
+            nav.addView(b, LinearLayout.LayoutParams(0, dp(44), 1f))
         }
         content.addView(nav, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(8) })
     }
@@ -286,7 +336,8 @@ class MainActivity : Activity() {
     }
 
     private fun showCalendar() {
-        screen("Il calendario dei pasti", "Organizza pranzo e cena, anche per i prossimi giorni.")
+        screen("Il calendario dei pasti", "Organizza pranzo e cena, anche per i prossimi giorni.",
+            "calendar") { showCalendar() }
         searchForDay = false
         selectedAlternative = false
         label("Tocca un giorno per vederne i pasti. Tieni premuto come da impostazioni Android per aggiungere una ricetta.", 13f)
@@ -307,29 +358,79 @@ class MainActivity : Activity() {
                 "Tieni premuta la data con una pressione prolungata per aggiungere una ricetta: " +
                 "potrai scegliere pranzo, cena e principale o alternativa.")
         }
-        label(selectedDate.format(dateFormatter).replaceFirstChar { it.uppercase() }, 18f, true)
-        actionRow("◀ Precedente", { selectedDate = selectedDate.minusDays(1); showCalendar() },
-            "Successivo ▶", { selectedDate = selectedDate.plusDays(1); showCalendar() })
+        label(selectedDate.format(dateFormatter).replaceFirstChar { it.uppercase() }, 17f, true)
+        actionRow("◀ Precedente", { selectedDate = selectedDate.minusDays(1); expandedMeals.clear(); showCalendar() },
+            "Successivo ▶", { selectedDate = selectedDate.plusDays(1); expandedMeals.clear(); showCalendar() })
+        actionRow("↻ Oggi", { selectedDate = LocalDate.now(); expandedMeals.clear(); showCalendar() },
+            "🗑 Svuota giorno", { confirmClearDay() })
         val today = db.onDay(selectedDate.toString())
         listOf("Pranzo", "Cena").forEach { meal ->
-            label(if (meal == "Pranzo") "☀️ PRANZO" else "🌙 CENA", 20f, true)
             val planned = today.filter { it.meal == meal || it.meal == "Entrambi" }
-            if (planned.isEmpty()) label("Ancora nessun piatto selezionato.", 14f)
-            planned.forEach { recipe ->
-                action((if (recipe.alternative) "🔄 Alternativa · " else "🍴 ") +
-                    recipe.category + " · " + recipe.title) {
-                    showDetail(recipe.id)
+            val expanded = meal in expandedMeals
+            val section = Button(this).apply {
+                text = (if (meal == "Pranzo") "☀️ PRANZO" else "🌙 CENA") +
+                    "  ·  " + planned.size + (if (expanded) "  ⌃" else "  ⌄")
+                textSize = 17f; isAllCaps = false
+                gravity = Gravity.CENTER_VERTICAL
+                setTypeface(null, Typeface.BOLD)
+                setTextColor(familyDeep)
+                background = outlined(familyPale, 17f)
+                setOnClickListener {
+                    if (expanded) expandedMeals.remove(meal) else expandedMeals.add(meal)
+                    showCalendar()
                 }
-                action("✏️ Cambia assegnazione · " + recipe.title) { changePlanning(recipe) }
-                action("📋 Clona su altri giorni · " + recipe.title) { cloneRecipeToDay(recipe) }
             }
-            actionRow("＋ Aggiungi per $meal", {
-                selectedMeal = meal
-                showEditor(planByDefault = true)
-            }, "🔎 Alternativa", { startMealSearch(meal, true) })
+            content.addView(section, LinearLayout.LayoutParams(-1, dp(46)).apply {
+                topMargin = dp(5); bottomMargin = dp(4)
+            })
+            if (planned.isEmpty()) label("Nessun piatto assegnato.", 13f)
+            planned.forEach { recipe ->
+                action((if (recipe.alternative) "↪ " else "• ") + recipe.title) { showDetail(recipe.id) }
+                if (expanded) {
+                    actionRow("✏️ Modifica", { changePlanning(recipe) },
+                        "🗑 Dal giorno", { removeFromDay(recipe) })
+                    action("📋 Clona in un altro giorno") { cloneRecipeToDay(recipe) }
+                }
+            }
+            if (expanded) {
+                actionRow("＋ Aggiungi", {
+                    selectedMeal = meal; showEditor(planByDefault = true)
+                }, "🔎 Alternativa", { startMealSearch(meal, true) })
+            }
         }
-        action("🔎 Cerca una nuova ricetta") { showSearch() }
-        action("PDF e stampa del giorno") { report("Menu del giorno", selectedDate.format(dateFormatter), db.onDay(selectedDate.toString())) }
+        actionRow("🔎 Cerca ricetta", { showSearch() },
+            "＋ Nuova ricetta", { showEditor() })
+        action("PDF e stampa del giorno") {
+            report("Menu del giorno", selectedDate.format(dateFormatter), db.onDay(selectedDate.toString()))
+        }
+    }
+
+    /** Unplan a recipe without deleting its saved ingredients, steps or photograph. */
+    private fun removeFromDay(recipe: Recipe) {
+        AlertDialog.Builder(this).setTitle("Rimuovere dal giorno?")
+            .setMessage("«" + recipe.title + "» non comparirà più nel giorno " +
+                recipe.day + ". Resterà nel ricettario.")
+            .setPositiveButton("Rimuovi dal giorno") { _, _ ->
+                db.save(recipe.copy(day = ""))
+                showCalendar()
+            }.setNegativeButton("Annulla", null).show()
+    }
+
+    private fun confirmClearDay() {
+        val recipes = db.onDay(selectedDate.toString())
+        if (recipes.isEmpty()) {
+            Toast.makeText(this, "Il giorno è già vuoto", Toast.LENGTH_SHORT).show()
+            return
+        }
+        AlertDialog.Builder(this).setTitle("Svuotare questo giorno?")
+            .setMessage("Rimuovere " + recipes.size + " piatti dal " +
+                selectedDate.format(dateFormatter) +
+                "? Le ricette rimarranno tutte nel ricettario.")
+            .setPositiveButton("Svuota giorno") { _, _ ->
+                recipes.forEach { db.save(it.copy(day = "")) }
+                expandedMeals.clear()
+                showCalendar()
+            }.setNegativeButton("Annulla", null).show()
     }
 
     /** Update a saved appointment in place, preserving the recipe and its photographs. */
@@ -413,7 +514,10 @@ class MainActivity : Activity() {
         selectedPhoto = existing?.imagePath ?: ""
         photoPreview = null
         screen(if (existing == null || existing.id == 0L) "Scrivi la tua ricetta" else "Modifica ricetta",
-            "Compila i campi che conosci. Nome, ingredienti e preparazione sono obbligatori.")
+            "Compila i campi che conosci. Nome, ingredienti e preparazione sono obbligatori.",
+            "editor-${existing?.id ?: 0L}") {
+            showEditor(existing, initialAlternative, suggestedTitle, suggestedUrl, planByDefault)
+        }
         label("INFORMAZIONI GENERALI", 20f, true)
         val titleField = input("Nome del piatto *", existing?.title ?: suggestedTitle)
         val descriptionField = input("Descrizione breve / presentazione", existing?.description.orEmpty(), true)
@@ -643,7 +747,8 @@ class MainActivity : Activity() {
     }
 
     private fun showSearch() {
-        screen("Trova cosa cucinare", "Scopri le proposte senza uscire dall'app.")
+        screen("Trova cosa cucinare", "Scopri le proposte senza uscire dall'app.",
+            "search") { showSearch() }
         label("Giorno scelto: " + selectedDate.format(dateFormatter), 16f, true)
         if (searchForDay) label(selectedMeal + " · " + if (selectedAlternative) "Alternativa" else "Principale", 16f, true)
         actionRow("🔗 Ho un link", { showRecipeLink() }, "📅 Pasti del giorno", { showCalendar() })
@@ -664,8 +769,8 @@ class MainActivity : Activity() {
         label("Ingredienti obbligatori, anche singolare/plurale e preparazioni equivalenti. " +
             "Categoria, difficoltà e tempi sono preferenze: gli scostamenti vengono segnalati.", 13f)
 
-        action("🔎 Mostra fino a 10 ricette") {
-            searchIngredients = ingredients.query() ?: return@action
+        primaryAction("🔎 CERCA RICETTE NEI SITI") search@{
+            searchIngredients = ingredients.query() ?: return@search
             searchCategory = category.selectedItem.toString()
             searchDifficulty = difficulty.selectedItem.toString()
             searchDuration = duration.selectedItem.toString()
@@ -714,11 +819,16 @@ class MainActivity : Activity() {
                 }
             }.start()
         }
-        actionRow("＋ Nuova ricetta", { showEditor() }, "📚 Ricettario", { showArchive() })
+        actionRow("↻ Azzera ingredienti", {
+            searchIngredients = ""
+            showSearch()
+        }, "📚 Ricettario", { showArchive() })
+        action("＋ Nuova ricetta") { showEditor() }
     }
 
     private fun showSourceSettings() {
-        screen("Priorità dei siti", "L'ordine viene memorizzato per le prossime ricerche.")
+        screen("Priorità dei siti", "L'ordine viene memorizzato per le prossime ricerche.",
+            "sources") { showSourceSettings() }
         label("Le fonti con priorità più alta vengono prima nei risultati compatibili. Seguono pertinenza e valutazioni degli utenti, quando disponibili.", 14f)
         action("Aggiungi un sito") {
             val box = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(18),dp(8),dp(18),dp(8)) }
@@ -753,32 +863,59 @@ class MainActivity : Activity() {
             "La modifica rimane anche dopo il riavvio e gli aggiornamenti.", 13f)
         val names = entries.map { it.key }.toTypedArray()
         entries.forEachIndexed { position, entry ->
-            val spinner = dropdown("${position+1}ª priorità", names, entry.key)
-            spinner.contentDescription = "Priorità ${position+1}"
+            val row = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+            }
+            val spinner = Spinner(this).apply {
+                adapter = ArrayAdapter(this@MainActivity,
+                    android.R.layout.simple_spinner_dropdown_item, names)
+                setSelection(position)
+                background = outlined(Color.WHITE, 15f)
+                setPadding(dp(9), 0, dp(5), 0)
+                contentDescription = "${position + 1}ª priorità: " + entry.key
+            }
             spinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
                 override fun onNothingSelected(parent: AdapterView<*>?) { }
                 override fun onItemSelected(parent: AdapterView<*>?, view: View?, selected: Int, id: Long) {
                     if (selected == position) return
                     val reordered = entries.toMutableList()
-                    java.util.Collections.swap(reordered,position,selected)
+                    java.util.Collections.swap(reordered, position, selected)
                     sourcePreferences.save(reordered.associateTo(linkedMapOf()) { it.key to it.value })
                     showSourceSettings()
                 }
             }
-            action("🗑️ Elimina sito · " + entry.key) {
-                AlertDialog.Builder(this)
-                    .setTitle("Eliminare questo sito di ricerca?")
-                    .setMessage(entry.key + "\n" + entry.value +
-                        "\nNon sarà più consultato nelle ricerche. Potrai aggiungerlo nuovamente o ripristinare i siti iniziali.")
-                    .setPositiveButton("Elimina sito") { _, _ ->
-                        val remaining = LinkedHashMap(RecipeSources.sites)
-                        remaining.remove(entry.key)
-                        sourcePreferences.save(remaining)
-                        showSourceSettings()
-                    }
-                    .setNegativeButton("Annulla", null)
-                    .show()
+            row.addView(TextView(this).apply {
+                text = "${position + 1}."
+                textSize = 14f
+                setTextColor(familyDeep)
+            }, LinearLayout.LayoutParams(dp(25), -2))
+            row.addView(spinner, LinearLayout.LayoutParams(0, dp(44), 1f))
+            val remove = Button(this).apply {
+                text = "🗑"; textSize = 15f
+                isAllCaps = false
+                contentDescription = "Elimina sito " + entry.key
+                background = outlined(familyPale, 16f)
+                setOnClickListener {
+                    AlertDialog.Builder(this@MainActivity)
+                        .setTitle("Eliminare il sito?")
+                        .setMessage(entry.key + "\n" + entry.value +
+                            "\nNon sarà più consultato nelle ricerche.")
+                        .setPositiveButton("Elimina sito") { _, _ ->
+                            val remaining = LinkedHashMap(RecipeSources.sites)
+                            remaining.remove(entry.key)
+                            sourcePreferences.save(remaining)
+                            showSourceSettings()
+                        }
+                        .setNegativeButton("Annulla", null).show()
+                }
             }
+            row.addView(remove, LinearLayout.LayoutParams(dp(48), dp(44)).apply {
+                marginStart = dp(5)
+            })
+            content.addView(row, LinearLayout.LayoutParams(-1, -2).apply {
+                bottomMargin = dp(5)
+            })
         }
         action("Ripristina siti e ordine iniziali") {
             val restored = LinkedHashMap(RecipeSources.defaults)
@@ -798,7 +935,8 @@ class MainActivity : Activity() {
     }
 
     private fun showRecipeLink() {
-        screen("Aggiungi una ricetta dal link", "Per il " + selectedDate.format(dateFormatter))
+        screen("Aggiungi una ricetta dal link", "Per il " + selectedDate.format(dateFormatter),
+            "link") { showRecipeLink() }
         label("Incolla il link della pagina della ricetta.", 16f)
         val link = input("https://…")
         link.inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_VARIATION_URI
@@ -910,7 +1048,7 @@ class MainActivity : Activity() {
                 text = "👀 Scheda"
                 isAllCaps = false
                 setOnClickListener { popup.dismiss(); showOnlineDetail(recipe) }
-            }, LinearLayout.LayoutParams(0, dp(48), 1f))
+            }, LinearLayout.LayoutParams(0, dp(44), 1f))
             buttons.addView(Button(this).apply {
                 text = "💾 Salva"
                 isAllCaps = false
@@ -918,7 +1056,7 @@ class MainActivity : Activity() {
                     popup.dismiss()
                     showOnlineDetail(recipe)
                 }
-            }, LinearLayout.LayoutParams(0, dp(48), 1f))
+            }, LinearLayout.LayoutParams(0, dp(44), 1f))
             row.addView(buttons)
             rows.addView(row, LinearLayout.LayoutParams(-1, -2).apply {
                 bottomMargin = dp(12)
@@ -955,7 +1093,9 @@ class MainActivity : Activity() {
                     title = result.title.ifBlank { sourceRecipe.title },
                     category = "", difficulty = "Non disponibile"
                 ) else sourceRecipe
-                screen(recipe.title, recipe.source)
+                screen(recipe.title, recipe.source, "online-" + recipe.url) {
+                    showOnlineDetail(sourceRecipe, imported)
+                }
                 if (!imported) {
                     RecipePreferences.notices(recipe, searchCategory, searchDifficulty, searchDuration)
                         .forEach { label("⚠ " + it, 13f) }
@@ -1097,7 +1237,8 @@ class MainActivity : Activity() {
 
     private fun showArchive(search: String = "", category: String = "Tutte",
                             difficulty: String = "Tutte", order: String = "Nome A–Z", ingredientQuery: String = "") {
-        screen("Il mio ricettario", "Ricette salvate sul telefono, consultabili anche offline.")
+        screen("Il mio ricettario", "Ricette salvate sul telefono, consultabili anche offline.",
+            "archive") { showArchive(search, category, difficulty, order, ingredientQuery) }
         val queryField = input("Cerca per nome o parola chiave", search)
         label("Ingredienti: la ricetta deve contenerli tutti", 14f, true)
         label("Una casella per ingrediente. Massimo 10 ingredienti.", 13f)
@@ -1140,7 +1281,8 @@ class MainActivity : Activity() {
     private fun showDetail(id: Long) {
         val r = db.get(id) ?: run { showCalendar(); return }
         screen(r.title, r.meal + " · " + r.category + " · " +
-            (if (r.alternative) "Alternativa" else "Principale"))
+            (if (r.alternative) "Alternativa" else "Principale"),
+            "detail-" + id) { showDetail(id) }
         if (r.imagePath.isNotBlank()) addPhotoPreview(r.imagePath)
         label("📅 " + r.day.ifBlank { "Solo ricettario" } + "   ⏱ " + r.duration + "   👩‍🍳 " + r.difficulty, 15f)
         showRecipeMetadata(r)
@@ -1167,7 +1309,10 @@ class MainActivity : Activity() {
             if (r.day.isNotBlank()) selectedDate = LocalDate.parse(r.day)
             showEditor(r)
         }
-        if (r.day.isNotBlank()) action("✏️ Cambia pranzo / cena / tipo / categoria") { changePlanning(r) }
+        if (r.day.isNotBlank()) {
+            actionRow("✏️ Cambia assegnazione", { changePlanning(r) },
+                "🗑 Dal giorno", { removeFromDay(r) })
+        }
         action("📋 Clona su altri giorni del calendario") { cloneRecipeToDay(r) }
         action("🗑️ Elimina questa voce") {
             AlertDialog.Builder(this).setTitle("Eliminare la ricetta?")
