@@ -69,7 +69,10 @@ object RecipeReports {
                 paragraph(recipe.category + " | " + recipe.difficulty + " | " + recipe.day.ifBlank { "Ricettario" },10f)
                 val metadata = listOf("Dosi" to recipe.portions,"Preparazione" to recipe.prepTime,
                     "Cottura" to recipe.cookTime,"Totale" to recipe.totalTime,"Riposo" to recipe.restTime,
-                    "Valori nutrizionali" to recipe.nutrition).filter { it.second.isNotBlank() }
+                    "Valori nutrizionali" to recipe.nutrition,
+                    "Cucina" to recipe.cuisine,"Autore" to recipe.author,
+                    "Temperatura" to recipe.temperature,"Costo" to recipe.cost,
+                    "Etichette" to recipe.tags,"Allergeni" to recipe.allergens).filter { it.second.isNotBlank() }
                 metadata.forEach { paragraph(it.first + ": " + it.second,10f) }
                 if(metadata.none { it.first in listOf("Preparazione","Cottura","Totale") }) paragraph("Tempo: "+recipe.duration,10f)
                 if(recipe.imagePath.isNotBlank()) {
@@ -82,11 +85,18 @@ object RecipeReports {
                         bitmap.recycle();y+=height+12f
                     }
                 }
+                if(recipe.description.isNotBlank()) { paragraph("Descrizione",12f,true); paragraph(recipe.description) }
                 paragraph("Ingredienti",12f,true)
                 paragraph(recipe.ingredients.ifBlank { "Non disponibili" })
                 if(recipe.instructions.isNotBlank()) { paragraph("Preparazione semplificata / appunti",12f,true); paragraph(recipe.instructions) }
                 if(recipe.originalInstructions.isNotBlank()) { paragraph("Procedimento originale",12f,true); paragraph(recipe.originalInstructions) }
                 if(recipe.instructions.isBlank() && recipe.originalInstructions.isBlank()) paragraph("Procedimento non disponibile: consulta la fonte originale.")
+                listOf("Attrezzatura" to recipe.equipment,
+                    "Consigli e accorgimenti" to recipe.tips,
+                    "Varianti" to recipe.variations,
+                    "Conservazione" to recipe.storage,
+                    "Note personali" to recipe.notes).filter { it.second.isNotBlank() }
+                    .forEach { (section, value) -> paragraph(section,12f,true); paragraph(value) }
                 if(recipe.url.isNotBlank()) { paragraph("Fonte originale",10f,true); paragraph(recipe.url,9f) }
             }
             page?.let { document.finishPage(it) };page=null
