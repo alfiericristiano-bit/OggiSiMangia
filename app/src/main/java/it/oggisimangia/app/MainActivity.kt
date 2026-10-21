@@ -312,6 +312,127 @@ class MainActivity : Activity() {
         content.addView(nav, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(7) })
     }
 
+    private fun prominentAction(value: String, onClick: () -> Unit) {
+        val button = Button(this).apply {
+            text = value; textSize = 16f; isAllCaps = false
+            setTypeface(null, Typeface.BOLD)
+            setTextColor(Color.WHITE)
+            background = GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT,
+                intArrayOf(familyTeal, Color.rgb(29, 160, 135))).apply {
+                cornerRadius = dp(19).toFloat()
+            }
+            elevation = dp(4).toFloat()
+            setOnClickListener { hideKeyboard(); onClick() }
+        }
+        content.addView(button, LinearLayout.LayoutParams(-1, dp(54)).apply {
+            topMargin = dp(7); bottomMargin = dp(8)
+        })
+    }
+
+    /** Unplan the recipe without deleting it from the personal archive. */
+    private fun removeFromDay(recipe: Recipe) {
+        AlertDialog.Builder(this).setTitle("Rimuovere dal giorno?")
+            .setMessage("«${recipe.title}» sarà rimossa dal calendario, ma resterà nel ricettario.")
+            .setNegativeButton("Annulla", null)
+            .setPositiveButton("Rimuovi") { _, _ ->
+                db.save(recipe.copy(day = ""))
+                showCalendar()
+            }.show()
+    }
+
+    private fun resetDay() {
+        val planned = db.onDay(selectedDate.toString())
+        if (planned.isEmpty()) {
+            Toast.makeText(this, "Questo giorno è già vuoto", Toast.LENGTH_SHORT).show()
+            return
+        }
+        AlertDialog.Builder(this).setTitle("Svuotare il giorno?")
+            .setMessage("Rimuovere ${planned.size} assegnazioni dal ${selectedDate.format(dateFormatter)}? " +
+                "Le ricette resteranno salvate nel ricettario.")
+            .setNegativeButton("Annulla", null)
+            .setPositiveButton("Svuota giorno") { _, _ ->
+                planned.forEach { db.save(it.copy(day = "")) }
+                expandedMeals.clear()
+                showCalendar()
+            }.show()
+    }
+
+    /** Only recipe titles stay visible until the meal header is expanded. */
+    private fun mealSection(meal: String, planned: List<Recipe>) {
+        val opened = meal in expandedMeals
+        val card = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(10), dp(7), dp(10), dp(9))
+            background = outlined(Color.WHITE, 19f)
+            elevation = dp(1).toFloat()
+        }
+        val header = TextView(this).apply {
+            text = (if (meal == "Pranzo") "☀️" else "🌙") + "  $meal · ${planned.size} " +
+                (if (opened) "⌃" else "⌄")
+            textSize = 17f
+            setTypeface(null, Typeface.BOLD)
+            setTextColor(familyDeep)
+            setPadding(dp(6), dp(6), dp(6), dp(6))
+            contentDescription = "$meal, ${planned.size} ricette, " +
+                (if (opened) "tocca per chiudere" else "tocca per espandere")
+            setOnClickListener {
+                if (opened) expandedMeals.remove(meal) else expandedMeals.add(meal)
+                showCalendar()
+            }
+        }
+        card.addView(header, LinearLayout.LayoutParams(-1, dp(44)))
+        if (planned.isEmpty()) card.addView(TextView(this).apply {
+            text = "Nessuna ricetta assegnata"; textSize = 13f
+            setTextColor(Color.rgb(97, 123, 115))
+            setPadding(dp(6), 0, dp(6), dp(7))
+        })
+        planned.forEach { recipe ->
+            card.addView(TextView(this).apply {
+                text = (if (recipe.alternative) "↪ " else "• ") + recipe.title
+                textSize = 15f
+                setTextColor(familyInk)
+                setPadding(dp(8), dp(7), dp(8), dp(7))
+                setOnClickListener { showDetail(recipe.id) }
+            })
+            if (opened) {
+                val controls = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+                listOf("✎ Modifica", "↗ Clona", "✕ Rimuovi").forEachIndexed { index, caption ->
+                    controls.addView(Button(this).apply {
+                        text = caption; isAllCaps = false; textSize = 11f
+                        maxLines = 2
+                        setTextColor(if (index == 2) Color.rgb(160, 58, 56) else familyDeep)
+                        background = outlined(familyPale, 13f)
+                        setOnClickListener {
+                            when (index) {
+                                0 -> changePlanning(recipe)
+                                1 -> cloneRecipeToDay(recipe)
+                                else -> removeFromDay(recipe)
+                            }
+                        }
+                    }, LinearLayout.LayoutParams(0, dp(44), 1f).apply { marginEnd = dp(3) })
+                }
+                card.addView(controls)
+            }
+        }
+        if (opened) {
+            val controls = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+            val add = Button(this).apply {
+                text = "＋ Aggiungi"; isAllCaps = false; textSize = 12f
+                setTextColor(familyDeep); background = outlined(familyPale, 14f)
+                setOnClickListener { selectedMeal = meal; showEditor(planByDefault = true) }
+            }
+            val alternative = Button(this).apply {
+                text = "🔎 Alternativa"; isAllCaps = false; textSize = 12f
+                setTextColor(familyDeep); background = outlined(familyPale, 14f)
+                setOnClickListener { startMealSearch(meal, true) }
+            }
+            controls.addView(add, LinearLayout.LayoutParams(0, dp(44), 1f).apply { marginEnd = dp(4) })
+            controls.addView(alternative, LinearLayout.LayoutParams(0, dp(44), 1f))
+            card.addView(controls, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(4) })
+        }
+        content.addView(card, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(7) })
+    }
+
     private fun chooseDate(after: () -> Unit) {
         DatePickerDialog(this, { _, year, month, day ->
             selectedDate = LocalDate.of(year, month + 1, day)
@@ -320,50 +441,40 @@ class MainActivity : Activity() {
     }
 
     private fun showCalendar() {
-        screen("Il calendario dei pasti", "Organizza pranzo e cena, anche per i prossimi giorni.")
+        screen("Il calendario dei pasti", "I piatti del giorno, a colpo d'occhio.", key = "calendar")
+        currentScreenRestore = { showCalendar() }
         searchForDay = false
         selectedAlternative = false
-        label("Tocca un giorno per vederne i pasti. Tieni premuto come da impostazioni Android per aggiungere una ricetta.", 13f)
-        action("ⓘ Come funziona il calendario") {
-            AppHints.showAgain(this, "calendar_long_press", "Come funziona il calendario",
-                "Tocca una data per scegliere il giorno e vedere pranzo e cena. " +
-                "Tieni premuta la data con una pressione prolungata per aggiungere una ricetta: " +
-                "potrai scegliere pranzo, cena e principale o alternativa.")
-        }
+        label("Tocca un giorno per selezionarlo · tieni premuto per aggiungere", 12f)
+            .setOnClickListener {
+                AppHints.showAgain(this, "calendar_long_press", "Come funziona il calendario",
+                    "Tocca un giorno per vedere i pasti. Tienilo premuto per aggiungere una ricetta.")
+            }
         val calendar = MealCalendar(this, selectedDate, { month -> db.monthMarkers(month) }, { day ->
-            selectedDate = day
-            showCalendar()
+            selectedDate = day; expandedMeals.clear(); showCalendar()
         }, { day -> confirmDaySearch(day) })
         content.addView(calendar, LinearLayout.LayoutParams(-1, -2))
         content.post {
             AppHints.showOnce(this, "calendar_long_press", "Come funziona il calendario",
-                "Tocca una data per scegliere il giorno e vedere pranzo e cena. " +
-                "Tieni premuta la data con una pressione prolungata per aggiungere una ricetta: " +
-                "potrai scegliere pranzo, cena e principale o alternativa.")
+                "Tocca una data per selezionarla; tienila premuta per aggiungere una ricetta.")
         }
-        label(selectedDate.format(dateFormatter).replaceFirstChar { it.uppercase() }, 18f, true)
-        actionRow("◀ Precedente", { selectedDate = selectedDate.minusDays(1); showCalendar() },
-            "Successivo ▶", { selectedDate = selectedDate.plusDays(1); showCalendar() })
+        label(selectedDate.format(dateFormatter).replaceFirstChar { it.uppercase() }, 16f, true)
+        actionRow("◀ Precedente", {
+            selectedDate = selectedDate.minusDays(1); expandedMeals.clear(); showCalendar()
+        }, "Successivo ▶", {
+            selectedDate = selectedDate.plusDays(1); expandedMeals.clear(); showCalendar()
+        })
         val today = db.onDay(selectedDate.toString())
         listOf("Pranzo", "Cena").forEach { meal ->
-            label(if (meal == "Pranzo") "☀️ PRANZO" else "🌙 CENA", 20f, true)
-            val planned = today.filter { it.meal == meal || it.meal == "Entrambi" }
-            if (planned.isEmpty()) label("Ancora nessun piatto selezionato.", 14f)
-            planned.forEach { recipe ->
-                action((if (recipe.alternative) "🔄 Alternativa · " else "🍴 ") +
-                    recipe.category + " · " + recipe.title) {
-                    showDetail(recipe.id)
-                }
-                action("✏️ Cambia assegnazione · " + recipe.title) { changePlanning(recipe) }
-                action("📋 Clona su altri giorni · " + recipe.title) { cloneRecipeToDay(recipe) }
-            }
-            actionRow("＋ Aggiungi per $meal", {
-                selectedMeal = meal
-                showEditor(planByDefault = true)
-            }, "🔎 Alternativa", { startMealSearch(meal, true) })
+            mealSection(meal, today.filter { it.meal == meal || it.meal == "Entrambi" })
         }
-        action("🔎 Cerca una nuova ricetta") { showSearch() }
-        action("PDF e stampa del giorno") { report("Menu del giorno", selectedDate.format(dateFormatter), db.onDay(selectedDate.toString())) }
+        actionRow("✕ Svuota giorno", { resetDay() }, "＋ Aggiungi ricetta", {
+            showEditor(planByDefault = true)
+        })
+        prominentAction("🔎 Cerca una ricetta") { showSearch() }
+        action("PDF e stampa del giorno") {
+            report("Menu del giorno", selectedDate.format(dateFormatter), today)
+        }
     }
 
     /** Update a saved appointment in place, preserving the recipe and its photographs. */
