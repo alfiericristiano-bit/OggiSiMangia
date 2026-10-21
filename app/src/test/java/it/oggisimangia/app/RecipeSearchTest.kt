@@ -38,8 +38,8 @@ class RecipeSearchTest {
         assertEquals(listOf("polenta,", "polenta"), RecipeSearchQueries.variants("polenta,"))
         assertTrue(RecipeSearchQueries.bing("misya.info", "polenta,").contains("polenta%2C"))
         assertTrue(RecipeSearchQueries.editorial("GialloZafferano", "polenta,").contains("polenta%2C"))
-        assertTrue(RecipeValidation.containsEvery("200 g polenta\\n250 ml acqua", "polenta,"))
-        assertTrue(RecipeValidation.containsEvery("200 g polenta\\n250 ml acqua", "polenta"))
+        assertTrue(RecipeValidation.containsEvery("200 g polenta\n250 ml acqua", "polenta,"))
+        assertTrue(RecipeValidation.containsEvery("200 g polenta\n250 ml acqua", "polenta"))
     }
 
     @Test fun searchCanReadRssOrHtmlResultsWithoutTrustingOtherDomains() {
