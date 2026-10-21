@@ -7,7 +7,7 @@ class RecipeSearchTest {
     @org.junit.After fun resetSources() { RecipeSources.configure(RecipeSources.defaults) }
     private fun item(title: String, url: String, rating: Double? = null, count: Int? = null) =
         WebRecipe(title, "", url, "Fonte", rating = rating, feedbackCount = count,
-            ingredients = "100 g pasta\n200 g zucchine")
+            ingredients = if (title.contains("zucchine", true)) "100 g pasta\n200 g zucchine" else "100 g cioccolato")
 
     @Test fun allElevenSourcesAreAllowedButNotHostedBlogsOrLookalikes() {
         assertEquals(11, RecipeSources.sites.size)
