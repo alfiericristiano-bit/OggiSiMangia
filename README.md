@@ -24,6 +24,18 @@ Android 1.4.0 (versionCode 11).
 
 Le fonti possono bloccare richieste o cambiare struttura. Non sono garantiti dieci risultati né recensioni per ogni ricetta. I conteggi pubblicati orientano l'ordinamento; non certificano la ricetta. Dati mancanti e riassunti non disponibili vengono dichiarati. Non vengono aggirati accessi riservati. Ingredienti e testi salvati dall'utente sono conservati localmente; le foto della fonte vengono conservate in copia compressa solo quando si sceglie di salvare o pianificare la ricetta, mantenendo il riferimento alla fonte.
 
+## Regola permanente di distribuzione APK nella chat
+
+Dopo ogni modifica del codice e ogni nuova versione:
+1. Avviare la compilazione con GitHub Actions e controllare il completamento di test, lint, firma e prova di aggiornamento senza perdita dei dati.
+2. Recuperare l'Artifact APK della compilazione riuscita, estrarre il file `.apk` dallo ZIP di GitHub Actions e presentare **direttamente nella risposta ChatGPT il file APK scaricabile**, con nome che includa la versione (per esempio `OggiSiMangia-v1.4.1.apk`).
+3. Non sostituire il download diretto in chat con un pulsante o collegamento che apra soltanto la pagina GitHub Actions o la lista degli Artifact. Il link GitHub può essere un'informazione supplementare, non il download principale.
+4. Mostrare chiaramente nome file, versione, esito della compilazione e risultato delle verifiche; non dichiarare disponibile un file se non è stato effettivamente recuperato e allegato.
+5. Se la sessione non consente tecnicamente di recuperare o allegare il file, dichiarare esplicitamente la limitazione e fornire il percorso GitHub verificato come ripiego, senza presentarlo come download diretto.
+6. Mantenere sempre lo stesso `applicationId`, la stessa firma persistente e un `versionCode` crescente affinché l'APK possa aggiornare la versione già installata senza eliminare dati.
+
+Questa regola riguarda **la modalità di consegna all'utente in chat**, oltre alla pubblicazione dell'Artifact su GitHub.
+
 ## Build e firma persistente (1.2.1)
 
 La distribuzione pubblica soltanto APK release firmati con la chiave persistente, dopo test, lint e prova di aggiornamento in-place su emulatore. Il controllo installa due versioni firmate con la stessa chiave e verifica che un file nel sandbox dell'app resti presente dopo adb install -r.
