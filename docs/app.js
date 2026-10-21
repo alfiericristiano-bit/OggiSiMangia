@@ -41,6 +41,8 @@
   let state=load(), view="calendar", selected=todayISO(), month=fromISO(todayISO());
   let editingId=null,photoDraft="",formIngredients=[""],formSteps=[""];
   let archiveSearch="",archiveCategory="Tutte",archiveIngredientFields=[""];
+  // Web equivalent of the Android default long press. Native APK uses OS-configured delay.
+  const WEB_LONG_PRESS_MS=500;
   let toastTimer=0,pressTimer=0,pressedLong=false,pressPoint=null;
   const app=document.getElementById("app"), dialog=document.getElementById("modal"),body=document.getElementById("modal-body");
   function persist() {
@@ -103,7 +105,7 @@
       const hasLunch=assignments.some(x=>x.assignment.meal==="Pranzo"||x.assignment.meal==="Entrambi");
       const hasDinner=assignments.some(x=>x.assignment.meal==="Cena"||x.assignment.meal==="Entrambi");
       if(hasLunch)lunch++;if(hasDinner)dinner++;if(assignments.length)days.add(date);
-      cells+='<button type="button" class="day '+(date===selected?"selected ":"")+(date===todayISO()?"today":"")+'" data-action="select-day" data-date="'+date+'" title="'+escape(formatDate(date))+' — tocco: seleziona, tieni premuto oltre 2 secondi: aggiungi"><span class="day-number">'+n+'</span><span class="dots">'+(hasLunch?'<i class="dot"></i>':"")+(hasDinner?'<i class="dot dinner"></i>':"")+'</span></button>';
+      cells+='<button type="button" class="day '+(date===selected?"selected ":"")+(date===todayISO()?"today":"")+'" data-action="select-day" data-date="'+date+'" title="'+escape(formatDate(date))+' — tocco: seleziona, tieni premuto a lungo: aggiungi"><span class="day-number">'+n+'</span><span class="dots">'+(hasLunch?'<i class="dot"></i>':"")+(hasDinner?'<i class="dot dinner"></i>':"")+'</span></button>';
     }
     function mealCard(meal) {
       const items=assignmentsFor(selected,meal).sort((a,b)=>Number(a.assignment.alternative)-Number(b.assignment.alternative));
@@ -120,13 +122,13 @@
         }).join(""):'<div class="empty">Nessuna ricetta assegnata a '+meal.toLowerCase()+'.</div>')+'</div>';
     }
     app.innerHTML=
-      '<section class="headline"><div><p class="kicker">Calendario dei pasti</p><h1>Organizza i tuoi pasti</h1><p class="subtitle">Tocca un giorno per selezionarlo; tienilo premuto per più di 2 secondi per aggiungere un piatto.</p></div>'+
+      '<section class="headline calendar-hero"><div><p class="kicker">Calendario dei pasti</p><h1>Organizza i tuoi pasti</h1><p class="subtitle">Tocca un giorno per selezionarlo; tienilo premuto a lungo per aggiungere un piatto.</p></div>'+
       '<div class="head-actions">'+button("ⓘ Come funziona","show-help")+button("＋ Nuova ricetta","new-recipe","primary")+'</div></section>'+
       '<div class="calendar-layout"><section class="card"><div class="card-head"><h2>Il tuo calendario</h2><div class="month-picker">'+
       button("‹","prev-month","icon")+'<strong>'+escape(new Intl.DateTimeFormat("it-IT",{month:"long",year:"numeric"}).format(first))+'</strong>'+button("›","next-month","icon")+'</div></div>'+
       '<div class="week-grid">'+["L","M","M","G","V","S","D"].map(s=>'<span>'+s+'</span>').join("")+'</div><div class="day-grid" id="calendar-grid">'+cells+'</div>'+
       '<div class="legend"><span><i class="dot"></i> Pranzo</span><span><i class="dot dinner"></i> Cena</span></div>'+
-      '<p class="card-hint">💡 Premi per oltre 2 secondi un giorno per aggiungere una ricetta; un tocco breve seleziona il giorno.</p></section>'+
+      '<p class="card-hint">💡 Tieni premuto a lungo un giorno per aggiungere una ricetta; un tocco breve seleziona il giorno.</p></section>'+
       '<section class="card"><div class="card-head"><h2 class="selected-day-title">'+escape(formatDate(selected))+'</h2>'+
       button("Oggi","go-today","tiny")+'</div>'+mealCard("Pranzo")+mealCard("Cena")+
       '<div class="head-actions">'+button("＋ Crea ricetta per questo giorno","new-for-day","soft")+'</div></section></div>'+
@@ -298,7 +300,7 @@
   }
   function showHelp(force) {
     if(!force&&state.tipsHidden)return;
-    modal("Come funziona il calendario",'<p>Tocca una data per selezionarla. <strong>Tieni premuto oltre 2 secondi</strong> per aggiungere una ricetta a quel giorno.</p>'+
+    modal("Come funziona il calendario",'<p>Tocca una data per selezionarla. <strong>Tieni premuto a lungo</strong> per aggiungere una ricetta a quel giorno.</p>'+
       '<p>Puoi assegnare una ricetta a pranzo o cena, come principale oppure alternativa, e clonarla in altre date.</p>'+
       '<label style="display:flex;gap:10px;align-items:center;margin:14px 0"><input type="checkbox" id="hide-help" '+(state.tipsHidden?"checked":"")+
       '> Non mostrare più questo messaggio</label><div class="modal-actions">'+button("Ho capito","accept-help","primary")+'</div>');
@@ -505,6 +507,9 @@
     if(!persist())return;
     editingId=id;view="detail";render();toast("Ricetta salvata nel browser.");
   }
+  document.addEventListener("contextmenu",function(e){
+    if(e.target.closest("#calendar-grid .day[data-date]"))e.preventDefault();
+  });
   document.addEventListener("click",click);
   document.addEventListener("change",change);
   document.addEventListener("submit",submit);
@@ -514,7 +519,7 @@
     const cell=e.target.closest("#calendar-grid .day[data-date]");if(!cell)return;
     pressedLong=false;pressPoint={x:e.clientX,y:e.clientY};
     clearTimeout(pressTimer);
-    pressTimer=setTimeout(()=>{pressedLong=true;selected=cell.dataset.date;month=fromISO(selected);planner(null,null,"add");},2100);
+    pressTimer=setTimeout(()=>{pressedLong=true;selected=cell.dataset.date;month=fromISO(selected);planner(null,null,"add");},WEB_LONG_PRESS_MS);
   });
   grid.addEventListener("pointermove",function(e){if(pressPoint&&Math.hypot(e.clientX-pressPoint.x,e.clientY-pressPoint.y)>12){clearTimeout(pressTimer);pressPoint=null;}});
   ["pointerup","pointercancel","scroll"].forEach(name=>grid.addEventListener(name,()=>{clearTimeout(pressTimer);pressPoint=null;},true));
