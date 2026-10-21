@@ -161,3 +161,266 @@ body.dark .recipe-placeholder{background:linear-gradient(120deg,#254631,#4e422e)
 }
 @media(max-width:370px){.day{min-height:49px}.week-grid,.day-grid{gap:3px}.month-picker strong{min-width:118px;font-size:13px}.site-pill{font-size:10px;padding:6px 8px}.card{padding:12px}.quick-stat{gap:7px}.stat{padding:10px}}
 @media print { .sidebar,.topbar,.bottom-nav,.footer,.head-actions,.btn,.hide-print,.site-pill{display:none!important} #app{padding:0;max-width:100%} .app-shell{display:block}.card{box-shadow:none}body{background:white;color:black}.recipe-form{display:none} }
+
+
+/* FamilyChat design system for OggiSiMangia...
+   Matched to the actual FamilyChat repository styles (2026-10-21).
+   Layout only; no change to browser storage or recipe behavior. */
+:root{
+  --bg:#f4f7f7;
+  --paper:#ffffff;
+  --paper-soft:#f8fbf9;
+  --ink:#233d39;
+  --muted:#637d73;
+  --green:#147d72;
+  --green-2:#15675b;
+  --green-pale:#e5f6ef;
+  --outline:#dfece6;
+  --shadow:0 5px 18px rgba(46,100,86,.08);
+}
+body{background:var(--bg);}
+body.dark {
+  --bg:#152522;
+  --paper:#1d302b;
+  --paper-soft:#223b33;
+  --ink:#e7f5f0;
+  --muted:#c3d9cf;
+  --green:#20a58c;
+  --green-2:#78dec3;
+  --green-pale:#294c41;
+  --outline:#35554a;
+  --shadow:0 8px 24px rgba(0,0,0,.13);
+}
+.app-shell {
+  width:min(100%,900px);
+  margin:0 auto;
+  display:flex;
+  flex-direction:column;
+  min-height:100dvh;
+  background:var(--paper);
+  box-shadow:0 10px 50px rgba(21,58,53,.12);
+}
+.sidebar{
+  flex:none;
+  width:100%;
+  position:relative;
+  top:auto;
+  height:auto;
+  padding:0;
+  display:block;
+  border:0;
+  background:var(--paper);
+}
+.sidebar .brand{
+  margin:0;
+  padding:18px 22px;
+  background:linear-gradient(120deg,#147d72,#20a58c);
+  color:#fff;
+  min-height:95px;
+  gap:13px;
+}
+.brand-icon{
+  width:54px;
+  height:54px;
+  border-radius:17px;
+  background:rgba(255,255,255,.18);
+  display:grid;
+  place-items:center;
+  font-size:29px;
+  flex:0 0 54px;
+}
+.brand-text{flex:1;min-width:0;}
+.brand-text strong{display:block;font-size:26px;letter-spacing:-.8px;line-height:1.15;color:#fff;}
+.brand-text span{color:#edfdf5;font-size:12px;opacity:.9;display:block;margin-top:5px;}
+.sidebar .preview-ribbon{display:none;}
+.brand .brand-theme{
+  border:0;
+  margin-left:auto;
+  background:rgba(255,255,255,.16);
+  color:#fff;
+  border-radius:13px;
+  width:46px;
+  height:46px;
+  display:grid;
+  place-items:center;
+  flex:0 0 46px;
+  font-size:23px;
+}
+.brand .brand-theme:hover{background:rgba(255,255,255,.28);}
+.sidebar-bottom{display:none;}
+#main-nav{
+  display:flex;
+  flex-direction:row;
+  gap:5px;
+  padding:9px 11px;
+  position:sticky;
+  top:0;
+  z-index:20;
+  overflow-x:auto;
+  scrollbar-width:thin;
+  background:var(--paper);
+  border-bottom:1px solid var(--outline);
+  box-shadow:0 3px 8px rgba(15,70,52,.025);
+}
+#main-nav .nav-link{
+  min-width:90px;
+  flex:1 0 auto;
+  display:flex;
+  justify-content:center;
+  flex-direction:column;
+  text-align:center;
+  align-items:center;
+  gap:4px;
+  color:var(--muted);
+  border-radius:12px;
+  padding:9px 5px;
+  background:transparent;
+  font-size:12px;
+  line-height:1.25;
+  min-height:58px;
+  font-weight:650;
+}
+#main-nav .nav-link span{font-size:23px;width:auto;line-height:1.2;}
+#main-nav .nav-link.active,#main-nav .nav-link:hover{
+  color:var(--green-2);
+  background:var(--green-pale);
+}
+.topbar{display:none;}
+.main-wrap{display:flex;flex:1;min-height:0;}
+#app{padding:23px 22px 46px;max-width:100%;}
+.footer{font-size:12px;color:var(--muted);padding:17px 14px 25px;}
+.bottom-nav{display:none!important;}
+.headline{align-items:center;margin-bottom:20px;}
+.headline h1{font-size:clamp(24px,4vw,30px);letter-spacing:-.6px;}
+.headline .kicker{color:var(--green);font-size:11px;font-weight:850;}
+.headline .subtitle{color:var(--muted);line-height:1.5;}
+.calendar-hero{
+  background:linear-gradient(130deg,#e2f9ec 0%,#d9f5f1 65%,#c5ede5 100%);
+  padding:23px;
+  border-radius:23px;
+  min-height:167px;
+  position:relative;
+  overflow:hidden;
+}
+.calendar-hero::after{
+  content:"🍲";
+  font-size:74px;
+  opacity:.85;
+  position:absolute;
+  right:22px;
+  bottom:0;
+  transform:rotate(-8deg);
+  pointer-events:none;
+}
+.calendar-hero>div:first-child{position:relative;z-index:1;max-width:70%;}
+.calendar-hero .head-actions{position:relative;z-index:1;}
+.calendar-hero h1{color:#1c5d50;font-size:clamp(24px,3vw,28px);}
+.calendar-hero .subtitle{color:#426b61;}
+.calendar-hero .kicker{color:#16776c;}
+.card{
+  border:1px solid var(--outline);
+  border-radius:18px;
+  background:var(--paper);
+  box-shadow:var(--shadow);
+}
+.card-head h2,.selected-day-title{color:var(--green-2);}
+.btn{
+  border-radius:12px;
+  background:var(--green-pale);
+  border:1px solid var(--outline);
+  color:var(--green-2);
+  padding:10px 13px;
+  font-weight:650;
+  transition:background .15s,transform .15s;
+}
+.btn.primary{background:#147d72;border-color:#147d72;color:#fff;}
+.btn.soft{background:#eff8f4;border-color:#dcebe3;color:#15675b;}
+.btn:hover{background:#d8f1e7;}
+.btn.primary:hover{background:#0e695e;color:white;}
+.btn:active{transform:scale(.98);}
+.input,.select,.textarea{
+  border:1px solid #c7d8d2;
+  border-radius:11px;
+  background:var(--paper);
+  color:var(--ink);
+  padding:12px;
+}
+.field label{font-weight:650;}
+.day{
+  border:1px solid var(--outline);
+  background:var(--paper);
+  color:var(--ink);
+  border-radius:10px;
+  min-height:73px;
+}
+.day.selected{
+  background:#d6f5e9;
+  border:2px solid #087b6a;
+  color:#125c50;
+  box-shadow:inset 0 0 0 1px #087b6a;
+}
+.day:hover{background:#edf9f3;border-color:#7bb4a0;}
+.week-grid span{color:var(--muted);}
+.month-picker strong{color:var(--green-2);}
+.stat{
+  border:1px solid var(--outline);
+  background:var(--paper);
+  border-radius:17px;
+  padding:15px;
+  text-align:center;
+  box-shadow:var(--shadow);
+}
+.stat strong{color:#147d72;font-size:26px;}
+.stat span{font-size:12px;color:var(--muted);}
+.meal-entry,.source-item{border-radius:15px;border:1px solid var(--outline);background:var(--paper-soft);}
+.chip{background:var(--green-pale);color:var(--green-2);}
+.notice{background:var(--green-pale);color:var(--green-2);}
+#modal{border-radius:18px;}
+#toast{background:#15675b;}
+body.dark .calendar-hero{background:linear-gradient(130deg,#254e42,#315d50);}
+body.dark .calendar-hero .kicker,
+body.dark .calendar-hero h1,
+body.dark .calendar-hero .subtitle{color:#f0fff8;}
+body.dark .day.selected{background:#176953;border-color:#8ef1d3;color:white;}
+body.dark .day:hover{background:#254a3b;}
+body.dark .btn.soft{background:#2a4c41;border-color:#35554a;color:#e6f7ef;}
+body.dark .btn.primary{background:#20a58c;border-color:#20a58c;color:white;}
+body.dark .stat strong{color:#78dec3;}
+body.dark .input,body.dark .textarea,body.dark .select{border-color:#46685b;}
+body.dark .calendar-hero::after{opacity:.58;}
+@media(max-width:760px){
+  .sidebar{display:block;}
+  .brand-icon{width:45px;height:45px;flex-basis:45px;font-size:25px;}
+  .sidebar .brand{padding:16px 15px;min-height:77px;}
+  .brand-text strong{font-size:22px;}
+  .brand-text span{font-size:11px;}
+  .brand .brand-theme{width:42px;height:42px;font-size:20px;}
+  #app{padding:19px 15px 30px;}
+  #main-nav{padding:7px 5px;gap:0;}
+  #main-nav .nav-link{min-width:68px;flex:1 0 auto;font-size:11px;padding:8px 3px;min-height:57px;}
+  #main-nav .nav-link span{font-size:20px;}
+  .calendar-hero{min-height:168px;padding:17px;align-items:flex-start;}
+  .calendar-hero h1{font-size:23px;}
+  .calendar-hero .subtitle{font-size:12px;}
+  .calendar-hero::after{font-size:56px;right:8px;bottom:19px;}
+  .calendar-hero .head-actions{max-width:100%;}
+  .calendar-hero .head-actions .btn{font-size:11px;padding:7px;}
+  .card{padding:15px;}
+  .day{min-height:64px;}
+  .footer{padding-bottom:24px;}
+}
+@media(max-width:430px){
+  .calendar-hero>div:first-child{max-width:77%;}
+  #main-nav .nav-link{min-width:64px;}
+  .day{min-height:52px;}
+  .brand-text strong{font-size:21px;}
+  .calendar-hero .head-actions{margin-top:5px;}
+}
+@media(prefers-reduced-motion:reduce){
+  .btn{transition:none;}
+}
+@media print{
+  #main-nav,.sidebar,.brand,.calendar-hero::after{display:none!important;}
+  #app{padding:0;}
+  .app-shell{box-shadow:none;width:100%;}
+}
