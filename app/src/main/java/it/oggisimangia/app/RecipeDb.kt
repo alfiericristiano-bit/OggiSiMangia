@@ -32,6 +32,7 @@ data class Recipe(
     val cuisine: String = "",
     val equipment: String = "",
     val tips: String = "",
+    val notes: String = "",
     val storage: String = "",
     val variations: String = "",
     val allergens: String = "",
@@ -71,6 +72,7 @@ class RecipeDb(context: Context) : SQLiteOpenHelper(context, "oggisimangia.db", 
                 cuisine TEXT NOT NULL DEFAULT '',
                 equipment TEXT NOT NULL DEFAULT '',
                 tips TEXT NOT NULL DEFAULT '',
+                notes TEXT NOT NULL DEFAULT '',
                 storage TEXT NOT NULL DEFAULT '',
                 variations TEXT NOT NULL DEFAULT '',
                 allergens TEXT NOT NULL DEFAULT '',
@@ -104,6 +106,7 @@ class RecipeDb(context: Context) : SQLiteOpenHelper(context, "oggisimangia.db", 
             db.execSQL("ALTER TABLE recipes ADD COLUMN cuisine TEXT NOT NULL DEFAULT ''")
             db.execSQL("ALTER TABLE recipes ADD COLUMN equipment TEXT NOT NULL DEFAULT ''")
             db.execSQL("ALTER TABLE recipes ADD COLUMN tips TEXT NOT NULL DEFAULT ''")
+            db.execSQL("ALTER TABLE recipes ADD COLUMN notes TEXT NOT NULL DEFAULT ''")
             db.execSQL("ALTER TABLE recipes ADD COLUMN storage TEXT NOT NULL DEFAULT ''")
             db.execSQL("ALTER TABLE recipes ADD COLUMN variations TEXT NOT NULL DEFAULT ''")
             db.execSQL("ALTER TABLE recipes ADD COLUMN allergens TEXT NOT NULL DEFAULT ''")
@@ -141,6 +144,7 @@ class RecipeDb(context: Context) : SQLiteOpenHelper(context, "oggisimangia.db", 
         cuisine = c.getString(c.getColumnIndexOrThrow("cuisine")),
         equipment = c.getString(c.getColumnIndexOrThrow("equipment")),
         tips = c.getString(c.getColumnIndexOrThrow("tips")),
+        notes = c.getString(c.getColumnIndexOrThrow("notes")),
         storage = c.getString(c.getColumnIndexOrThrow("storage")),
         variations = c.getString(c.getColumnIndexOrThrow("variations")),
         allergens = c.getString(c.getColumnIndexOrThrow("allergens")),
@@ -177,6 +181,7 @@ class RecipeDb(context: Context) : SQLiteOpenHelper(context, "oggisimangia.db", 
             put("cuisine", r.cuisine)
             put("equipment", r.equipment)
             put("tips", r.tips)
+            put("notes", r.notes)
             put("storage", r.storage)
             put("variations", r.variations)
             put("allergens", r.allergens)
