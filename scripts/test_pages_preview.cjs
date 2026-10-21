@@ -111,4 +111,24 @@ assert.equal(recipe.assignments.length,2,"Clone did not preserve original");
 assert(recipe.assignments.some(a=>a.date==="2026-10-21"&&a.meal==="Pranzo"),"Original planning was replaced");
 assert(recipe.assignments.some(a=>a.date==="2026-10-23"&&a.meal==="Cena"&&a.alternative),"Clone meal and role lost");
 
-console.log("PASS: Pages assets, initial calendar, recipe archive AND filtering, persistent site removal, day planning and cloning.");
+// v1.5.4: collapsed cards show dish titles without action clutter.
+assert(element("app").innerHTML.includes('data-action="toggle-meal"'),"Expandable meal sections missing");
+assert(element("app").innerHTML.includes("Pasta alle zucchine"),"Collapsed lunch/dinner must show recipe titles");
+clickAction("toggle-meal",{meal:"Cena"});
+assert(element("app").innerHTML.includes("Rimuovi"),"Expanded meal actions missing");
+clickAction("toggle-meal",{meal:"Cena"});
+clickAction("clear-day");
+assert(element("modal").open,"Clear-day confirmation missing");
+clickAction("confirm-clear-day");
+recipes=JSON.parse(storage.get("oggisimangia_web_preview_v1")).recipes;
+recipe=recipes.find(r=>r.id==="demo-pasta");
+assert.equal(recipe.assignments.length,1,"Reset day should only remove chosen day");
+assert(recipe.assignments.some(a=>a.date==="2026-10-21"),"Reset day removed other assignments");
+clickView("archive");
+assert(element("app").innerHTML.includes("← Indietro"),"Page back control missing");
+clickAction("reset-ingredients");
+assert(element("app").innerHTML.includes("Pasta alle zucchine"),"Reset ingredients did not clear filter");
+clickAction("back-page");
+assert(element("app").innerHTML.includes("Il tuo calendario"),"Back button did not restore previous page");
+
+console.log("PASS: smartphone preview, filtering, sources, planning, collapsible meals, safe reset day, search reset and back navigation.");
