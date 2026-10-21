@@ -10,7 +10,14 @@ L'anteprima web è **sempre solo in formato smartphone** (PC: cornice e area cir
 
 **Risparmio quote:** effettuare un'unica pubblicazione Vercel per blocco sostanziale su `main`, raggruppare i piccoli aggiustamenti e usare GitHub Actions senza verifiche online ripetute e superflue. Il monitoraggio approfondito online è lanciato solo manualmente con il workflow `Verifica sito Vercel online`.
 
-Android 1.5.3 (versionCode 16).
+Android 1.5.4 (versionCode 17).
+
+- Navigazione con pulsante Indietro in ogni pagina secondaria e tasto fisico/gestuale Android.
+- Home: pranzo e cena compressi, mostrano solamente i nomi delle ricette; toccando l'intestazione compaiono i controlli.
+- Eliminazione della pianificazione da un giorno e Svuota giorno con conferma: le ricette rimangono nel ricettario.
+- Azzera ingredienti nella ricerca senza azzerare i filtri; ricerca avviata con pulsante primario grande e ben evidente.
+- Fonti online in righe compatte con elimina singolo sito, conferma e salvataggio; pulsanti e schede arrotondati.
+- L'anteprima Vercel riproduce le nuove operazioni di calendario e ricettario ma non esegue l'APK, né la ricerca online sui siti.
 
 - Ricerca: le interrogazioni ai siti provano prima ogni ingrediente seguito da virgola (anche il singolo), poi varianti senza virgola finale / senza punteggiatura. Consultazione parallela dei siti e lettura RSS/HTML di ricerca quando disponibile; la verifica degli ingredienti e dei passaggi resta rigorosa.\n- In caso di risposta vuota l'app chiarisce che alcuni siti possono bloccare la consultazione e che il messaggio non prova l'assenza di ricette.\n\n- Gli ingredienti sono obbligatori e confrontati con le forme singolari, plurali e preparazioni esplicite nella ricetta pubblicata; categoria, difficoltà e tempi sono invece preferenze segnalate sulle schede senza escludere ricette valide.\n- Interfaccia più compatta e pulsanti collegati disposti orizzontalmente.\n
 
