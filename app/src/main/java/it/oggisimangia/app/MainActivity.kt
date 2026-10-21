@@ -129,7 +129,7 @@ class MainActivity : Activity() {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
             setPadding(dp(17), dp(17), dp(16), dp(18))
-            background = GradientDrawable(GradientDrawable.Orientation.TL_BR,
+            this.background = GradientDrawable(GradientDrawable.Orientation.TL_BR,
                 intArrayOf(familyTeal, Color.rgb(32, 165, 140))).apply {
                 cornerRadius = dp(22).toFloat()
             }
@@ -137,7 +137,7 @@ class MainActivity : Activity() {
         }
         hero.addView(TextView(this).apply {
             text = "🍝"; textSize = 30f; gravity = Gravity.CENTER
-            background = shape(Color.argb(45, 255, 255, 255), 15f)
+            this.background = shape(Color.argb(45, 255, 255, 255), 15f)
         }, LinearLayout.LayoutParams(dp(55), dp(55)).apply { marginEnd = dp(13) })
         val headerText = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         headerText.addView(TextView(this).apply {
