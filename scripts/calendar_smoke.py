@@ -41,7 +41,7 @@ help_data = adb('exec-out', 'cat', '/sdcard/calendar-help.xml')
 help_nodes = list(ET.fromstring(help_data).iter('node'))
 assert any(n.attrib.get('text') == 'Come funziona il calendario' for n in help_nodes), 'Calendar help popup missing'
 def help_tap(text):
-    node = next(n for n in help_nodes if n.attrib.get('text') == text)
+    node = next(n for n in help_nodes if n.attrib.get('text','').casefold() == text.casefold())
     x1, y1, x2, y2 = map(int, re.findall(r'\d+', node.attrib['bounds']))
     adb('shell', 'input', 'tap', str((x1+x2)//2), str((y1+y2)//2))
 help_tap('Non mostrare più questo messaggio')
