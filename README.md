@@ -10,6 +10,15 @@ L'anteprima web è **sempre solo in formato smartphone** (PC: cornice e area cir
 
 **Risparmio quote:** effettuare un'unica pubblicazione Vercel per blocco sostanziale su `main`, raggruppare i piccoli aggiustamenti e usare GitHub Actions senza verifiche online ripetute e superflue. Il monitoraggio approfondito online è lanciato solo manualmente con il workflow `Verifica sito Vercel online`.
 
+Android 1.5.4 (versionCode 17).
+
+- UI Android e Vercel più moderna e compatta: comandi arrotondati, spazi contenuti e pulsante ricerca ben visibile.
+- Navigazione Indietro sulle pagine secondarie e ritorno alla scheda precedente.
+- Home: Pranzo e Cena espandibili; quando chiusi restano visibili solo i nomi dei piatti. Nell'espansione si trovano modifica, clonazione, aggiunta e rimozione.
+- Calendario: ritorno al giorno corrente, possibilità di svuotare il giorno con conferma senza cancellare le ricette dall'archivio; rimozione singola per pasto, compreso il caso Entrambi.
+- Ricerca: cancella tutte le caselle degli ingredienti e mette in evidenza il pulsante di ricerca sui siti.
+- Fonti Android: priorità e eliminazione con conferma sulla stessa riga; eliminazione persistente anche per i siti predefiniti. Nell'anteprima web la gestione delle fonti rimane dimostrativa e locale.
+
 Android 1.5.3 (versionCode 16).
 
 - Ricerca: le interrogazioni ai siti provano prima ogni ingrediente seguito da virgola (anche il singolo), poi varianti senza virgola finale / senza punteggiatura. Consultazione parallela dei siti e lettura RSS/HTML di ricerca quando disponibile; la verifica degli ingredienti e dei passaggi resta rigorosa.\n- In caso di risposta vuota l'app chiarisce che alcuni siti possono bloccare la consultazione e che il messaggio non prova l'assenza di ricette.\n\n- Gli ingredienti sono obbligatori e confrontati con le forme singolari, plurali e preparazioni esplicite nella ricetta pubblicata; categoria, difficoltà e tempi sono invece preferenze segnalate sulle schede senza escludere ricette valide.\n- Interfaccia più compatta e pulsanti collegati disposti orizzontalmente.\n
