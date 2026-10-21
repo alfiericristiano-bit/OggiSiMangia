@@ -17,8 +17,9 @@ class MealCalendar(context: Context, private val selected: LocalDate,
                    private val onSelect: (LocalDate) -> Unit,
                    private val onAdd: (LocalDate) -> Unit) : LinearLayout(context) {
     private var month = YearMonth.from(selected)
-    private val lunch = Color.rgb(215, 112, 0)
-    private val dinner = Color.rgb(31, 102, 191)
+    private val lunch = Color.rgb(216, 117, 35)
+    private val dinner = Color.rgb(63, 117, 180)
+    private val teal = Color.rgb(20, 125, 114)
     init { orientation = VERTICAL; render() }
     private fun dp(value: Int) = (value * resources.displayMetrics.density).toInt()
     private fun render() {
@@ -26,12 +27,19 @@ class MealCalendar(context: Context, private val selected: LocalDate,
         val header = LinearLayout(context).apply { gravity = Gravity.CENTER_VERTICAL }
         fun arrow(caption: String, description: String, move: Long) = Button(context).apply {
             text = caption; contentDescription = description
+            isAllCaps = false
+            textSize = 23f
+            setTextColor(teal)
+            background = GradientDrawable().apply {
+                setColor(Color.rgb(234,244,241)); cornerRadius = dp(12).toFloat()
+            }
             setOnClickListener { month = month.plusMonths(move); render() }
         }
         header.addView(arrow("‹", "Mese precedente", -1), LayoutParams(dp(52), dp(48)))
         header.addView(TextView(context).apply {
             text = month.format(DateTimeFormatter.ofPattern("MMMM yyyy", Locale.ITALIAN))
             textSize = 18f; gravity = Gravity.CENTER; setTypeface(null, Typeface.BOLD)
+            setTextColor(Color.rgb(21,103,91))
         }, LayoutParams(0, dp(48), 1f))
         header.addView(arrow("›", "Mese successivo", 1), LayoutParams(dp(52), dp(48)))
         addView(header)
@@ -50,13 +58,18 @@ class MealCalendar(context: Context, private val selected: LocalDate,
         for (number in 1..month.lengthOfMonth()) {
             val date = month.atDay(number)
             val meals = occupied[date.toString()].orEmpty()
-            val dayCell = DayCell(context).apply {
-                orientation = VERTICAL; gravity = Gravity.CENTER; isFocusable = true; isClickable = true
+            // Default Android View long click respects OS and accessibility long-press delay.
+            val dayCell = LinearLayout(context).apply {
+                orientation = VERTICAL; gravity = Gravity.CENTER
+                isFocusable = true; isClickable = true; isLongClickable = true
                 isSelected = date == selected
                 contentDescription = date.format(DateTimeFormatter.ofPattern("d MMMM yyyy", Locale.ITALIAN)) +
                     if (meals.isEmpty()) ", nessun pasto pianificato" else ", " + meals.joinToString(" e ")
-                if (date == selected) background = GradientDrawable().apply {
-                    setColor(Color.rgb(222, 240, 219)); cornerRadius = dp(10).toFloat()
+                background = GradientDrawable().apply {
+                    setColor(if (date == selected) Color.rgb(214,245,233) else Color.WHITE)
+                    cornerRadius = dp(10).toFloat()
+                    setStroke(dp(if (date == selected) 2 else 1),
+                        if (date == selected) teal else Color.rgb(222,235,228))
                 }
                 setOnClickListener { onSelect(date) }
                 setOnLongClickListener { onAdd(date); true }
@@ -72,7 +85,7 @@ class MealCalendar(context: Context, private val selected: LocalDate,
                 }, LayoutParams(dp(7), dp(7)).apply { setMargins(dp(2), dp(3), dp(2), 0) })
             }
             dayCell.addView(dots, LayoutParams(-1, dp(12)))
-            cell(dayCell, 46)
+            cell(dayCell, 52)
         }
         addView(grid, LayoutParams(-1, -2))
         val legend = LinearLayout(context).apply { gravity = Gravity.CENTER }
@@ -85,39 +98,3 @@ class MealCalendar(context: Context, private val selected: LocalDate,
     }
 }
 
-/** Owns the physical hold threshold instead of Android's default short long-click delay. */
-private class DayCell(context: Context) : LinearLayout(context) {
-    private var downX = 0f
-    private var downY = 0f
-    private var tracking = false
-    private var held = false
-    private val slop = android.view.ViewConfiguration.get(context).scaledTouchSlop
-    private val hold = Runnable {
-        if (tracking && isAttachedToWindow) {
-            held = true
-            isPressed = false
-            performLongClick()
-        }
-    }
-    override fun onTouchEvent(event: android.view.MotionEvent): Boolean {
-        when (event.actionMasked) {
-            android.view.MotionEvent.ACTION_DOWN -> {
-                downX = event.x; downY = event.y; tracking = true; held = false; isPressed = true
-                postDelayed(hold, 2100L)
-            }
-            android.view.MotionEvent.ACTION_MOVE -> {
-                if (kotlin.math.abs(event.x - downX) > slop || kotlin.math.abs(event.y - downY) > slop) cancelHold()
-            }
-            android.view.MotionEvent.ACTION_UP -> {
-                val click = tracking && !held
-                cancelHold()
-                if (click) performClick()
-            }
-            android.view.MotionEvent.ACTION_CANCEL, android.view.MotionEvent.ACTION_POINTER_DOWN -> cancelHold()
-        }
-        return true
-    }
-    override fun performClick(): Boolean = super.performClick()
-    private fun cancelHold() { removeCallbacks(hold); tracking = false; isPressed = false }
-    override fun onDetachedFromWindow() { cancelHold(); super.onDetachedFromWindow() }
-}
