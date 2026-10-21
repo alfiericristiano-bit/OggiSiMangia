@@ -52,6 +52,11 @@ class MainActivity : Activity() {
     private var lastSearchResults: List<WebRecipe> = emptyList()
     private var lastSearchOffset = 0
     private var photoLabel: TextView? = null
+    private val expandedMeals = mutableSetOf<String>()
+    private var currentPageKey = ""
+    private var currentPageRestore: (() -> Unit)? = null
+    private val pageHistory = ArrayDeque<() -> Unit>()
+    private var goingBack = false
     private val dateFormatter = DateTimeFormatter.ofPattern("EEEE d MMMM yyyy", java.util.Locale.ITALIAN)
 
     companion object {
@@ -111,7 +116,13 @@ class MainActivity : Activity() {
     private fun outlined(color: Int = Color.WHITE, radius: Float = 12f): GradientDrawable =
         shape(color, radius).apply { setStroke(dp(1), Color.rgb(199, 216, 210)) }
 
-    private fun screen(title: String, subtitle: String) {
+    private fun screen(title: String, subtitle: String, key: String, restore: () -> Unit) {
+        if (!goingBack && currentPageKey.isNotEmpty() && currentPageKey != key) {
+            currentPageRestore?.let { pageHistory.addLast(it) }
+            if (pageHistory.size > 16) pageHistory.removeFirst()
+        }
+        currentPageKey = key
+        currentPageRestore = restore
         val background = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setBackgroundColor(Color.rgb(244, 247, 247))
@@ -153,9 +164,31 @@ class MainActivity : Activity() {
             setTextColor(Color.rgb(235, 251, 244)); maxLines = 3
         })
         hero.addView(headerText, LinearLayout.LayoutParams(0, -2, 1f))
-        content.addView(hero, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(8) })
+        content.addView(hero, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(7) })
+        if (key != "calendar") {
+            val back = Button(this).apply {
+                text = "‹  Indietro"
+                textSize = 14f; isAllCaps = false; gravity = Gravity.CENTER_VERTICAL
+                setTextColor(familyDeep)
+                background = outlined(Color.WHITE, 16f)
+                setOnClickListener { goBack() }
+            }
+            content.addView(back, LinearLayout.LayoutParams(-1, dp(44)).apply { bottomMargin = dp(6) })
+        }
         navigation(title)
     }
+
+    private fun goBack() {
+        hideKeyboard()
+        val previous = if (pageHistory.isEmpty()) null else pageHistory.removeLast()
+        goingBack = true
+        try {
+            if (previous != null) previous() else showCalendar()
+        } finally { goingBack = false }
+    }
+
+    @Deprecated("Android back navigation")
+    override fun onBackPressed() { goBack() }
 
     private fun label(value: String, size: Float = 16f, bold: Boolean = false): TextView =
         TextView(this).apply {
@@ -170,12 +203,29 @@ class MainActivity : Activity() {
         val btn = Button(this).apply {
             text = value; isAllCaps = false; textSize = 14f
             setTextColor(familyDeep)
-            background = outlined(familyPale, 12f)
+            background = outlined(familyPale, 17f)
             elevation = dp(1).toFloat()
             setOnClickListener { hideKeyboard(); onClick() }
         }
-        content.addView(btn, LinearLayout.LayoutParams(-1, dp(48)).apply {
-            bottomMargin = dp(6)
+        content.addView(btn, LinearLayout.LayoutParams(-1, dp(44)).apply {
+            bottomMargin = dp(5)
+        })
+    }
+
+    private fun primaryAction(value: String, onClick: () -> Unit) {
+        val btn = Button(this).apply {
+            text = value; isAllCaps = false; textSize = 16f
+            setTypeface(null, Typeface.BOLD)
+            setTextColor(Color.WHITE)
+            background = GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT,
+                intArrayOf(familyDeep, Color.rgb(20, 150, 126))).apply {
+                cornerRadius = dp(19).toFloat()
+            }
+            elevation = dp(4).toFloat()
+            setOnClickListener { hideKeyboard(); onClick() }
+        }
+        content.addView(btn, LinearLayout.LayoutParams(-1, dp(54)).apply {
+            topMargin = dp(7); bottomMargin = dp(9)
         })
     }
 
@@ -189,10 +239,10 @@ class MainActivity : Activity() {
                 maxLines = 2
                 ellipsize = android.text.TextUtils.TruncateAt.END
                 setTextColor(familyDeep)
-                background = outlined(familyPale, 12f)
+                background = outlined(familyPale, 17f)
                 setOnClickListener { hideKeyboard(); entry.second() }
             }
-            row.addView(button, LinearLayout.LayoutParams(0, dp(48), 1f).apply {
+            row.addView(button, LinearLayout.LayoutParams(0, dp(44), 1f).apply {
                 if (index == 0) marginEnd = dp(6)
             })
         }
@@ -207,7 +257,7 @@ class MainActivity : Activity() {
             setText(initial)
             textSize = 16f
             setPadding(dp(12), dp(8), dp(12), dp(8))
-            background = outlined(Color.WHITE, 11f)
+            background = outlined(Color.WHITE, 15f)
             setTextColor(familyInk)
             setHintTextColor(Color.rgb(105,129,120))
             if (multi) {
@@ -239,9 +289,9 @@ class MainActivity : Activity() {
         val spinner = Spinner(this)
         spinner.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, choices)
         spinner.setSelection(choices.indexOf(value).coerceAtLeast(0))
-        spinner.background = outlined(Color.WHITE, 11f)
+        spinner.background = outlined(Color.WHITE, 15f)
         spinner.setPadding(dp(9), 0, dp(9), 0)
-        content.addView(spinner, LinearLayout.LayoutParams(-1, dp(48)).apply { bottomMargin = dp(6) })
+        content.addView(spinner, LinearLayout.LayoutParams(-1, dp(44)).apply { bottomMargin = dp(5) })
         return spinner
     }
 
@@ -273,7 +323,7 @@ class MainActivity : Activity() {
                     }
                 }
             }
-            nav.addView(b, LinearLayout.LayoutParams(0, dp(48), 1f))
+            nav.addView(b, LinearLayout.LayoutParams(0, dp(44), 1f))
         }
         content.addView(nav, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(8) })
     }
@@ -286,7 +336,8 @@ class MainActivity : Activity() {
     }
 
     private fun showCalendar() {
-        screen("Il calendario dei pasti", "Organizza pranzo e cena, anche per i prossimi giorni.")
+        screen("Il calendario dei pasti", "Organizza pranzo e cena, anche per i prossimi giorni.",
+            "calendar") { showCalendar() }
         searchForDay = false
         selectedAlternative = false
         label("Tocca un giorno per vederne i pasti. Tieni premuto come da impostazioni Android per aggiungere una ricetta.", 13f)
@@ -413,7 +464,10 @@ class MainActivity : Activity() {
         selectedPhoto = existing?.imagePath ?: ""
         photoPreview = null
         screen(if (existing == null || existing.id == 0L) "Scrivi la tua ricetta" else "Modifica ricetta",
-            "Compila i campi che conosci. Nome, ingredienti e preparazione sono obbligatori.")
+            "Compila i campi che conosci. Nome, ingredienti e preparazione sono obbligatori.",
+            "editor-${existing?.id ?: 0L}") {
+            showEditor(existing, initialAlternative, suggestedTitle, suggestedUrl, planByDefault)
+        }
         label("INFORMAZIONI GENERALI", 20f, true)
         val titleField = input("Nome del piatto *", existing?.title ?: suggestedTitle)
         val descriptionField = input("Descrizione breve / presentazione", existing?.description.orEmpty(), true)
@@ -643,7 +697,8 @@ class MainActivity : Activity() {
     }
 
     private fun showSearch() {
-        screen("Trova cosa cucinare", "Scopri le proposte senza uscire dall'app.")
+        screen("Trova cosa cucinare", "Scopri le proposte senza uscire dall'app.",
+            "search") { showSearch() }
         label("Giorno scelto: " + selectedDate.format(dateFormatter), 16f, true)
         if (searchForDay) label(selectedMeal + " · " + if (selectedAlternative) "Alternativa" else "Principale", 16f, true)
         actionRow("🔗 Ho un link", { showRecipeLink() }, "📅 Pasti del giorno", { showCalendar() })
@@ -718,7 +773,8 @@ class MainActivity : Activity() {
     }
 
     private fun showSourceSettings() {
-        screen("Priorità dei siti", "L'ordine viene memorizzato per le prossime ricerche.")
+        screen("Priorità dei siti", "L'ordine viene memorizzato per le prossime ricerche.",
+            "sources") { showSourceSettings() }
         label("Le fonti con priorità più alta vengono prima nei risultati compatibili. Seguono pertinenza e valutazioni degli utenti, quando disponibili.", 14f)
         action("Aggiungi un sito") {
             val box = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(18),dp(8),dp(18),dp(8)) }
@@ -798,7 +854,8 @@ class MainActivity : Activity() {
     }
 
     private fun showRecipeLink() {
-        screen("Aggiungi una ricetta dal link", "Per il " + selectedDate.format(dateFormatter))
+        screen("Aggiungi una ricetta dal link", "Per il " + selectedDate.format(dateFormatter),
+            "link") { showRecipeLink() }
         label("Incolla il link della pagina della ricetta.", 16f)
         val link = input("https://…")
         link.inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_VARIATION_URI
@@ -910,7 +967,7 @@ class MainActivity : Activity() {
                 text = "👀 Scheda"
                 isAllCaps = false
                 setOnClickListener { popup.dismiss(); showOnlineDetail(recipe) }
-            }, LinearLayout.LayoutParams(0, dp(48), 1f))
+            }, LinearLayout.LayoutParams(0, dp(44), 1f))
             buttons.addView(Button(this).apply {
                 text = "💾 Salva"
                 isAllCaps = false
@@ -918,7 +975,7 @@ class MainActivity : Activity() {
                     popup.dismiss()
                     showOnlineDetail(recipe)
                 }
-            }, LinearLayout.LayoutParams(0, dp(48), 1f))
+            }, LinearLayout.LayoutParams(0, dp(44), 1f))
             row.addView(buttons)
             rows.addView(row, LinearLayout.LayoutParams(-1, -2).apply {
                 bottomMargin = dp(12)
@@ -955,7 +1012,9 @@ class MainActivity : Activity() {
                     title = result.title.ifBlank { sourceRecipe.title },
                     category = "", difficulty = "Non disponibile"
                 ) else sourceRecipe
-                screen(recipe.title, recipe.source)
+                screen(recipe.title, recipe.source, "online-" + recipe.url) {
+                    showOnlineDetail(sourceRecipe, imported)
+                }
                 if (!imported) {
                     RecipePreferences.notices(recipe, searchCategory, searchDifficulty, searchDuration)
                         .forEach { label("⚠ " + it, 13f) }
@@ -1097,7 +1156,8 @@ class MainActivity : Activity() {
 
     private fun showArchive(search: String = "", category: String = "Tutte",
                             difficulty: String = "Tutte", order: String = "Nome A–Z", ingredientQuery: String = "") {
-        screen("Il mio ricettario", "Ricette salvate sul telefono, consultabili anche offline.")
+        screen("Il mio ricettario", "Ricette salvate sul telefono, consultabili anche offline.",
+            "archive") { showArchive(search, category, difficulty, order, ingredientQuery) }
         val queryField = input("Cerca per nome o parola chiave", search)
         label("Ingredienti: la ricetta deve contenerli tutti", 14f, true)
         label("Una casella per ingrediente. Massimo 10 ingredienti.", 13f)
@@ -1140,7 +1200,8 @@ class MainActivity : Activity() {
     private fun showDetail(id: Long) {
         val r = db.get(id) ?: run { showCalendar(); return }
         screen(r.title, r.meal + " · " + r.category + " · " +
-            (if (r.alternative) "Alternativa" else "Principale"))
+            (if (r.alternative) "Alternativa" else "Principale"),
+            "detail-" + id) { showDetail(id) }
         if (r.imagePath.isNotBlank()) addPhotoPreview(r.imagePath)
         label("📅 " + r.day.ifBlank { "Solo ricettario" } + "   ⏱ " + r.duration + "   👩‍🍳 " + r.difficulty, 15f)
         showRecipeMetadata(r)
