@@ -21,19 +21,12 @@ data class WebRecipe(
     val difficulty: String = "",
     val minutes: Int? = null,
     val rating: Double? = null,
-    val feedbackCount: Int? = null
+    val feedbackCount: Int? = null,
+    val relevance: Int = 0
 )
 
 object RecipeFinder {
-    private val acceptedHosts = listOf(
-        "giallozafferano.it", "cucchiaio.it", "fattoincasadabenedetta.it"
-    )
-
-    fun isTrusted(url: String): Boolean = try {
-        val uri = Uri.parse(url)
-        val host = uri.host?.lowercase() ?: ""
-        uri.scheme == "https" && acceptedHosts.any { host == it || host.endsWith(".$it") }
-    } catch (_: Exception) { false }
+    fun isTrusted(url: String): Boolean = RecipeSources.trusted(url)
 
     fun search(
         ingredients: String,
@@ -69,7 +62,7 @@ object RecipeFinder {
                     .followRedirects(true)
                     .get()
                 for (recipe in extract(document, name)) {
-                    if (collected.size >= 45) break
+                    if (collected.size >= 60) break
                     collected.putIfAbsent(recipe.url.substringBefore('?'), recipe)
                 }
             } catch (_: Exception) {
@@ -90,8 +83,8 @@ object RecipeFinder {
         // I dati di difficoltà e tempo non sempre sono forniti dalla fonte.
         // In quel caso la scheda resta visibile con l'attributo "non disponibile".
         return collected.values.filter { r ->
-            (r.minutes == null || r.minutes <= maxMinutes) &&
-                (r.difficulty.isBlank() || difficulty == "Difficile" ||
+            rank(r) > 0 && (r.minutes == null || r.minutes <= maxMinutes) &&
+                (r.difficulty.isBlank() || difficulty == "Non disponibile" ||
                     r.difficulty.equals(difficulty, true) ||
                     (difficulty == "Facile" && r.difficulty == "Molto facile")) &&
                 (r.category.isBlank() || category.isBlank() ||
@@ -143,7 +136,7 @@ object RecipeFinder {
             val rating = Regex("[0-5][,.][0-9]").find(ratingString)
                 ?.value?.replace(',', '.')?.toDoubleOrNull()
             val feedbackString = card.select(
-                "[itemprop=reviewCount], [itemprop=ratingCount], a[href*=comment], a[href*=recension]"
+                "[itemprop=ratingCount], [itemprop=reviewCount]"
             ).firstOrNull()?.let { it.attr("content").ifBlank { it.text() } }.orEmpty()
             val feedbacks = Regex("\\d+").find(feedbackString)?.value?.toIntOrNull()
 
@@ -151,7 +144,7 @@ object RecipeFinder {
                 title, summary, url, source, imageUrl, recipeCategory, diff,
                 mins, rating, feedbacks
             ))
-            if (found.size >= 35) break
+            if (found.size >= 18) break
         }
         return found.values.toList()
     }

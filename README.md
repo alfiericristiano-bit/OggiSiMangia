@@ -1,6 +1,6 @@
 # 🍽️ OggiSiMangia...
 
-Android 1.3.1 (versionCode 8).
+Android 1.3.2 (versionCode 9).
 
 - Tocco su un giorno della home: apre la ricerca mantenendo la data scelta, con accesso ai pasti già pianificati.
 - "Ho già trovato la ricetta da aggiungere": importazione da un link HTTPS pubblico, anche di altri siti, nella stessa scheda interna della ricerca. Titolo, foto, ingredienti, procedimento e metadati provengono dai dati pubblicati; in assenza di dati si può salvare il link e completare la scheda manualmente.
@@ -9,7 +9,8 @@ Android 1.3.1 (versionCode 8).
 - Aggiungi al calendario apre la scelta del giorno e del pasto, con ricetta principale o alternativa. La griglia mensile legge il database e distingue pranzo (arancione) e cena (blu), anche sullo stesso giorno.
 - Ricettario con filtro ingredienti OR: basta almeno uno tra quelli indicati, separati da virgola, punto e virgola o riga. Ogni ricetta trovata può essere inserita nel giorno scelto dal calendario.
 - Migrazione dello schema SQLite v1/v2 → v3 preservando le ricette e le foto esistenti.
-- Un solo Cerca consulta GialloZafferano, Il Cucchiaio d'Argento e Fatto in Casa da Benedetta, mostrando dieci risultati per pagina nel popup.
+- Ricerca su 11 fonti: GialloZafferano, Cucchiaio d’Argento, Fatto in casa da Benedetta, Misya, Cookaround, La Cucina Italiana, Tavolartegusto, Ricetta.it, Sale&Pepe, RicetteDalMondo, Agrodolce. Fonti centralizzate in RecipeSources. Ogni ricerca tenta tutte le fonti via ricerca pubblica per dominio e verifica delle pagine Recipe JSON-LD; le tre fonti originali hanno anche ricerca diretta. Quote per fonte e richieste concorrenti con scadenza. Nessun aggiramento dei blocchi dei siti.
+- Prima le ricette pertinenti di GialloZafferano, poi le altre: in ogni gruppo corrispondenza ingredienti, media ponderata (prior 3,5/5 con peso 20), numero di voti/recensioni. Rating normalizzati a 5 in base alla scala dichiarata; commenti e visualizzazioni non diventano voti. Ricette prive di rating restano disponibili dopo quelle valutate a parità di pertinenza. Dieci risultati per pagina. La ricerca non garantisce copertura completa di ciascun sito.
 - Scheda interna con ingredienti, dosi, tempo e sintesi estrattiva dei passaggi pubblicati in formato Recipe JSON-LD. La sintesi conserva frasi con quantità, tempi e riferimenti di cottura; il testo completo resta consultabile.
 - Vedi ricetta originale sul sito apre il browser su richiesta.
 - Salvataggio Semplificata / Originale / Entrambe, con ingredienti e link. Originale significa testo del procedimento leggibile offline, non copia grafica dell'intera pagina.

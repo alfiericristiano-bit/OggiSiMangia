@@ -48,7 +48,6 @@ class MainActivity : Activity() {
         private val categories = arrayOf("Antipasto", "Primo", "Secondo", "Contorno", "Piatto unico", "Dolce")
         private val difficulties = arrayOf("Facile", "Media", "Difficile", "Non disponibile")
         private val durations = arrayOf("Volante", "Veloce", "Media", "Lunga")
-        private val allowedDomains = listOf("giallozafferano.it", "cucchiaio.it", "fattoincasadabenedetta.it")
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -313,6 +312,12 @@ class MainActivity : Activity() {
         val category = dropdown("Cerchi un...", categories, searchCategory)
         val difficulty = dropdown("Difficoltà desiderata", difficulties, searchDifficulty)
         val duration = dropdown("Tempo a disposizione", durations, searchDuration)
+        action("Siti consultati e ordine dei risultati") {
+            AlertDialog.Builder(this).setTitle("Le nostre fonti")
+                .setMessage(RecipeSources.sites.keys.joinToString("\n") +
+                    "\n\nPrima le ricette compatibili di GialloZafferano; poi le altre fonti. In ciascun gruppo: corrispondenza degli ingredienti, voto ponderato per numero di voti, numero di voti/recensioni. Le visualizzazioni non sono stimate. I siti possono non rispondere o non pubblicare tutti i dati.")
+                .setPositiveButton("Chiudi", null).show()
+        }
         label("Le schede mostrano solo le informazioni disponibili sui siti originali. " +
             "I filtri vengono applicati quando i dati sono presenti.", 13f)
 
@@ -327,7 +332,7 @@ class MainActivity : Activity() {
             }
             val progress = AlertDialog.Builder(this)
                 .setTitle("Ricerca delle ricette")
-                .setMessage("Consulto i siti selezionati...")
+                .setMessage("Consulto gli 11 siti selezionati, con priorità a GialloZafferano...")
                 .setCancelable(false)
                 .create()
             progress.show()
@@ -337,25 +342,22 @@ class MainActivity : Activity() {
             val selectedDuration = searchDuration
             Thread {
                 val results = try {
-                    val primary = RecipeFinder.search(selectedIngredients, selectedCategory,
-                        selectedDifficulty, selectedDuration)
-                    val backup = if (primary.size <= 10) {
-                        try {
-                            RecipeDiscovery.search(selectedIngredients, selectedCategory,
-                                selectedDifficulty, selectedDuration).map { r ->
-                                WebRecipe(r.title, r.description, r.url, r.site,
-                                    r.photoUrl, selectedCategory, r.difficulty,
-                                    r.minutes, r.rating, r.feedbackCount)
-                            }
-                        } catch (_: Exception) { emptyList() }
-                    } else emptyList()
-                    (primary + backup).distinctBy { it.url.substringBefore('?').substringBefore('#').trimEnd('/') }
-                        .sortedWith(compareByDescending<WebRecipe> { it.feedbackCount ?: -1 }
-                            .thenByDescending {
-                                val title = it.title.lowercase()
-                                selectedIngredients.split(',', ';', '\n')
-                                    .count { term -> title.contains(term.trim().lowercase()) }
-                            })
+                    val executor = java.util.concurrent.Executors.newFixedThreadPool(2)
+                    try {
+                        val jobs = listOf(
+                            java.util.concurrent.Callable { RecipeFinder.search(selectedIngredients, selectedCategory, selectedDifficulty, selectedDuration) },
+                            java.util.concurrent.Callable { RecipeDiscovery.search(selectedIngredients, selectedCategory, selectedDifficulty, selectedDuration) }
+                        )
+                        val all = executor.invokeAll(jobs, 80, java.util.concurrent.TimeUnit.SECONDS).flatMap {
+                            try { if (it.isCancelled) emptyList() else it.get() } catch (_: Exception) { emptyList() }
+                        }
+                        // Prefer enriched Recipe data for duplicates, then apply one common order.
+                        val unique = all.groupBy { it.url.substringBefore('?').substringBefore('#').trimEnd('/') }
+                            .values.map { duplicates -> duplicates.maxBy { r ->
+                                (if (r.rating != null) 2 else 0) + (if (r.feedbackCount != null) 2 else 0) + r.relevance
+                            } }
+                        RecipeRanking.order(unique, selectedIngredients)
+                    } finally { executor.shutdownNow() }
                 } catch (_: Exception) { emptyList() }
                 runOnUiThread {
                     if (isFinishing || isDestroyed) return@runOnUiThread
@@ -399,14 +401,10 @@ class MainActivity : Activity() {
 
     private fun showSitePicker(query: String) {
         val encoded = java.net.URLEncoder.encode(query, "UTF-8")
-        val choices = arrayOf("GialloZafferano", "Il Cucchiaio d'Argento",
-            "Fatto in Casa da Benedetta")
-        val links = arrayOf(
-            "https://www.giallozafferano.it/ricerca-ricette/" +
-                encoded.replace("+", "%2B") + "/",
-            "https://www.cucchiaio.it/?s=" + encoded,
-            "https://www.fattoincasadabenedetta.it/?s=" + encoded
-        )
+        val choices = RecipeSources.sites.keys.toTypedArray()
+        val links = RecipeSources.sites.values.map { domain ->
+            "https://www.bing.com/search?q=" + java.net.URLEncoder.encode("site:$domain ricetta $query", "UTF-8")
+        }
         AlertDialog.Builder(this).setTitle("Scegli il sito")
             .setItems(choices) { _, index -> openWeb(links[index]) }
             .setNegativeButton("Chiudi", null).show()
@@ -462,7 +460,7 @@ class MainActivity : Activity() {
                 recipe.minutes?.let { "⏱ " + it + " min" },
                 recipe.difficulty.takeIf { it.isNotBlank() },
                 recipe.rating?.let { "⭐ " + it },
-                recipe.feedbackCount?.let { it.toString() + " valutazioni/commenti" }
+                recipe.feedbackCount?.let { it.toString() + " voti/recensioni" }
             ).joinToString(" · ")
             row.addView(TextView(this).apply {
                 text = details
