@@ -32,6 +32,21 @@ adb('push', str(fixture), '/data/local/tmp/calendar-fixture.db')
 adb('shell', 'run-as', package, 'mkdir', '-p', 'databases')
 adb('shell', 'run-as', package, 'cp', '/data/local/tmp/calendar-fixture.db', 'databases/oggisimangia.db')
 adb('shell', 'am', 'start', '-W', '-n', package + '/.MainActivity')
+# The new first-run help is part of the UI: verify and dismiss it, opting out persistently.
+import time
+time.sleep(0.7)
+adb('shell', 'uiautomator', 'dump', '/sdcard/calendar-help.xml')
+help_data = adb('exec-out', 'cat', '/sdcard/calendar-help.xml')
+(out / 'calendar-help.xml').write_bytes(help_data)
+help_nodes = list(ET.fromstring(help_data).iter('node'))
+assert any(n.attrib.get('text') == 'Come funziona il calendario' for n in help_nodes), 'Calendar help popup missing'
+def help_tap(text):
+    node = next(n for n in help_nodes if n.attrib.get('text') == text)
+    x1, y1, x2, y2 = map(int, re.findall(r'\\d+', node.attrib['bounds']))
+    adb('shell', 'input', 'tap', str((x1+x2)//2), str((y1+y2)//2))
+help_tap('Non mostrare più questo messaggio')
+help_tap('Ho capito')
+time.sleep(0.3)
 adb('shell', 'uiautomator', 'dump', '/sdcard/calendar.xml')
 xml = adb('exec-out', 'cat', '/sdcard/calendar.xml')
 (out / 'calendar.xml').write_bytes(xml)
@@ -123,6 +138,9 @@ tap(ok)
 meal=snapshot('save-meal')
 assert text_node(meal,'Pranzo · Alternativa').attrib.get('checked') == 'true'
 tap(text_node(meal,'Aggiungi'))
+cloned=snapshot('clone-confirmed')
+assert any(n.attrib.get('text') == 'Ricetta copiata' for n in cloned), 'Cloning confirmation missing'
+tap(text_node(cloned,'Torna al calendario'))
 rows=db_rows()
 assert rows[-1] == ('Ricetta alternativa',today,'Pranzo',1), rows
 button=find_scrolling('🔄 Alternativa · Primo · Ricetta alternativa','home-alternative')
@@ -150,6 +168,7 @@ print('PASS: native multipage PDF generated and Android print service opened wit
 adb('shell','am','force-stop',package)
 adb('shell','am','start','-W','-n',package+'/.MainActivity')
 home=snapshot('preferences-home')
+assert not any(n.attrib.get('text')=='Come funziona il calendario' for n in home), 'Help opt-out was not saved'
 tap(next(n for n in home if 'Cerca' in n.attrib.get('text','') and n.attrib.get('clickable')=='true'))
 tap(find_scrolling('Priorità dei siti e nuove fonti','source-action'))
 settings=snapshot('source-settings')
@@ -199,3 +218,4 @@ assert ordered[0]['name']=='Misya',ordered
 assert any(r['domain']=='example.org' and r['name']=='FonteTest' for r in ordered)
 assert first is not None
 print('PASS: source priority and custom domain survive process restart; ingredient fields grow from one to ten and stop at the limit.')
+print('PASS: calendar guidance popup can be dismissed with Ho capito; do-not-show choice survives restart.')
