@@ -611,3 +611,68 @@ body.dark .calendar-hero::after{opacity:.58;}
   .phone-preview .bottom-nav button { min-height:52px; padding:5px 0; }
   .phone-preview .footer { padding:10px 8px 77px; }
 }
+
+/* v1.5.4 — compact, tactile mobile UI inspired by contemporary Android apps. */
+@media screen {
+  .phone-preview .web-back-row {
+    display:flex; align-items:center; margin:0 0 9px;
+  }
+  .phone-preview .web-back-row .btn {
+    border-radius:15px; min-height:44px; padding:8px 16px;
+    background:var(--green-pale); font-weight:800; color:var(--green-2);
+  }
+  .phone-preview .meal-section.compact-meal {
+    padding:8px 10px; margin:9px 0; border:1px solid var(--outline);
+    border-radius:19px; background:var(--paper);
+    box-shadow:0 3px 10px rgba(18,88,76,.04);
+  }
+  .phone-preview .meal-toggle {
+    display:flex; width:100%; min-height:44px; align-items:center;
+    justify-content:space-between; padding:7px 5px;
+    color:var(--green-2); background:transparent;
+    border:0; font-weight:800; text-align:left; font-size:16px;
+    border-radius:12px;
+  }
+  .phone-preview .meal-toggle .meal-count {font-size:12px; font-weight:650;color:var(--muted)}
+  .phone-preview .meal-entry.compact-entry {
+    margin:0; padding:1px 3px; background:transparent;
+    border:0; border-top:1px solid var(--outline); border-radius:0; box-shadow:none;
+  }
+  .phone-preview .recipe-title-link {
+    background:transparent; border:0; text-align:left; color:var(--ink);
+    font-size:14px; font-weight:650; padding:9px 5px; width:100%;
+    min-height:40px; border-radius:10px;
+  }
+  .phone-preview .recipe-title-link:active {background:var(--green-pale)}
+  .phone-preview .meal-entry .meal-meta{display:block;padding:0 5px}
+  .phone-preview .meal-entry .actions {
+    margin:5px 0 8px; display:flex; flex-wrap:nowrap; gap:5px;
+  }
+  .phone-preview .meal-entry .actions .btn{flex:1 1 0;min-width:0;font-size:11px;padding:7px 5px}
+  .phone-preview .meal-quick-actions {padding-top:7px}
+  .phone-preview .compact-actions{display:flex;flex-wrap:nowrap;margin-top:10px;gap:7px}
+  .phone-preview .compact-actions .btn{flex:1 1 0;min-width:0}
+  .phone-preview .search-submit{
+    width:100%; display:flex; margin:12px 0 4px; min-height:55px;
+    font-size:15px; font-weight:850; letter-spacing:.15px;
+    border:none; border-radius:18px;
+    background:linear-gradient(115deg,#147d72,#20a58c);
+    box-shadow:0 6px 15px rgba(16,116,95,.2); color:#fff;
+  }
+  .phone-preview .btn,
+  .phone-preview .input,.phone-preview .select,.phone-preview .textarea {
+    border-radius:15px;
+  }
+  .phone-preview .card{border-radius:19px}
+  .phone-preview .recipe-card {border-radius:20px}
+  .phone-preview .source-item {border-radius:17px}
+  .phone-preview .btn.primary {background:linear-gradient(115deg,#147d72,#20a58c);color:white}
+  .phone-preview .card-head {margin-bottom:8px}
+  .phone-preview .headline {margin-bottom:10px}
+  .phone-preview .form-section{margin:12px 0 9px;padding-top:12px}
+  #modal {border-radius:23px}
+}
+@media screen and (max-width:360px) {
+  .phone-preview .meal-entry .actions .btn{font-size:10px}
+  .phone-preview .compact-actions .btn{font-size:11px}
+}
