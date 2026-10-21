@@ -31,6 +31,30 @@ class RecipeSearchTest {
         assertEquals(listOf(many,few,unknown), RecipeRanking.order(listOf(unknown,few,many),"zucchine"))
         assertEquals(-1.0, RecipeRanking.confidence(5.0,null),0.0)
     }
+    @Test fun commaTerminatedQueryAlsoWorksWithOneIngredient() {
+        assertEquals(listOf("polenta,", "polenta"), RecipeSearchQueries.variants("polenta"))
+        assertEquals(listOf("lenticchie, pomodori,", "lenticchie, pomodori", "lenticchie pomodori"),
+            RecipeSearchQueries.variants("lenticchie; pomodori"))
+        assertEquals(listOf("polenta,", "polenta"), RecipeSearchQueries.variants("polenta,"))
+        assertTrue(RecipeSearchQueries.bing("misya.info", "polenta,").contains("polenta%2C"))
+        assertTrue(RecipeSearchQueries.editorial("GialloZafferano", "polenta,").contains("polenta%2C"))
+        assertTrue(RecipeValidation.containsEvery("200 g polenta\\n250 ml acqua", "polenta,"))
+        assertTrue(RecipeValidation.containsEvery("200 g polenta\\n250 ml acqua", "polenta"))
+    }
+
+    @Test fun searchCanReadRssOrHtmlResultsWithoutTrustingOtherDomains() {
+        val rss = """<rss><channel><item><link>https://www.misya.info/ricetta/polenta.htm</link></item></channel></rss>"""
+        assertEquals(listOf("https://www.misya.info/ricetta/polenta.htm"),
+            RecipeDiscovery.searchLinks(rss, "misya.info"))
+        val html = """<ul id="b_results"><li class="b_algo"><h2>
+            <a href="https://www.misya.info/ricetta/polenta.htm">Polenta</a>
+            </h2></li><li class="b_algo"><h2>
+            <a href="https://www.bad-example.org/ricetta/polenta">Non fidarsi</a>
+            </h2></li></ul>"""
+        assertEquals(listOf("https://www.misya.info/ricetta/polenta.htm"),
+            RecipeDiscovery.searchLinks(html, "misya.info"))
+    }
+
     @Test fun rssKeepsOnlyTheQueriedSource() {
         val xml = """<rss><channel><item><link>https://www.misya.info/ricetta/pasta.htm</link></item>
             <item><link>https://www.cookaround.com/ricetta/pasta.html</link></item>

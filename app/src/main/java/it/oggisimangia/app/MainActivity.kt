@@ -704,10 +704,10 @@ class MainActivity : Activity() {
                     if (results.isEmpty()) {
                         AlertDialog.Builder(this)
                             .setTitle("Nessuna ricetta verificata")
-                            .setMessage("Non sono stati trovati piatti con tutti gli ingredienti richiesti " +
-                                "nell'elenco ingredienti e con un procedimento leggibile. " +
-                                "Alcuni siti potrebbero impedire la lettura automatica. " +
-                                "Controlla le fonti attive o riprova più tardi.")
+                            .setMessage("Non ho potuto verificare ricette con tutti gli ingredienti richiesti. " +
+                                "Questo non significa che non esistano: alcuni siti potrebbero " +
+                                "non rispondere o bloccare la consultazione automatica. " +
+                                "Puoi riprovare, controllare le fonti oppure importare un link.")
                             .setPositiveButton("Chiudi", null).show()
                     } else showRecipeResults(results)
                 }

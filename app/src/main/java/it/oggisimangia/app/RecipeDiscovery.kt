@@ -18,7 +18,8 @@ object RecipeDiscovery {
         repeat(4) {
             RecipeLink.requirePublic(address)
             val response = Jsoup.connect(address).userAgent("Mozilla/5.0 (Android; OggiSiMangia/1.3)")
-                .timeout(6500).maxBodySize(2_000_000).followRedirects(false).execute()
+                .timeout(6500).maxBodySize(2_000_000).ignoreContentType(true)
+                .followRedirects(false).execute()
             if (response.statusCode() in 200..299) return response.body()
             require(response.statusCode() in 300..399)
             address = java.net.URL(java.net.URL(address), response.header("Location") ?: error("Redirect")).toString()
@@ -29,6 +30,15 @@ object RecipeDiscovery {
 
     internal fun rssLinks(xml: String, domain: String): List<String> = Jsoup.parse(xml, "", Parser.xmlParser())
         .select("item > link").map { it.text().trim() }.filter { RecipeSources.belongs(it, domain) }.distinct().take(4)
+
+    /** RSS is preferred; some search responses come back as HTML instead. */
+    internal fun searchLinks(body: String, domain: String): List<String> {
+        val rss = rssLinks(body, domain)
+        if (rss.isNotEmpty()) return rss
+        return Jsoup.parse(body).select("li.b_algo h2 a[href], #b_results h2 a[href]")
+            .map { it.attr("href").trim() }
+            .filter { RecipeSources.belongs(it, domain) }.distinct().take(4)
+    }
 
     internal fun schema(html: String): JSONObject? {
         val found = mutableListOf<JSONObject>()
@@ -93,27 +103,34 @@ object RecipeDiscovery {
     }
 
     fun search(ingredients: String, category: String, difficulty: String, duration: String): List<WebRecipe> {
-        val executor = Executors.newFixedThreadPool(6)
+        val queries = RecipeSearchQueries.variants(ingredients)
+        if (queries.isEmpty()) return emptyList()
+        // One task per configured source. A punctuation fallback should not
+        // prevent sources at the end of the user's priority list from running.
+        val executor = Executors.newFixedThreadPool(12)
         try {
-            // Do not restrict the discovery query by preferred category.
-            val encoded = URLEncoder.encode(ingredients.replace('\n',' '), "UTF-8")
-            val searches = RecipeSources.sites.map { (site, domain) -> Callable {
-                try {
-                    val q = URLEncoder.encode("site:$domain ricetta ", "UTF-8") + encoded
-                    rssLinks(download("https://www.bing.com/search?q=$q&format=rss"), domain).map { site to it }
-                } catch (_: Exception) { emptyList<Pair<String,String>>() }
+            val searches = RecipeSources.sites.toList().map { (site, domain) -> Callable {
+                val found = linkedSetOf<String>()
+                for (query in queries) {
+                    try {
+                        found += searchLinks(download(RecipeSearchQueries.bing(domain, query)), domain)
+                    } catch (_: Exception) {
+                        // Try a form without the trailing comma if this one fails.
+                    }
+                    if (found.size >= 4) break
+                }
+                found.take(4).map { site to it }
             } }
-            // Each site gets its own quota; early sources cannot consume all slots.
-            val links = executor.invokeAll(searches, 18, TimeUnit.SECONDS).flatMap {
+            // Keep a bounded network budget so UI search does not hang.
+            val links = executor.invokeAll(searches, 25, TimeUnit.SECONDS).flatMap {
                 try { if (it.isCancelled) emptyList() else it.get() } catch (_: Exception) { emptyList() }
             }.distinctBy { it.second }
             val reads = links.map { (site, link) -> Callable {
                 try { preview(download(link), link, site, ingredients) } catch (_: Exception) { null }
             } }
-            val all = executor.invokeAll(reads, 55, TimeUnit.SECONDS).mapNotNull {
+            val all = executor.invokeAll(reads, 43, TimeUnit.SECONDS).mapNotNull {
                 try { if (it.isCancelled) null else it.get() } catch (_: Exception) { null }
             }
-            // Display legitimate recipes even if preferences do not match.
             return RecipeRanking.order(all, ingredients)
         } finally { executor.shutdownNow() }
     }
