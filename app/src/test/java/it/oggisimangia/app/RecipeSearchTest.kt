@@ -4,6 +4,7 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class RecipeSearchTest {
+    @org.junit.After fun resetSources() { RecipeSources.configure(RecipeSources.defaults) }
     private fun item(title: String, url: String, rating: Double? = null, count: Int? = null) =
         WebRecipe(title, "", url, "Fonte", rating = rating, feedbackCount = count)
 
@@ -53,5 +54,18 @@ class RecipeSearchTest {
         val r = RecipeDiscovery.preview(html,"https://www.agrodolce.it/pasta","Agrodolce","zucchine")!!
         assertNull(r.rating)
         assertNull(r.feedbackCount)
+    }
+    @Test fun userPriorityOverridesDefaultAndNewDomainsParticipate() {
+        val sites = linkedMapOf("Nuova fonte" to "ricette.example.org", "Misya" to "misya.info")
+        RecipeSources.defaults.forEach { (name,domain) -> if(domain !in sites.values) sites[name]=domain }
+        RecipeSources.configure(sites)
+        val custom=item("Pasta zucchine","https://ricette.example.org/pasta",4.5,100)
+        val giallo=item("Pasta zucchine","https://ricette.giallozafferano.it/Pasta.html",5.0,1000)
+        val misya=item("Pasta zucchine","https://www.misya.info/ricetta/pasta.htm",4.8,500)
+        assertTrue(RecipeSources.trusted(custom.url))
+        assertEquals(listOf(custom,misya,giallo),RecipeRanking.order(listOf(giallo,misya,custom),"zucchine"))
+        assertEquals("esempio.it",RecipeSources.normalizeDomain("https://www.esempio.it/ricetta/pasta"))
+        assertNull(RecipeSources.normalizeDomain("https://127.0.0.1/"))
+        assertNull(RecipeSources.normalizeDomain("https://user:pass@esempio.it/"))
     }
 }

@@ -29,6 +29,8 @@ import java.util.UUID
 
 class MainActivity : Activity() {
     private lateinit var db: RecipeDb
+    private lateinit var sourcePreferences: SourcePreferences
+    private var pendingReport: File? = null
     private lateinit var content: LinearLayout
     private var selectedDate = LocalDate.now()
     private var selectedMeal = "Pranzo"
@@ -47,6 +49,7 @@ class MainActivity : Activity() {
 
     companion object {
         private const val PHOTO_REQUEST = 401
+        private const val PDF_REQUEST = 402
         private val categories = arrayOf("Antipasto", "Primo", "Secondo", "Contorno", "Piatto unico", "Dolce")
         private val difficulties = arrayOf("Facile", "Media", "Difficile", "Non disponibile")
         private val durations = arrayOf("Volante", "Veloce", "Media", "Lunga")
@@ -55,6 +58,8 @@ class MainActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         db = RecipeDb(this)
+        sourcePreferences = SourcePreferences(this)
+        RecipeSources.configure(sourcePreferences.load())
         window.statusBarColor = Color.rgb(31, 78, 49)
         window.navigationBarColor = Color.rgb(31, 78, 49)
         showCalendar()
@@ -193,6 +198,7 @@ class MainActivity : Activity() {
             action("＋ Cerca alternativa per " + meal.lowercase()) { startMealSearch(meal, true) }
         }
         action("🔎 Cerca una nuova ricetta") { showSearch() }
+        action("PDF e stampa del giorno") { report("Menu del giorno", selectedDate.format(dateFormatter), db.onDay(selectedDate.toString())) }
     }
 
     private fun confirmDaySearch(day: LocalDate) {
@@ -220,15 +226,6 @@ class MainActivity : Activity() {
         selectedAlternative = alternative
         searchForDay = true
         showSearch()
-    }
-
-    private fun ingredientHelp(field: EditText) {
-        val message = "Separa gli ingredienti con una virgola: ingrediente 1, ingrediente 2, … fino a 10 ingredienti."
-        field.tooltipText = message
-        field.setOnFocusChangeListener { _, focused ->
-            if (focused) Toast.makeText(this, message, Toast.LENGTH_LONG).show()
-        }
-        label("Separa gli ingredienti con la virgola. Massimo 10 ingredienti.", 13f)
     }
 
     private fun showEditor(existing: Recipe? = null, initialAlternative: Boolean = false,
@@ -351,36 +348,30 @@ class MainActivity : Activity() {
         action("Ho già trovato la ricetta da aggiungere") { showRecipeLink() }
         action("📅 Vedi i pasti del giorno scelto") { showCalendar() }
         label("Quali ingredienti hai a disposizione?", 17f, true)
-        val ingredients = input("Ingrediente 1, ingrediente 2, … (massimo 10)", searchIngredients, true)
-        ingredientHelp(ingredients)
+        label("Una casella per ingrediente. Massimo 10 ingredienti.", 13f)
+        val ingredients = IngredientInputs(this, searchIngredients) { searchIngredients = it }
+        content.addView(ingredients)
         val category = dropdown("Cerchi un...", categories, searchCategory)
         val difficulty = dropdown("Difficoltà desiderata", difficulties, searchDifficulty)
         val duration = dropdown("Tempo a disposizione", durations, searchDuration)
-        action("Siti consultati e ordine dei risultati") {
-            AlertDialog.Builder(this).setTitle("Le nostre fonti")
-                .setMessage(RecipeSources.sites.keys.joinToString("\n") +
-                    "\n\nPrima le ricette compatibili di GialloZafferano; poi le altre fonti. In ciascun gruppo: corrispondenza degli ingredienti, voto ponderato per numero di voti, numero di voti/recensioni. Le visualizzazioni non sono stimate. I siti possono non rispondere o non pubblicare tutti i dati.")
-                .setPositiveButton("Chiudi", null).show()
+        action("Priorità dei siti e nuove fonti") {
+            searchIngredients = ingredients.values().joinToString(", ")
+            searchCategory = category.selectedItem.toString()
+            searchDifficulty = difficulty.selectedItem.toString()
+            searchDuration = duration.selectedItem.toString()
+            showSourceSettings()
         }
         label("Le schede mostrano solo le informazioni disponibili sui siti originali. " +
             "I filtri vengono applicati quando i dati sono presenti.", 13f)
 
         action("🔎 Mostra fino a 10 ricette") {
-            searchIngredients = ingredients.text.toString().trim()
+            searchIngredients = ingredients.query() ?: return@action
             searchCategory = category.selectedItem.toString()
             searchDifficulty = difficulty.selectedItem.toString()
             searchDuration = duration.selectedItem.toString()
-            if (searchIngredients.isBlank()) {
-                ingredients.error = "Indica almeno un ingrediente"
-                return@action
-            }
-            if (RecipeRanking.terms(searchIngredients).size > 10) {
-                ingredients.error = "Inserisci al massimo 10 ingredienti, separati da virgola"
-                return@action
-            }
             val progress = AlertDialog.Builder(this)
                 .setTitle("Ricerca delle ricette")
-                .setMessage("Consulto gli 11 siti selezionati, con priorità a GialloZafferano...")
+                .setMessage("Consulto i siti secondo le priorità impostate...")
                 .setCancelable(false)
                 .create()
             progress.show()
@@ -425,6 +416,67 @@ class MainActivity : Activity() {
         }
         action("＋ Registra una ricetta manualmente") { showEditor() }
         action("📚 Apri ricettario") { showArchive() }
+    }
+
+    private fun showSourceSettings() {
+        screen("Priorità dei siti", "L'ordine viene memorizzato per le prossime ricerche.")
+        label("Le fonti con priorità più alta vengono prima nei risultati compatibili. Seguono pertinenza e valutazioni degli utenti, quando disponibili.", 14f)
+        action("Aggiungi un sito") {
+            val box = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(18),dp(8),dp(18),dp(8)) }
+            val name = EditText(this).apply { hint = "Nome del sito"; contentDescription = "Nome del sito" }
+            val address = EditText(this).apply {
+                hint = "Sito, es. https://www.esempio.it"; contentDescription = "Indirizzo del sito"
+                inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_VARIATION_URI
+            }
+            box.addView(name); box.addView(address)
+            val dialog = AlertDialog.Builder(this).setTitle("Nuova fonte di ricette").setView(box)
+                .setPositiveButton("Memorizza", null).setNegativeButton("Annulla", null).create()
+            dialog.setOnShowListener { dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+                val domain = RecipeSources.normalizeDomain(address.text.toString())
+                val title = name.text.toString().trim().ifBlank { domain.orEmpty() }
+                when {
+                    domain == null -> address.error = "Inserisci un dominio pubblico HTTPS valido"
+                    domain in RecipeSources.sites.values -> address.error = "Questo sito è già presente"
+                    title in RecipeSources.sites.keys -> name.error = "Scegli un nome diverso"
+                    else -> {
+                        sourcePreferences.save(LinkedHashMap(RecipeSources.sites).apply { put(title,domain) })
+                        dialog.dismiss(); showSourceSettings()
+                    }
+                }
+            } }
+            dialog.show()
+        }
+        val entries = RecipeSources.sites.entries.toList()
+        val names = entries.map { it.key }.toTypedArray()
+        entries.forEachIndexed { position, entry ->
+            val spinner = dropdown("${position+1}ª priorità", names, entry.key)
+            spinner.contentDescription = "Priorità ${position+1}"
+            spinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+                override fun onNothingSelected(parent: AdapterView<*>?) { }
+                override fun onItemSelected(parent: AdapterView<*>?, view: View?, selected: Int, id: Long) {
+                    if (selected == position) return
+                    val reordered = entries.toMutableList()
+                    java.util.Collections.swap(reordered,position,selected)
+                    sourcePreferences.save(reordered.associateTo(linkedMapOf()) { it.key to it.value })
+                    showSourceSettings()
+                }
+            }
+        }
+        action("Ripristina ordine iniziale") {
+            val restored = LinkedHashMap(RecipeSources.defaults)
+            RecipeSources.sites.forEach { (name,domain) -> if (domain !in restored.values) restored[name] = domain }
+            sourcePreferences.save(restored); showSourceSettings()
+        }
+        action("← Torna alla ricerca") { showSearch() }
+    }
+
+    private fun report(title: String, subtitle: String, recipes: List<Recipe>) {
+        RecipeReports.show(this, title, subtitle, recipes) { file ->
+            pendingReport = file
+            startActivityForResult(Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
+                addCategory(Intent.CATEGORY_OPENABLE); type = "application/pdf"; putExtra(Intent.EXTRA_TITLE,file.name)
+            }, PDF_REQUEST)
+        }
     }
 
     private fun showRecipeLink() {
@@ -716,20 +768,18 @@ class MainActivity : Activity() {
         screen("Il mio ricettario", "Ricette salvate sul telefono, consultabili anche offline.")
         val queryField = input("Cerca per nome o parola chiave", search)
         label("Ingredienti: basta che la ricetta ne contenga almeno uno", 14f, true)
-        val ingredientField = input("Es. uova, zucchine, riso (separati da virgola)", ingredientQuery, true)
-        ingredientHelp(ingredientField)
+        label("Una casella per ingrediente. Massimo 10 ingredienti.", 13f)
+        val ingredientField = IngredientInputs(this, ingredientQuery)
+        content.addView(ingredientField)
         val categoryPicker = dropdown("Categoria", arrayOf("Tutte") + categories, category)
         val difficultyPicker = dropdown("Difficoltà", arrayOf("Tutte") + difficulties, difficulty)
         val orderPicker = dropdown("Ordina", arrayOf("Nome A–Z", "Data (recenti)", "Difficoltà"), order)
         action("Applica filtri") {
-            if (RecipeRanking.terms(ingredientField.text.toString()).size > 10) {
-                ingredientField.error = "Inserisci al massimo 10 ingredienti, separati da virgola"
-                return@action
-            }
+            val selectedIngredients = ingredientField.query(allowEmpty = true) ?: return@action
             showArchive(queryField.text.toString().trim(),
                 categoryPicker.selectedItem.toString(),
                 difficultyPicker.selectedItem.toString(),
-                orderPicker.selectedItem.toString(), ingredientField.text.toString().trim())
+                orderPicker.selectedItem.toString(), selectedIngredients)
         }
         val items = db.archive(search, category, difficulty, order, ingredientQuery)
         label("Risultati: " + items.size, 17f, true)
@@ -774,6 +824,7 @@ class MainActivity : Activity() {
         if (r.url.isNotBlank() && trusted(r.url)) {
             action("🌐 Leggi la ricetta nell’app") { openWeb(r.url) }
         }
+        action("PDF e stampa della ricetta") { report("Scheda ricetta", r.title, listOf(r)) }
         action("✏️ Modifica questa ricetta") {
             if (r.day.isNotBlank()) selectedDate = LocalDate.parse(r.day)
             showEditor(r)
@@ -794,6 +845,16 @@ class MainActivity : Activity() {
     @Deprecated("Activity result used for system photo picker compatibility")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == PDF_REQUEST && resultCode == RESULT_OK) {
+            val file = pendingReport ?: return
+            val uri = data?.data ?: return
+            try {
+                contentResolver.openOutputStream(uri)?.use { output -> file.inputStream().use { it.copyTo(output) } }
+                    ?: error("Destinazione non disponibile")
+                Toast.makeText(this, "PDF salvato", Toast.LENGTH_LONG).show()
+            } catch (_: Exception) { Toast.makeText(this, "Impossibile salvare il PDF", Toast.LENGTH_LONG).show() }
+            pendingReport = null
+        }
         if (requestCode == PHOTO_REQUEST && resultCode == RESULT_OK) {
             val uri = data?.data ?: return
             try {

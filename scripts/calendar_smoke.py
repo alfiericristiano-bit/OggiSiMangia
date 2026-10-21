@@ -11,6 +11,7 @@ def adb(*args):
 
 assert adb('shell', 'getprop', 'ro.kernel.qemu').decode().strip() == '1', 'Emulator required'
 package = 'it.oggisimangia.app'
+adb('shell','settings','put','secure','show_ime_with_hard_keyboard','1')
 out = Path('build/calendar-check'); out.mkdir(parents=True, exist_ok=True)
 source = Path('app/src/main/java/it/oggisimangia/app/RecipeDb.kt').read_text()
 schema = re.search(r'CREATE TABLE recipes \((.*?)\n            \)', source, re.S).group(1)
@@ -24,6 +25,7 @@ for meal, title, ingredients in [('Pranzo', 'Pasta alle zucchine', 'pasta, zucch
     db.execute('INSERT INTO recipes (day,meal,category,title,ingredients,prepTime,cookTime,portions) VALUES (?,?,?,?,?,?,?,?)',
                (today, meal, 'Primo' if meal == 'Pranzo' else 'Secondo', title, ingredients, '10 min', '20 min', '2 persone'))
 db.execute("INSERT INTO recipes (day,meal,category,title,ingredients) VALUES ('','Pranzo','Primo','Ricetta alternativa','riso')")
+db.execute("UPDATE recipes SET originalInstructions=? WHERE title='Pasta alle zucchine'", ('\n'.join(f'{i}. Mescola gli ingredienti e cuoci per 10 minuti, poi lascia riposare prima di servire.' for i in range(1,75)),))
 db.commit(); db.close()
 adb('shell', 'am', 'force-stop', package)
 adb('push', str(fixture), '/data/local/tmp/calendar-fixture.db')
@@ -128,3 +130,72 @@ assert button is not None
 (out / 'home-alternative.png').write_bytes(adb('exec-out','screencap','-p'))
 print('PASS: tap selects day; 1200ms does not prompt; 2400ms prompts; No preserves data; existing main proposes alternative.')
 print('PASS: lunch/alternative context reaches search and saved-recipe planning; SQLite and the home dashboard show the saved alternative.')
+
+# Native PDF output and the Android print UI (no physical print is sent).
+tap(find_scrolling('PDF e stampa del giorno','report-action'))
+ready=snapshot('report-ready')
+assert any(n.attrib.get('text') == 'Report PDF pronto' for n in ready)
+files=adb('shell','run-as',package,'ls','cache/reports').decode().splitlines()
+assert files
+pdf=adb('exec-out','run-as',package,'cat','cache/reports/'+files[-1])
+assert pdf.startswith(b'%PDF') and len(pdf)>1000
+(out/'menu-test.pdf').write_bytes(pdf)
+tap(text_node(ready,'Stampa'))
+print_ui=snapshot('print-ui')
+assert any('printspooler' in n.attrib.get('package','') for n in print_ui), 'Android print UI did not open'
+adb('shell','input','keyevent','KEYCODE_BACK')
+print('PASS: native multipage PDF generated and Android print service opened without submitting a print job.')
+
+# Configure source priorities and a custom domain, then verify persistence after process restart.
+adb('shell','am','force-stop',package)
+adb('shell','am','start','-W','-n',package+'/.MainActivity')
+home=snapshot('preferences-home')
+tap(next(n for n in home if 'Cerca' in n.attrib.get('text','') and n.attrib.get('clickable')=='true'))
+tap(find_scrolling('Priorità dei siti e nuove fonti','source-action'))
+settings=snapshot('source-settings')
+spinner=next(n for n in settings if n.attrib.get('content-desc')=='Priorità 1')
+tap(spinner)
+choices=snapshot('source-choices')
+tap(text_node(choices,'Misya'))
+settings=snapshot('source-swapped')
+tap(text_node(settings,'Aggiungi un sito'))
+form=snapshot('source-form')
+name=next(n for n in form if n.attrib.get('content-desc')=='Nome del sito')
+tap(name);adb('shell','input','text','FonteTest')
+form=snapshot('source-name')
+address=next(n for n in form if n.attrib.get('content-desc')=='Indirizzo del sito')
+tap(address);adb('shell','input','text','https://example.org')
+adb('shell','input','keyevent','KEYCODE_BACK')
+tap(text_node(snapshot('source-filled'),'Memorizza'))
+adb('shell','am','force-stop',package)
+adb('shell','am','start','-W','-n',package+'/.MainActivity')
+home=snapshot('persist-home')
+tap(next(n for n in home if 'Cerca' in n.attrib.get('text','') and n.attrib.get('clickable')=='true'))
+# The first ingredient row grows to ten independent fields.
+for index in range(1,11):
+    current=snapshot('ingredients-'+str(index))
+    field=next((n for n in current if n.attrib.get('content-desc')=='Ingrediente '+str(index)),None)
+    for attempt in range(8):
+        if field is not None: break
+        adb('shell','input','swipe','160','530','160','220','300')
+        current=snapshot('ingredients-scroll')
+        field=next((n for n in current if n.attrib.get('content-desc')=='Ingrediente '+str(index)),None)
+    assert field is not None
+    tap(field);adb('shell','input','text','ingrediente'+str(index));adb('shell','input','keyevent','KEYCODE_BACK')
+    if index<10: tap(find_scrolling('Aggiungi ingrediente','ingredient-add'))
+last=snapshot('ingredients-limit')
+limit=next((n for n in last if n.attrib.get('text')=='Massimo 10'),None)
+if limit is None: limit=find_scrolling('Massimo 10','ingredient-limit-scroll')
+assert limit.attrib.get('enabled')=='false'
+tap(find_scrolling('Priorità dei siti e nuove fonti','source-persist-action'))
+settings=snapshot('sources-restored')
+first=next(n for n in settings if n.attrib.get('content-desc')=='Priorità 1')
+# Inspect the selected spinner descendant and the persisted authoritative preference file.
+prefs=adb('exec-out','run-as',package,'cat','shared_prefs/recipe_sources.xml')
+root=ET.fromstring(prefs)
+import json
+ordered=json.loads(next(e.text for e in root if e.attrib.get('name')=='ordered'))
+assert ordered[0]['name']=='Misya',ordered
+assert any(r['domain']=='example.org' and r['name']=='FonteTest' for r in ordered)
+assert first is not None
+print('PASS: source priority and custom domain survive process restart; ingredient fields grow from one to ten and stop at the limit.')

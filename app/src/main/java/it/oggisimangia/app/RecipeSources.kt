@@ -3,7 +3,7 @@ package it.oggisimangia.app
 import java.net.URI
 
 object RecipeSources {
-    val sites = linkedMapOf(
+    val defaults = linkedMapOf(
         "GialloZafferano" to "giallozafferano.it",
         "Il Cucchiaio d'Argento" to "cucchiaio.it",
         "Fatto in Casa da Benedetta" to "fattoincasadabenedetta.it",
@@ -16,6 +16,14 @@ object RecipeSources {
         "RicetteDalMondo" to "ricettedalmondo.it",
         "Agrodolce" to "agrodolce.it"
     )
+    @Volatile private var configured: Map<String,String> = defaults
+    val sites: Map<String,String> get() = configured
+    fun configure(values: Map<String,String>) { configured = LinkedHashMap(values) }
+    fun normalizeDomain(value: String): String? = try {
+        val url = if (value.trim().contains("://")) value.trim() else "https://" + value.trim()
+        if (!RecipeLink.isValid(url)) null else URI(url).host.lowercase().removePrefix("www.")
+    } catch (_: Exception) { null }
+    fun priority(url: String): Int = sites.values.indexOfFirst { belongs(url,it) }.let { if (it < 0) Int.MAX_VALUE else it }
     fun domain(url: String): String = try { URI(url).host?.lowercase().orEmpty() } catch (_: Exception) { "" }
     fun isGiallo(url: String): Boolean = domain(url) in setOf("ricette.giallozafferano.it", "www.giallozafferano.it", "giallozafferano.it")
     fun trusted(url: String): Boolean = try {
@@ -39,7 +47,7 @@ object RecipeRanking {
     }
     fun order(items: List<WebRecipe>, ingredients: String): List<WebRecipe> = items
         .filter { maxOf(it.relevance, relevance(it.title + " " + it.summary, ingredients)) > 0 }
-        .sortedWith(compareByDescending<WebRecipe> { RecipeSources.isGiallo(it.url) }
+        .sortedWith(compareBy<WebRecipe> { RecipeSources.priority(it.url) }
             .thenByDescending { maxOf(it.relevance, relevance(it.title + " " + it.summary, ingredients)) }
             .thenByDescending { confidence(it.rating, it.feedbackCount) }
             .thenByDescending { it.feedbackCount ?: -1 }

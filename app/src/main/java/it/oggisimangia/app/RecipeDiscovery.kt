@@ -16,6 +16,7 @@ object RecipeDiscovery {
     private fun download(url: String): String {
         var address = url
         repeat(4) {
+            RecipeLink.requirePublic(address)
             val response = Jsoup.connect(address).userAgent("Mozilla/5.0 (Android; OggiSiMangia/1.3)")
                 .timeout(6500).maxBodySize(2_000_000).followRedirects(false).execute()
             if (response.statusCode() in 200..299) return response.body()
