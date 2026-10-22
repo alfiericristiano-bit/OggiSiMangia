@@ -72,6 +72,7 @@ class MainActivity : Activity() {
     private var autoRest = ""
     private var autoTotal = ""
     private var autoPortions = ""
+    private var autoDifficulty = ""
     private val dishPhotoChoices = linkedMapOf<String, Boolean>()
     private var magazinePagesContainer: LinearLayout? = null
     private var dishPhotosContainer: LinearLayout? = null
@@ -716,7 +717,7 @@ class MainActivity : Activity() {
         scanPageRoles.putAll(photoRoles(existing?.scanPages))
         scanPageTexts.clear()
         autoTitle = ""; autoIngredients = ""; autoSteps = ""
-        autoPrep = ""; autoCook = ""; autoRest = ""; autoTotal = ""; autoPortions = ""
+        autoPrep = ""; autoCook = ""; autoRest = ""; autoTotal = ""; autoPortions = ""; autoDifficulty = ""
         dishPhotoChoices.clear()
         dishPhotoChoices.putAll(photoChoices(existing?.dishPhotos))
         photoPreview = null
@@ -1094,21 +1095,73 @@ class MainActivity : Activity() {
         }
     }
 
+    /** OCR page headers include photo roles so user corrections are also re-interpreted. */
+    private fun editableScanSections(raw: String): List<MagazineRecipeText.Section> {
+        val marker = Regex("^Pagina\\s+[0-9]+\\s*\\((intera|ingredienti|preparazione|dettagli)\\)\\s*$",
+            RegexOption.IGNORE_CASE)
+        val sections = mutableListOf<MagazineRecipeText.Section>()
+        var role = MagazineRecipeText.WHOLE
+        val body = StringBuilder()
+        fun flush() {
+            if (body.isNotBlank()) sections.add(MagazineRecipeText.Section(role, body.toString()))
+            body.clear()
+        }
+        raw.lines().forEach { line ->
+            val match = marker.matchEntire(line.trim())
+            if (match != null) { flush(); role = match.groupValues[1].lowercase() }
+            else body.append(line).append('\n')
+        }
+        flush()
+        return sections
+    }
+
     private fun applyMagazineSuggestions(onlyMissing: Boolean) {
         val text = editorOcr?.text?.toString().orEmpty()
         if (text.isBlank()) {
-            Toast.makeText(this, "Nessun testo OCR disponibile. Le foto restano salvabili.", Toast.LENGTH_LONG).show()
+            if (!onlyMissing) Toast.makeText(this,
+                "Nessun testo OCR disponibile. Le fotografie restano salvabili.",
+                Toast.LENGTH_LONG).show()
             return
         }
-        val guess = MagazineRecipeText.suggest(text)
-        if (guess.title.isNotBlank() && (!onlyMissing || editorTitle?.text.isNullOrBlank()))
-            editorTitle?.setText(guess.title)
-        if (guess.ingredients.isNotBlank() && (!onlyMissing || editorIngredients?.entries().isNullOrEmpty()))
+        val sections = editableScanSections(text)
+        val guess = MagazineRecipeText.suggestSections(sections)
+        fun update(field: EditText?, value: String, previous: String, save: (String) -> Unit) {
+            if (value.isNotBlank() && field != null &&
+                (!onlyMissing || field.text.isNullOrBlank() ||
+                    (previous.isNotBlank() && field.text.toString() == previous))) {
+                field.setText(value)
+                save(value)
+            }
+        }
+        update(editorTitle, guess.title, autoTitle) { autoTitle = it }
+        if (guess.ingredients.isNotBlank() && editorIngredients != null &&
+            (!onlyMissing || editorIngredients!!.entries().isEmpty() ||
+                (autoIngredients.isNotBlank() && editorIngredients!!.value() == autoIngredients))) {
             editorIngredients?.replaceValues(guess.ingredients)
-        if (guess.steps.isNotBlank() && (!onlyMissing || editorSteps?.entries().isNullOrEmpty()))
+            autoIngredients = guess.ingredients
+        }
+        if (guess.steps.isNotBlank() && editorSteps != null &&
+            (!onlyMissing || editorSteps!!.entries().isEmpty() ||
+                (autoSteps.isNotBlank() && editorSteps!!.value() == autoSteps))) {
             editorSteps?.replaceValues(guess.steps)
+            autoSteps = guess.steps
+        }
+        update(editorPrep, guess.prepTime, autoPrep) { autoPrep = it }
+        update(editorCook, guess.cookTime, autoCook) { autoCook = it }
+        update(editorRest, guess.restTime, autoRest) { autoRest = it }
+        update(editorTotal, guess.totalTime, autoTotal) { autoTotal = it }
+        update(editorPortions, guess.portions, autoPortions) { autoPortions = it }
+        if (guess.difficulty.isNotBlank()) editorDifficulty?.let { picker ->
+            if (!onlyMissing || autoDifficulty == picker.selectedItem?.toString() ||
+                (autoDifficulty.isBlank() && picker.selectedItem?.toString() == searchDifficulty)) {
+                val position = difficulties.indexOf(guess.difficulty)
+                if (position >= 0) {
+                    picker.setSelection(position)
+                    autoDifficulty = guess.difficulty
+                }
+            }
+        }
     }
-
 
     private fun updateOcrStatus() {
         val total = magazinePages.size
