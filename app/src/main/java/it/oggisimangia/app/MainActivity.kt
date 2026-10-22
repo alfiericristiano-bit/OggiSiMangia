@@ -91,15 +91,123 @@ class MainActivity : Activity() {
         db = RecipeDb(this)
         sourcePreferences = SourcePreferences(this)
         RecipeSources.configure(sourcePreferences.load())
-        window.statusBarColor = Color.rgb(15, 98, 86)
-        window.navigationBarColor = Color.rgb(15, 98, 86)
-        showCalendar()
+        window.statusBarColor = Color.rgb(45, 91, 61)
+        window.navigationBarColor = Color.rgb(45, 91, 61)
+        if (displayName().isBlank()) showNameIntroduction() else showCalendar()
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
         outState.putString("pending_camera_path", pendingCameraPath)
         outState.putString("pending_camera_kind", pendingCameraKind)
         super.onSaveInstanceState(outState)
+    }
+
+
+    private fun displayName(): String = getSharedPreferences("user_profile", MODE_PRIVATE)
+        .getString("display_name", "").orEmpty().trim()
+
+    private fun onboardingRoot(title: String, subtitle: String): LinearLayout {
+        val wrapper = ScrollView(this).apply { isFillViewport = true }
+        val layout = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER_HORIZONTAL
+            setPadding(dp(24), dp(32), dp(24), dp(28))
+            setBackgroundColor(Color.rgb(250, 252, 244))
+        }
+        wrapper.addView(layout)
+        setContentView(wrapper)
+        layout.addView(TextView(this).apply {
+            text = "OggiSiMangia..."
+            textSize = 27f
+            setTypeface(null, Typeface.BOLD)
+            setTextColor(Color.rgb(45, 91, 61))
+            gravity = Gravity.CENTER
+        })
+        layout.addView(TextView(this).apply {
+            text = title
+            textSize = 24f
+            setTypeface(null, Typeface.BOLD)
+            setTextColor(Color.rgb(35, 70, 49))
+            gravity = Gravity.CENTER
+            setPadding(0, dp(22), 0, dp(4))
+        })
+        layout.addView(TextView(this).apply {
+            text = subtitle
+            textSize = 15f
+            setTextColor(Color.rgb(82, 103, 76))
+            gravity = Gravity.CENTER
+        })
+        val image = ImageView(this).apply {
+            setImageResource(R.drawable.app_icon_clean)
+            contentDescription = "Calendario, pasta e basilico di OggiSiMangia"
+        }
+        layout.addView(image, LinearLayout.LayoutParams(dp(202), dp(202)).apply {
+            topMargin = dp(18); bottomMargin = dp(16)
+        })
+        image.alpha = 0.3f
+        image.scaleX = 0.78f
+        image.scaleY = 0.78f
+        image.animate().alpha(1f).scaleX(1f).scaleY(1f).setDuration(650L).start()
+        return layout
+    }
+
+    private fun showNameIntroduction() {
+        currentPageKey = "onboarding-name"
+        pageHistory.clear()
+        val layout = onboardingRoot("Ciao! Come ti chiami?",
+            "Mettiamo il tuo nome sul menu, così ogni giornata in cucina inizia con un sorriso.")
+        val nameInput = EditText(this).apply {
+            hint = "Il tuo nome"
+            setSingleLine(true)
+            textSize = 18f
+            setText(displayName())
+            inputType = android.text.InputType.TYPE_CLASS_TEXT or
+                android.text.InputType.TYPE_TEXT_FLAG_CAP_WORDS
+            background = outlined(Color.WHITE, 16f)
+            setPadding(dp(16), dp(11), dp(16), dp(11))
+            contentDescription = "Il tuo nome"
+        }
+        layout.addView(nameInput, LinearLayout.LayoutParams(-1, dp(54)))
+        layout.addView(Button(this).apply {
+            text = "Continua  →"
+            isAllCaps = false
+            textSize = 17f
+            setTextColor(Color.WHITE)
+            setTypeface(null, Typeface.BOLD)
+            background = shape(Color.rgb(64, 121, 65), 18f)
+            setOnClickListener {
+                val value = nameInput.text.toString().trim().replace(Regex("\\s+"), " ")
+                if (value.isBlank() || value.length > 40) {
+                    nameInput.error = "Inserisci un nome (massimo 40 caratteri)"
+                    nameInput.requestFocus()
+                } else {
+                    getSharedPreferences("user_profile", MODE_PRIVATE).edit()
+                        .putString("display_name", value).apply()
+                    hideKeyboard(nameInput)
+                    showPersonalWelcome(value)
+                }
+            }
+        }, LinearLayout.LayoutParams(-1, dp(55)).apply { topMargin = dp(20) })
+    }
+
+    private fun showPersonalWelcome(name: String = displayName()) {
+        currentPageKey = "onboarding-welcome"
+        val layout = onboardingRoot("Benvenuto, $name! 🍃",
+            "Il tuo ricettario, il calendario dei pasti e le ricette fotografate sono pronti.")
+        layout.addView(TextView(this).apply {
+            text = "📅  Pianifica i pasti    🍝  Scopri ricette    📷  Digitalizza le riviste"
+            textSize = 14f
+            gravity = Gravity.CENTER
+            setTextColor(Color.rgb(55, 92, 63))
+        })
+        layout.addView(Button(this).apply {
+            text = "Inizia a cucinare  →"
+            isAllCaps = false
+            textSize = 17f
+            setTextColor(Color.WHITE)
+            background = shape(Color.rgb(64, 121, 65), 18f)
+            setOnClickListener { pageHistory.clear(); showCalendar() }
+        }, LinearLayout.LayoutParams(-1, dp(55)).apply { topMargin = dp(23) })
     }
 
     private fun dp(n: Int) = (n * resources.displayMetrics.density).toInt()
@@ -164,9 +272,10 @@ class MainActivity : Activity() {
             }
             elevation = dp(3).toFloat()
         }
-        hero.addView(TextView(this).apply {
-            text = "🍽️"; textSize = 27f; gravity = Gravity.CENTER
-            // Emblem without decorative white frame.
+        hero.addView(ImageView(this).apply {
+            setImageResource(R.drawable.app_icon_clean)
+            scaleType = ImageView.ScaleType.FIT_CENTER
+            contentDescription = "OggiSiMangia: calendario e piatto"
         }, LinearLayout.LayoutParams(dp(44), dp(44)).apply { marginEnd = dp(8) })
         val headerText = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         headerText.addView(TextView(this).apply {
@@ -418,6 +527,9 @@ class MainActivity : Activity() {
         }
         actionRow("🔎 Cerca ricetta", { showSearch() },
             "＋ Nuova ricetta", { showEditor() })
+        action("👤 " + displayName().ifBlank { "Il mio profilo" } + " · Cambia nome") {
+            showNameIntroduction()
+        }
         action("PDF e stampa del giorno") {
             report("Menu del giorno", selectedDate.format(dateFormatter), db.onDay(selectedDate.toString()))
         }
