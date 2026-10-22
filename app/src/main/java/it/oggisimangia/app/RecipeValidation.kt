@@ -29,9 +29,9 @@ object RecipeValidation {
             collectionTitle.containsMatchIn(title)) return false
         val path = try { URI(url).path.orEmpty().lowercase().trimEnd('/') }
             catch (_: Exception) { return false }
-        if (path.length < 8 || nonRecipePaths.any { it in path }) return false
+        if (path.length < 5 || nonRecipePaths.any { it in path }) return false
         val slug = path.substringAfterLast('/').substringBeforeLast('.')
-        if (slug.length < 5 || slug in setOf("ricette", "ricetta", "recipe", "recipes",
+        if (slug.length < 4 || slug in setOf("ricette", "ricetta", "recipe", "recipes",
                 "home", "pasta", "primi", "secondi", "dolci", "cucina")) return false
         if (slug.contains("ricette-") || slug.contains("-ricette") ||
             slug.contains("tutte-le-") || slug.contains("ricettario")) return false
