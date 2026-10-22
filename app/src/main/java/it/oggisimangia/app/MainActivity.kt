@@ -31,6 +31,11 @@ import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.UUID
+import org.json.JSONArray
+import org.json.JSONObject
+import com.google.mlkit.vision.common.InputImage
+import com.google.mlkit.vision.text.TextRecognition
+import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 
 class MainActivity : Activity() {
     private lateinit var db: RecipeDb
@@ -47,6 +52,15 @@ class MainActivity : Activity() {
     private var searchDuration = "Veloce"
     private var searchCategory = "Primo"
     private var selectedPhoto = ""
+    private val magazinePages = mutableListOf<String>()
+    private val dishPhotoChoices = linkedMapOf<String, Boolean>()
+    private var magazinePagesContainer: LinearLayout? = null
+    private var dishPhotosContainer: LinearLayout? = null
+    private var editorTitle: EditText? = null
+    private var editorIngredients: RecipeListFields? = null
+    private var editorSteps: RecipeListFields? = null
+    private var editorOcr: EditText? = null
+    private var pendingCameraKind = "cover"
     private var photoPreview: ImageView? = null
     private var pendingCameraPath: String? = null
     private var lastSearchResults: List<WebRecipe> = emptyList()
@@ -63,6 +77,8 @@ class MainActivity : Activity() {
         private const val PHOTO_REQUEST = 401
         private const val CAMERA_REQUEST = 403
         private const val PDF_REQUEST = 402
+        private const val MAGAZINE_PAGES_REQUEST = 404
+        private const val DISH_PHOTOS_REQUEST = 405
         private val categories = arrayOf("Antipasto", "Primo", "Secondo", "Contorno", "Piatto unico", "Dolce")
         private val difficulties = arrayOf("Facile", "Media", "Difficile", "Non disponibile")
         private val durations = arrayOf("Volante", "Veloce", "Media", "Lunga")
@@ -71,6 +87,7 @@ class MainActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         pendingCameraPath = savedInstanceState?.getString("pending_camera_path")
+        pendingCameraKind = savedInstanceState?.getString("pending_camera_kind") ?: "cover"
         db = RecipeDb(this)
         sourcePreferences = SourcePreferences(this)
         RecipeSources.configure(sourcePreferences.load())
@@ -81,6 +98,7 @@ class MainActivity : Activity() {
 
     override fun onSaveInstanceState(outState: Bundle) {
         outState.putString("pending_camera_path", pendingCameraPath)
+        outState.putString("pending_camera_kind", pendingCameraKind)
         super.onSaveInstanceState(outState)
     }
 
@@ -107,10 +125,10 @@ class MainActivity : Activity() {
     }
 
     /** FamilyChat visual tokens, used only by the UI; stored recipe data remains unchanged. */
-    private val familyTeal = Color.rgb(20, 125, 114)
-    private val familyDeep = Color.rgb(21, 103, 91)
-    private val familyInk = Color.rgb(35, 61, 57)
-    private val familyPale = Color.rgb(234, 244, 241)
+    private val familyTeal = Color.rgb(167, 193, 96)
+    private val familyDeep = Color.rgb(45, 91, 61)
+    private val familyInk = Color.rgb(42, 57, 43)
+    private val familyPale = Color.rgb(241, 247, 226)
     private fun shape(color: Int, radius: Float = 16f): GradientDrawable =
         GradientDrawable().apply { setColor(color); cornerRadius = dp(radius.toInt()).toFloat() }
     private fun outlined(color: Int = Color.WHITE, radius: Float = 12f): GradientDrawable =
@@ -125,7 +143,7 @@ class MainActivity : Activity() {
         currentPageRestore = restore
         val background = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setBackgroundColor(Color.rgb(244, 247, 247))
+            setBackgroundColor(Color.rgb(249, 250, 245))
         }
         val scroll = ScrollView(this).apply { isFillViewport = true }
         content = LinearLayout(this).apply {
@@ -141,27 +159,27 @@ class MainActivity : Activity() {
             gravity = Gravity.CENTER_VERTICAL
             setPadding(dp(13), dp(10), dp(13), dp(11))
             this.background = GradientDrawable(GradientDrawable.Orientation.TL_BR,
-                intArrayOf(familyTeal, Color.rgb(32, 165, 140))).apply {
+                intArrayOf(familyTeal, Color.rgb(207, 224, 154))).apply {
                 cornerRadius = dp(22).toFloat()
             }
             elevation = dp(3).toFloat()
         }
         hero.addView(TextView(this).apply {
-            text = "🍝"; textSize = 26f; gravity = Gravity.CENTER
-            this.background = shape(Color.argb(45, 255, 255, 255), 15f)
+            text = "🍽️"; textSize = 27f; gravity = Gravity.CENTER
+            // Emblem without decorative white frame.
         }, LinearLayout.LayoutParams(dp(44), dp(44)).apply { marginEnd = dp(8) })
         val headerText = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         headerText.addView(TextView(this).apply {
             text = "OggiSiMangia..."; textSize = 21f
-            setTextColor(Color.WHITE); setTypeface(null, Typeface.BOLD)
+            setTextColor(familyInk); setTypeface(null, Typeface.BOLD)
         })
         headerText.addView(TextView(this).apply {
-            text = title; textSize = 15f; setTextColor(Color.WHITE)
+            text = title; textSize = 15f; setTextColor(familyInk)
             setTypeface(null, Typeface.BOLD)
         })
         headerText.addView(TextView(this).apply {
             text = subtitle; textSize = 11f
-            setTextColor(Color.rgb(235, 251, 244)); maxLines = 3
+            setTextColor(familyDeep); maxLines = 3
         })
         hero.addView(headerText, LinearLayout.LayoutParams(0, -2, 1f))
         content.addView(hero, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(7) })
@@ -512,7 +530,13 @@ class MainActivity : Activity() {
                            suggestedTitle: String = "", suggestedUrl: String = "",
                            planByDefault: Boolean = false) {
         selectedPhoto = existing?.imagePath ?: ""
+        magazinePages.clear()
+        magazinePages.addAll(photoPaths(existing?.scanPages))
+        dishPhotoChoices.clear()
+        dishPhotoChoices.putAll(photoChoices(existing?.dishPhotos))
         photoPreview = null
+        magazinePagesContainer = null
+        dishPhotosContainer = null
         screen(if (existing == null || existing.id == 0L) "Scrivi la tua ricetta" else "Modifica ricetta",
             "Compila i campi che conosci. Nome, ingredienti e preparazione sono obbligatori.",
             "editor-${existing?.id ?: 0L}") {
@@ -520,6 +544,30 @@ class MainActivity : Activity() {
         }
         label("INFORMAZIONI GENERALI", 20f, true)
         val titleField = input("Nome del piatto *", existing?.title ?: suggestedTitle)
+        editorTitle = titleField
+        label("RICETTA DA RIVISTA · SCANSIONE E OCR", 19f, true)
+        label("Fotografa una o più pagine. Puoi archiviare le fotografie anche senza OCR, oppure trasformare il testo in campi modificabili. Nessuna foto viene caricata online.", 13f)
+        magazinePagesContainer = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        content.addView(magazinePagesContainer)
+        refreshMagazinePages()
+        actionRow("📷 Fotografa pagina", { launchCamera("scan") },
+            "🖼️ Aggiungi pagine", { chooseMagazineFiles(MAGAZINE_PAGES_REQUEST) })
+        label("TESTO RICONOSCIUTO (MODIFICABILE)", 15f, true)
+        val ocrField = input("Testo OCR delle pagine, correggibile anche prima di salvare", existing?.scanOcrText.orEmpty(), true)
+        editorOcr = ocrField
+        action("📝 Compila titolo, ingredienti e preparazione dal testo OCR") {
+            AlertDialog.Builder(this).setTitle("Usare il testo OCR?")
+                .setMessage("I campi della ricetta saranno compilati con suggerimenti automatici. Controlla sempre dosi e preparazione: il riconoscimento può sbagliare.")
+                .setPositiveButton("Compila") { _, _ -> applyMagazineSuggestions(false) }
+                .setNegativeButton("Annulla", null).show()
+        }
+        label("FOTO DEL PIATTO · SCEGLI QUALI TENERE", 16f, true)
+        label("Aggiungi le fotografie che desideri; una spunta per scegliere quali conservare. Puoi includere anche una pagina intera fra le immagini.", 13f)
+        dishPhotosContainer = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        content.addView(dishPhotosContainer)
+        refreshDishPhotos()
+        actionRow("📷 Fotografa piatto", { launchCamera("dish") },
+            "🖼️ Scegli più foto", { chooseMagazineFiles(DISH_PHOTOS_REQUEST) })
         val descriptionField = input("Descrizione breve / presentazione", existing?.description.orEmpty(), true)
         val categoryPicker = dropdown("Portata", categories, existing?.category ?: selectedCategory)
         val difficultyPicker = dropdown("Difficoltà", difficulties, existing?.difficulty ?: searchDifficulty)
@@ -533,11 +581,13 @@ class MainActivity : Activity() {
         label("INGREDIENTI *", 20f, true)
         label("Una riga per ingrediente, con quantità e unità di misura. Puoi aggiungere o togliere righe.", 13f)
         val ingredientRows = RecipeListFields(this, existing?.ingredients ?: searchIngredients, false)
+        editorIngredients = ingredientRows
         content.addView(ingredientRows)
 
         label("PREPARAZIONE · PASSAGGI NUMERATI *", 20f, true)
         label("Inserisci ogni passaggio separatamente. L'app mantiene la numerazione anche se ne elimini uno.", 13f)
         val stepRows = RecipeListFields(this, existing?.instructions.orEmpty(), true)
+        editorSteps = stepRows
         content.addView(stepRows)
 
         label("TEMPI E COTTURA", 20f, true)
@@ -615,8 +665,8 @@ class MainActivity : Activity() {
                 titleField.requestFocus()
                 return@action
             }
-            if (!ingredientRows.requireOne("Aggiungi almeno un ingrediente")) return@action
-            if (stepRows.entries().isEmpty() && originalField?.text.isNullOrBlank()) {
+            if (magazinePages.isEmpty() && !ingredientRows.requireOne("Aggiungi almeno un ingrediente")) return@action
+            if (magazinePages.isEmpty() && stepRows.entries().isEmpty() && originalField?.text.isNullOrBlank()) {
                 stepRows.requireOne("Inserisci almeno un passaggio della preparazione")
                 return@action
             }
@@ -640,6 +690,9 @@ class MainActivity : Activity() {
                 url = url,
                 alternative = alternativePicker.selectedItem.toString() == "Alternativa",
                 imagePath = selectedPhoto,
+                scanPages = JSONArray(magazinePages).toString(),
+                dishPhotos = JSONObject(dishPhotoChoices as Map<*, *>).toString(),
+                scanOcrText = ocrField.text.toString().trim(),
                 originalInstructions = originalField?.text?.toString()?.trim() ?: existing?.originalInstructions.orEmpty(),
                 saveMode = mode,
                 prepTime = prepField.text.toString().trim(),
@@ -675,6 +728,173 @@ class MainActivity : Activity() {
         action("← Torna indietro senza salvare") { showCalendar() }
     }
 
+
+    private fun photoPaths(json: String?): List<String> = try {
+        val data = JSONArray(json ?: "[]")
+        (0 until data.length()).mapNotNull { data.optString(it).takeIf(String::isNotBlank) }
+    } catch (_: Exception) { emptyList() }
+
+    private fun photoChoices(json: String?): Map<String, Boolean> = try {
+        val data = JSONObject(json ?: "{}")
+        data.keys().asSequence().associateWith { data.optBoolean(it, false) }
+    } catch (_: Exception) { emptyMap() }
+
+    private fun chooseMagazineFiles(request: Int) {
+        startActivityForResult(Intent(Intent.ACTION_GET_CONTENT).apply {
+            type = "image/*"
+            addCategory(Intent.CATEGORY_OPENABLE)
+            putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true)
+        }, request)
+    }
+
+    private fun previewThumb(path: String, label: String): ImageView = ImageView(this).apply {
+        val options = BitmapFactory.Options().apply { inSampleSize = 4 }
+        setImageBitmap(BitmapFactory.decodeFile(path, options))
+        scaleType = ImageView.ScaleType.CENTER_CROP
+        contentDescription = label
+    }
+
+    private fun refreshMagazinePages() {
+        val host = magazinePagesContainer ?: return
+        host.removeAllViews()
+        magazinePages.forEachIndexed { index, path ->
+            val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
+            row.addView(previewThumb(path, "Pagina " + (index + 1) + " della rivista"),
+                LinearLayout.LayoutParams(dp(70), dp(92)))
+            val info = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+            info.addView(TextView(this).apply {
+                text = "Pagina " + (index + 1) + " · foto archiviata"
+                textSize = 14f
+                setTextColor(familyInk)
+            })
+            info.addView(Button(this).apply {
+                text = "✕ Elimina pagina"; isAllCaps = false
+                setOnClickListener {
+                    magazinePages.remove(path)
+                    refreshMagazinePages()
+                }
+            })
+            info.addView(Button(this).apply {
+                text = "＋ Usa come immagine"; isAllCaps = false
+                setOnClickListener {
+                    dishPhotoChoices[path] = true
+                    if (selectedPhoto.isBlank()) { selectedPhoto = path; refreshPhotoPreview() }
+                    refreshDishPhotos()
+                }
+            })
+            row.addView(info, LinearLayout.LayoutParams(0, -2, 1f))
+            host.addView(row)
+        }
+    }
+
+    private fun refreshDishPhotos() {
+        val host = dishPhotosContainer ?: return
+        host.removeAllViews()
+        dishPhotoChoices.toMap().forEach { (path, saved) ->
+            val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
+            row.addView(previewThumb(path, "Fotografia del piatto"), LinearLayout.LayoutParams(dp(72), dp(85)))
+            val options = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+            options.addView(CheckBox(this).apply {
+                text = "Conserva questa foto"
+                isChecked = saved
+                setOnCheckedChangeListener { _, enabled ->
+                    dishPhotoChoices[path] = enabled
+                    if (!enabled && selectedPhoto == path) {
+                        selectedPhoto = dishPhotoChoices.entries.firstOrNull { it.value }?.key ?: ""
+                        refreshPhotoPreview()
+                    }
+                }
+            })
+            options.addView(Button(this).apply {
+                text = "Usa come copertina"; isAllCaps = false
+                setOnClickListener {
+                    dishPhotoChoices[path] = true
+                    selectedPhoto = path
+                    refreshPhotoPreview()
+                    refreshDishPhotos()
+                }
+            })
+            options.addView(Button(this).apply {
+                text = "✕ Rimuovi foto"; isAllCaps = false
+                setOnClickListener {
+                    dishPhotoChoices.remove(path)
+                    if (selectedPhoto == path) {
+                        selectedPhoto = dishPhotoChoices.entries.firstOrNull { it.value }?.key ?: ""
+                        refreshPhotoPreview()
+                    }
+                    refreshDishPhotos()
+                }
+            })
+            row.addView(options, LinearLayout.LayoutParams(0, -2, 1f))
+            host.addView(row)
+        }
+    }
+
+    private fun addMagazineImage(uri: Uri, kind: String) {
+        try {
+            val path = compressPhoto(uri, if (kind == "scan") 2000 else 960)
+            if (kind == "scan") {
+                if (magazinePages.size >= 20) {
+                    File(path).delete()
+                    Toast.makeText(this, "Massimo 20 pagine per ricetta", Toast.LENGTH_LONG).show()
+                    return
+                }
+                magazinePages.add(path)
+                refreshMagazinePages()
+                recognizeMagazinePage(path, magazinePages.size)
+            } else {
+                dishPhotoChoices[path] = true
+                if (selectedPhoto.isBlank()) { selectedPhoto = path; refreshPhotoPreview() }
+                refreshDishPhotos()
+            }
+        } catch (_: Exception) {
+            Toast.makeText(this, "Immagine non leggibile: riprova", Toast.LENGTH_LONG).show()
+        }
+    }
+
+    private fun applyMagazineSuggestions(onlyMissing: Boolean) {
+        val text = editorOcr?.text?.toString().orEmpty()
+        if (text.isBlank()) {
+            Toast.makeText(this, "Nessun testo OCR disponibile. Le foto restano salvabili.", Toast.LENGTH_LONG).show()
+            return
+        }
+        val guess = MagazineRecipeText.suggest(text)
+        if (guess.title.isNotBlank() && (!onlyMissing || editorTitle?.text.isNullOrBlank()))
+            editorTitle?.setText(guess.title)
+        if (guess.ingredients.isNotBlank() && (!onlyMissing || editorIngredients?.entries().isNullOrEmpty()))
+            editorIngredients?.replaceValues(guess.ingredients)
+        if (guess.steps.isNotBlank() && (!onlyMissing || editorSteps?.entries().isNullOrEmpty()))
+            editorSteps?.replaceValues(guess.steps)
+    }
+
+    private fun recognizeMagazinePage(path: String, page: Int) {
+        val client = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
+        try {
+            val inputImage = InputImage.fromFilePath(this, Uri.fromFile(File(path)))
+            client.process(inputImage)
+                .addOnSuccessListener { result ->
+                    if (path in magazinePages && currentPageKey.startsWith("editor-")) {
+                        if (result.text.isNotBlank()) {
+                            val current = editorOcr?.text?.toString().orEmpty()
+                            editorOcr?.setText(current + (if (current.isBlank()) "" else "\n\n") +
+                                "Pagina $page\n" + result.text.trim())
+                            applyMagazineSuggestions(true)
+                            Toast.makeText(this, "Testo pagina $page riconosciuto: controlla i campi.", Toast.LENGTH_SHORT).show()
+                        } else {
+                            Toast.makeText(this, "Nessun testo leggibile; pagina fotografata conservata.", Toast.LENGTH_LONG).show()
+                        }
+                    }
+                }
+                .addOnFailureListener {
+                    Toast.makeText(this, "OCR non riuscito: fotografia conservata e modificabile.", Toast.LENGTH_LONG).show()
+                }
+                .addOnCompleteListener { client.close() }
+        } catch (_: Exception) {
+            client.close()
+            Toast.makeText(this, "OCR non disponibile, pagina conservata.", Toast.LENGTH_LONG).show()
+        }
+    }
+
     private fun refreshPhotoPreview() {
         val file = selectedPhoto.takeIf { it.isNotBlank() }?.let { File(it) }
         if (file != null && file.isFile) {
@@ -689,13 +909,14 @@ class MainActivity : Activity() {
         }
     }
 
-    private fun launchCamera() {
+    private fun launchCamera(kind: String = "cover") {
         try {
             val folder = File(cacheDir, "camera").apply { mkdirs() }
             val file = File(folder, UUID.randomUUID().toString() + ".jpg")
             val uri = androidx.core.content.FileProvider.getUriForFile(
                 this, packageName + ".fileprovider", file)
             pendingCameraPath = file.absolutePath
+            pendingCameraKind = kind
             val capture = Intent(MediaStore.ACTION_IMAGE_CAPTURE).apply {
                 putExtra(MediaStore.EXTRA_OUTPUT, uri)
                 clipData = android.content.ClipData.newRawUri("photo", uri)
@@ -1284,6 +1505,23 @@ class MainActivity : Activity() {
             (if (r.alternative) "Alternativa" else "Principale"),
             "detail-" + id) { showDetail(id) }
         if (r.imagePath.isNotBlank()) addPhotoPreview(r.imagePath)
+        val scanned = photoPaths(r.scanPages)
+        if (scanned.isNotEmpty()) {
+            label("PAGINE DELLA RIVISTA · " + scanned.size, 17f, true)
+            scanned.forEachIndexed { index, path ->
+                label("Pagina " + (index + 1), 13f, true)
+                addPhotoPreview(path)
+            }
+        }
+        val savedPhotos = photoChoices(r.dishPhotos).filterValues { it }.keys
+        if (savedPhotos.isNotEmpty()) {
+            label("FOTOGRAFIE SCELTE DEL PIATTO", 17f, true)
+            savedPhotos.filter { it != r.imagePath }.forEach { addPhotoPreview(it) }
+        }
+        if (r.scanOcrText.isNotBlank()) {
+            label("TRASCRIZIONE OCR ORIGINALE", 17f, true)
+            label(r.scanOcrText)
+        }
         label("📅 " + r.day.ifBlank { "Solo ricettario" } + "   ⏱ " + r.duration + "   👩‍🍳 " + r.difficulty, 15f)
         showRecipeMetadata(r)
         if (r.description.isNotBlank()) { label("DESCRIZIONE", 17f, true); label(r.description) }
@@ -1349,14 +1587,28 @@ class MainActivity : Activity() {
                 Toast.makeText(this, "Impossibile leggere la foto", Toast.LENGTH_LONG).show()
             }
         }
+        if ((requestCode == MAGAZINE_PAGES_REQUEST || requestCode == DISH_PHOTOS_REQUEST) && resultCode == RESULT_OK) {
+            val kind = if (requestCode == MAGAZINE_PAGES_REQUEST) "scan" else "dish"
+            val uris = mutableListOf<Uri>()
+            data?.clipData?.let { clip ->
+                for (index in 0 until clip.itemCount.coerceAtMost(20)) uris.add(clip.getItemAt(index).uri)
+            }
+            if (uris.isEmpty()) data?.data?.let { uris.add(it) }
+            uris.forEach { addMagazineImage(it, kind) }
+        }
         if (requestCode == CAMERA_REQUEST) {
+            val kind = pendingCameraKind
             val temporary = pendingCameraPath?.let { File(it) }
             pendingCameraPath = null
+            pendingCameraKind = "cover"
             try {
                 if (resultCode == RESULT_OK && temporary?.isFile == true && temporary.length() > 0L) {
-                    selectedPhoto = compressPhoto(Uri.fromFile(temporary))
-                    refreshPhotoPreview()
-                    Toast.makeText(this, "Foto scattata, compressa e pronta", Toast.LENGTH_SHORT).show()
+                    if (kind == "scan" || kind == "dish") addMagazineImage(Uri.fromFile(temporary), kind)
+                    else {
+                        selectedPhoto = compressPhoto(Uri.fromFile(temporary))
+                        refreshPhotoPreview()
+                        Toast.makeText(this, "Foto scattata, compressa e pronta", Toast.LENGTH_SHORT).show()
+                    }
                 } else if (resultCode == RESULT_OK) {
                     Toast.makeText(this, "La fotocamera non ha restituito una foto", Toast.LENGTH_LONG).show()
                 }
@@ -1366,17 +1618,17 @@ class MainActivity : Activity() {
         }
     }
 
-    private fun compressPhoto(uri: Uri): String {
+    private fun compressPhoto(uri: Uri, maxEdge: Int = 960): String {
         val resolver = contentResolver
         val opts = BitmapFactory.Options().apply { inJustDecodeBounds = true }
         resolver.openInputStream(uri).use { stream -> BitmapFactory.decodeStream(stream, null, opts) }
         var scale = 1
-        while (opts.outWidth / scale > 960 || opts.outHeight / scale > 960) scale *= 2
+        while (opts.outWidth / scale > maxEdge || opts.outHeight / scale > maxEdge) scale *= 2
         val decoding = BitmapFactory.Options().apply { inSampleSize = scale }
         val bitmap = resolver.openInputStream(uri).use { stream ->
             BitmapFactory.decodeStream(stream, null, decoding)
         } ?: throw IllegalStateException("Foto non valida")
-        val ratio = minOf(1.0, 960.0 / maxOf(bitmap.width, bitmap.height))
+        val ratio = minOf(1.0, maxEdge.toDouble() / maxOf(bitmap.width, bitmap.height))
         val resized = if (ratio < 1.0) Bitmap.createScaledBitmap(bitmap,
             (bitmap.width * ratio).toInt().coerceAtLeast(1),
             (bitmap.height * ratio).toInt().coerceAtLeast(1), true) else bitmap

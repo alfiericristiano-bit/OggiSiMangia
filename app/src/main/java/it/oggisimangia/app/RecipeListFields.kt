@@ -126,6 +126,20 @@ class RecipeListFields(context: Context, initial: String, private val steps: Boo
         addButton.isEnabled = fields.size < limit
     }
 
+    /** Replace suggestion rows after explicit user approval; users can edit every line. */
+    fun replaceValues(value: String) {
+        while (childCount > 1) {
+            val child = getChildAt(0)
+            if (child === addButton) break
+            removeView(child)
+        }
+        fields.clear()
+        indexes.clear()
+        val values = if (steps) RecipeSteps.split(value)
+            else value.lines().map { it.trim() }.filter { it.isNotBlank() }
+        values.ifEmpty { listOf("") }.take(limit).forEach { addRow(it) }
+    }
+
     fun entries(): List<String> = fields.map { it.text.toString().trim().replace("\n", " ") }
         .filter { it.isNotBlank() }
 

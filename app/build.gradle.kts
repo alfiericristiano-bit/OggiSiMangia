@@ -10,8 +10,8 @@ android {
         applicationId = "it.oggisimangia.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = providers.gradleProperty("verificationVersionCode").orNull?.toInt() ?: 17
-        versionName = "1.5.4"
+        versionCode = providers.gradleProperty("verificationVersionCode").orNull?.toInt() ?: 18
+        versionName = "1.6.0"
     }
     val signingPath = System.getenv("ANDROID_KEYSTORE_PATH")
     if (!signingPath.isNullOrBlank()) {
@@ -38,6 +38,7 @@ dependencies {
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.json:json:20240303")
     implementation("org.jsoup:jsoup:1.18.3")
+    implementation("com.google.mlkit:text-recognition:16.0.1")
     implementation("androidx.core:core:1.15.0")
 }
 

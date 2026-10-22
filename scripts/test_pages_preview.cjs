@@ -131,4 +131,23 @@ assert(recipe,"Clear day deleted the stored recipe");
 assert(recipe.assignments.some(a=>a.date==="2026-10-21"),"Clear day also removed other days");
 assert(!recipe.assignments.some(a=>a.date==="2026-10-23"),"Clear day failed to remove selected day");
 
+// v1.6.0: dashboard statistics are keyboard/touch accessible navigation buttons.
+clickView("calendar");
+assert(element("app").innerHTML.includes('data-action="stat-recipes"'),"Ricette summary button missing");
+assert(element("app").innerHTML.includes('data-action="stat-planned"'),"Planned days summary button missing");
+assert(element("app").innerHTML.includes('data-action="stat-sources"'),"Sources summary button missing");
+clickAction("stat-recipes");
+assert(element("app").innerHTML.includes("Il tuo archivio"),"Recipe count did not navigate to archive");
+clickView("calendar");
+clickAction("stat-planned");
+assert(element("app").innerHTML.includes("Giorni pianificati"),"Planned days count did not open its list");
+clickAction("stat-open-day",{date:"2026-10-21"});
+assert(element("app").innerHTML.includes("Il tuo calendario"),"Planned day could not return to calendar");
+clickAction("stat-sources");
+assert(element("app").innerHTML.includes("Fonti delle ricette"),"Source count did not navigate to settings");
+clickView("editor");
+assert(element("app").innerHTML.includes('id="scan-pages-input"'),"Multiple magazine pages picker missing");
+assert(element("app").innerHTML.includes('id="dish-photos-input"'),"Selectable dish photos picker missing");
+assert(element("app").innerHTML.includes("OCR automatico"),"Android-only OCR disclaimer missing");
+
 console.log("PASS: smartphone preview, back navigation, highlighted search, ingredient reset, meal accordion, site deletion, planning, cloning and safe day reset.");
