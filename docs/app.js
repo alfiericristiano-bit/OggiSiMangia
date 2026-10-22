@@ -113,6 +113,7 @@
     document.getElementById("today-caption").textContent=formatDate(todayISO(),{weekday:"long",day:"numeric",month:"long",year:"numeric"});
     if(view==="calendar") renderCalendar();
     else if(view==="archive") renderArchive();
+    else if(view==="planned") renderPlannedDays();
     else if(view==="editor") renderEditor();
     else if(view==="detail") renderDetail();
     else if(view==="sources") renderSources();
@@ -172,9 +173,25 @@
       '<div class="head-actions">'+button("↻ Oggi","go-today","tiny")+button("🗑 Svuota giorno","clear-day","tiny danger")+'</div></div>'+
       mealCard("Pranzo")+mealCard("Cena")+
       '<div class="head-actions">'+button("＋ Crea ricetta per questo giorno","new-for-day","soft")+'</div></section></div>'+
-      '<div class="quick-stat"><div class="stat"><strong>'+state.recipes.length+'</strong><span>Ricette nel browser</span></div>'+
-      '<div class="stat"><strong>'+days.size+'</strong><span>Giorni pianificati nel mese</span></div>'+
-      '<div class="stat"><strong>'+state.sources.length+'</strong><span>Fonti configurate</span></div></div>';
+      '<div class="quick-stat"><button class="stat stat-link" data-action="stat-recipes" aria-label="Apri ricettario"><strong>'+state.recipes.length+'</strong><span>Ricette</span></button>'+
+      '<button class="stat stat-link" data-action="stat-planned" aria-label="Apri giorni pianificati"><strong>'+days.size+'</strong><span>Giorni pianificati</span></button>'+
+      '<button class="stat stat-link" data-action="stat-sources" aria-label="Apri fonti configurate"><strong>'+state.sources.length+'</strong><span>Fonti configurate</span></button></div>';
+  }
+  function renderPlannedDays() {
+    const first=iso(new Date(month.getFullYear(),month.getMonth(),1)).slice(0,7);
+    const days=[...new Set(state.recipes.flatMap(r=>(r.assignments||[]).map(a=>a.date))
+      .filter(date=>date.startsWith(first)))].sort();
+    app.innerHTML='<section class="headline"><div><p class="kicker">Programmazione</p>'+
+      '<h1>Giorni pianificati</h1><p class="subtitle">Seleziona un giorno per tornare al calendario con i piatti già assegnati.</p></div></section>'+
+      '<section class="card"><div class="card-head"><h2>'+
+      escape(new Intl.DateTimeFormat("it-IT",{month:"long",year:"numeric"}).format(month))+
+      '</h2><div class="month-picker">'+button("‹","prev-month","icon")+button("›","next-month","icon")+'</div></div>'+
+      (days.length?days.map(date=>{
+        const meals=assignmentsFor(date);
+        return '<button class="planned-day-row" data-action="stat-open-day" data-date="'+escape(date)+'">'+
+          '<strong>'+escape(formatDate(date))+'</strong><span>'+meals.length+' ricette · '+escape(meals.map(x=>x.recipe.title).join(", "))+'</span><span aria-hidden="true">›</span></button>';
+      }).join(""):'<div class="empty">Nessun pasto assegnato in questo mese.</div>')+
+      '</section>';
   }
   function renderArchive() {
     const query=slug(archiveSearch.trim()),category=archiveCategory;
@@ -390,6 +407,10 @@
     const action=b.dataset.action,id=b.dataset.id,aid=b.dataset.aid,idx=Number(b.dataset.index);
     if(action==="close-modal"){closeModal();return;}
     if(action==="go-back"){goBack();return;}
+    if(action==="stat-recipes"){setView("archive");return;}
+    if(action==="stat-planned"){setView("planned");return;}
+    if(action==="stat-sources"){setView("sources");return;}
+    if(action==="stat-open-day"){selected=b.dataset.date;month=fromISO(selected);setView("calendar");return;}
     if(action==="toggle-meal"){
       if(expandedMeals.has(b.dataset.meal))expandedMeals.delete(b.dataset.meal);else expandedMeals.add(b.dataset.meal);
       render();return;
