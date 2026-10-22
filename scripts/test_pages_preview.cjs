@@ -137,7 +137,7 @@ assert(element("app").innerHTML.includes('data-action="stat-recipes"'),"Ricette 
 assert(element("app").innerHTML.includes('data-action="stat-planned"'),"Planned days summary button missing");
 assert(element("app").innerHTML.includes('data-action="stat-sources"'),"Sources summary button missing");
 clickAction("stat-recipes");
-assert(element("app").innerHTML.includes("Il mio ricettario"),"Recipe count did not navigate to archive");
+assert(element("app").innerHTML.includes("Il tuo archivio"),"Recipe count did not navigate to archive");
 clickView("calendar");
 clickAction("stat-planned");
 assert(element("app").innerHTML.includes("Giorni pianificati"),"Planned days count did not open its list");
