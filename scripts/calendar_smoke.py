@@ -35,6 +35,35 @@ adb('push', str(fixture), '/data/local/tmp/calendar-fixture.db')
 adb('shell', 'run-as', package, 'mkdir', '-p', 'databases')
 adb('shell', 'run-as', package, 'cp', '/data/local/tmp/calendar-fixture.db', 'databases/oggisimangia.db')
 adb('shell', 'am', 'start', '-W', '-n', package + '/.MainActivity')
+# New users go through the persisted profile gate before the calendar (fixture uses empty preferences).
+import time
+def intro_nodes(label):
+    adb('shell', 'rm', '-f', '/sdcard/intro.xml')
+    adb('shell', 'uiautomator', 'dump', '/sdcard/intro.xml')
+    raw = adb('exec-out', 'cat', '/sdcard/intro.xml')
+    (out / (label + '.xml')).write_bytes(raw)
+    return list(ET.fromstring(raw).iter('node'))
+
+def intro_tap(nodes, expected):
+    node = next(n for n in nodes if expected in n.attrib.get('text', '') or
+                expected in n.attrib.get('content-desc', ''))
+    x1, y1, x2, y2 = map(int, re.findall(r'\d+', node.attrib['bounds']))
+    adb('shell', 'input', 'tap', str((x1+x2)//2), str((y1+y2)//2))
+
+time.sleep(0.6)
+intro = intro_nodes('onboarding-first')
+if any('Come ti chiami?' in n.attrib.get('text', '') for n in intro):
+    intro_tap(intro, 'Il tuo nome')
+    adb('shell', 'input', 'text', 'Tester')
+    adb('shell', 'input', 'keyevent', 'KEYCODE_BACK')
+    intro_tap(intro_nodes('onboarding-typed'), 'Continua')
+    welcome = intro_nodes('onboarding-welcome')
+    assert any('Benvenuto, Tester' in n.attrib.get('text', '') for n in welcome), 'Welcome did not use saved name'
+    intro_tap(welcome, 'Inizia a cucinare')
+    time.sleep(0.7)
+    assert any('Il calendario dei pasti' in n.attrib.get('text', '') for n in intro_nodes('onboarding-complete')), 'Calendar did not open after onboarding'
+    print('PASS: first-run personalized name, welcome and preserved Android profile.')
+
 # The new first-run help is part of the UI: verify and dismiss it, opting out persistently.
 import time
 time.sleep(0.7)
