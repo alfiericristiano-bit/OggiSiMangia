@@ -39,6 +39,7 @@
   }
   function ingredientMatch(line,requested) {
     const words=s=>slug(s).replace(/[^a-z0-9]+/g," ").trim().split(/\s+/).filter(Boolean);
+    if(slug(requested).trim()==="pasta" && /\\bpasta\\s+(frolla|sfoglia|brisee|brise|fillo|madre|di\\s+(zucchero|mandorle|nocciole|pane)|per\\s+pizza)\\b/.test(slug(line))) return false;
     const have=new Set(words(line).map(ingredientWord));
     const wanted=words(requested).filter(x=>!["di","del","della","delle","dei","degli","con","per","da"].includes(x));
     return wanted.length>0&&wanted.every(x=>have.has(ingredientWord(x)));
@@ -230,7 +231,7 @@
       '<section class="card" style="margin-bottom:19px"><form id="archive-form"><div class="filters">'+
       field("search","Nome del piatto",archiveSearch,{placeholder:"Es. pasta alle zucchine"})+
       field("category","Categoria",archiveCategory,{select:["Tutte"].concat(CATEGORIES)})+'</div>'+
-      '<div class="field"><label>Ingredienti richiesti — tutti devono essere presenti</label><div id="filter-ingredient-rows" class="select-ingredients">'+archiveIngredientFields.map((x,i)=>ingredientFilterLine(x,i)).join("")+'</div></div>'+
+      '<div class="field"><label>Ingrediente principale e altri ingredienti — tutti obbligatori quando inseriti (massimo 10)</label><div id="filter-ingredient-rows" class="select-ingredients">'+archiveIngredientFields.map((x,i)=>ingredientFilterLine(x,i)).join("")+'</div></div>'+
       '<div class="head-actions archive-search-actions" style="margin-top:12px">'+button("＋ Ingrediente","add-filter-ingredient","soft")+
       button("↻ Azzera ingredienti","reset-ingredients","soft")+'</div>'+
       '<button type="submit" class="btn primary search-cta">🔎 CERCA RICETTE NEL RICETTARIO</button>'+
@@ -240,8 +241,10 @@
         '<section class="card empty">Non ci sono ricette che contengono <strong>tutti</strong> gli ingredienti richiesti. Prova a modificare i filtri oppure scrivi una nuova ricetta.</section>');
   }
   function ingredientFilterLine(value,index) {
-    return '<div class="list-line"><span class="number">'+(index+1)+'.</span><input class="input" data-filter-ingredient="'+index+'" aria-label="Ingrediente '+(index+1)+'" value="'+escape(value)+'" placeholder="Es. zucchine">'+
-      button("✕","remove-filter-ingredient","tiny",'data-index="'+index+'"')+'</div>';
+    const first=index===0;
+    const name=first?"Ingrediente principale":"Ingrediente "+(index+1);
+    return '<div class="list-line"><span class="number">'+(first?"★":(index+1)+".")+'</span><input class="input" data-filter-ingredient="'+index+'" aria-label="'+name+'" value="'+escape(value)+'" placeholder="'+(first?"Es. pasta, riso, pollo, patate":"Es. zucchine")+'">'+
+      (first?"":button("✕","remove-filter-ingredient","tiny",'data-index="'+index+'"'))+'</div>';
   }
   function recipeTile(r) {
     return '<article class="card recipe-card">'+
@@ -565,6 +568,7 @@
     }
     if(action==="remove-filter-ingredient"){
       currentArchiveValues();
+      if(idx===0){toast("L'ingrediente principale si svuota, ma non si elimina.");return;}
       archiveIngredientFields.length>1?archiveIngredientFields.splice(idx,1):archiveIngredientFields=[""];
       render();return;
     }
@@ -658,7 +662,15 @@
     }
   }
   function submit(e) {
-    if(e.target.id==="archive-form"){e.preventDefault();currentArchiveValues();render();return;}
+    if(e.target.id==="archive-form"){
+      e.preventDefault();currentArchiveValues();
+      if(!archiveIngredientFields[0].trim() && archiveIngredientFields.slice(1).some(x=>x.trim())){
+        toast("Inserisci prima l'ingrediente principale (es. pasta, riso, pollo, patate).");
+        document.querySelector('[data-filter-ingredient="0"]')?.focus();
+        return;
+      }
+      render();return;
+    }
     if(e.target.id!=="recipe-form")return;
     e.preventDefault();
     const form=e.target, f=new FormData(form);
