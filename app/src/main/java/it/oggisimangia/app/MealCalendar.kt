@@ -19,7 +19,7 @@ class MealCalendar(context: Context, private val selected: LocalDate,
     private var month = YearMonth.from(selected)
     private val lunch = Color.rgb(216, 117, 35)
     private val dinner = Color.rgb(63, 117, 180)
-    private val teal = Color.rgb(20, 125, 114)
+    private val teal = Color.rgb(21, 138, 56)
     init { orientation = VERTICAL; render() }
     private fun dp(value: Int) = (value * resources.displayMetrics.density).toInt()
     private fun render() {
@@ -31,15 +31,15 @@ class MealCalendar(context: Context, private val selected: LocalDate,
             textSize = 23f
             setTextColor(teal)
             background = GradientDrawable().apply {
-                setColor(Color.rgb(234,244,241)); cornerRadius = dp(12).toFloat()
+                setColor(Color.WHITE); cornerRadius = dp(12).toFloat()
             }
             setOnClickListener { month = month.plusMonths(move); render() }
         }
         header.addView(arrow("‹", "Mese precedente", -1), LayoutParams(dp(52), dp(48)))
         header.addView(TextView(context).apply {
             text = month.format(DateTimeFormatter.ofPattern("MMMM yyyy", Locale.ITALIAN))
-            textSize = 18f; gravity = Gravity.CENTER; setTypeface(null, Typeface.BOLD)
-            setTextColor(Color.rgb(21,103,91))
+            textSize = 20f; gravity = Gravity.CENTER; setTypeface(null, Typeface.BOLD)
+            setTextColor(Color.rgb(15,47,48))
         }, LayoutParams(0, dp(48), 1f))
         header.addView(arrow("›", "Mese successivo", 1), LayoutParams(dp(52), dp(48)))
         addView(header)
@@ -50,8 +50,12 @@ class MealCalendar(context: Context, private val selected: LocalDate,
                 columnSpec = GridLayout.spec(GridLayout.UNDEFINED, 1f)
             })
         }
-        listOf("L", "M", "M", "G", "V", "S", "D").forEach { day ->
-            cell(TextView(context).apply { text = day; gravity = Gravity.CENTER; setTypeface(null, Typeface.BOLD) }, 22)
+        listOf("Lun", "Mar", "Mer", "Gio", "Ven", "Sab", "Dom").forEach { day ->
+            cell(TextView(context).apply {
+                text = day; textSize = 12f
+                gravity = Gravity.CENTER; setTypeface(null, Typeface.BOLD)
+                setTextColor(if (day == "Dom") Color.rgb(204, 55, 50) else Color.rgb(81, 99, 90))
+            }, 28)
         }
         val occupied = markers(month)
         repeat(month.atDay(1).dayOfWeek.value - 1) { cell(TextView(context), 48) }
@@ -66,17 +70,17 @@ class MealCalendar(context: Context, private val selected: LocalDate,
                 contentDescription = date.format(DateTimeFormatter.ofPattern("d MMMM yyyy", Locale.ITALIAN)) +
                     if (meals.isEmpty()) ", nessun pasto pianificato" else ", " + meals.joinToString(" e ")
                 background = GradientDrawable().apply {
-                    setColor(if (date == selected) Color.rgb(214,245,233) else Color.WHITE)
+                    setColor(if (date == selected) teal else Color.WHITE)
                     cornerRadius = dp(10).toFloat()
-                    setStroke(dp(if (date == selected) 2 else 1),
-                        if (date == selected) teal else Color.rgb(222,235,228))
+                    setStroke(dp(1), if (date == selected) teal else Color.rgb(245,242,231))
                 }
                 setOnClickListener { onSelect(date) }
                 setOnLongClickListener { onAdd(date); true }
             }
             dayCell.addView(TextView(context).apply {
                 text = number.toString(); textSize = 16f; gravity = Gravity.CENTER
-                if (date == LocalDate.now()) setTypeface(null, Typeface.BOLD)
+                setTextColor(if (date == selected) Color.WHITE else Color.rgb(20, 36, 31))
+                if (date == LocalDate.now() || date == selected) setTypeface(null, Typeface.BOLD)
             })
             val dots = LinearLayout(context).apply { gravity = Gravity.CENTER; importantForAccessibility = android.view.View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS }
             for ((meal, color) in listOf("Pranzo" to lunch, "Cena" to dinner)) {
