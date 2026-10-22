@@ -36,6 +36,10 @@ object VoiceCommands {
     fun parse(spoken: String, today: LocalDate = LocalDate.now()): VoiceCommand {
         val text = normalized(spoken).trim(' ', '.', '!', '?')
         if (text.isBlank()) return VoiceCommand.Unknown
+        // Never interpret a destructive request as a harmless 'open' command just
+        // because it happens to mention the archive, calendar or recipe sources.
+        if (Regex("\\b(?:cancella|cancellami|elimina|eliminami|svuota|azzera|resetta|rimuovi|sovrascrivi|formatta)\\b")
+                .containsMatchIn(text)) return VoiceCommand.Unknown
         if (Regex("\\b(aiuto|help|comandi|cosa sai fare|come funziona)\\b").containsMatchIn(text)) return VoiceCommand.Help
 
         val guided = Regex(
@@ -73,7 +77,8 @@ object VoiceCommands {
         if (searchVerb) {
             val part = Regex("\\b(?:con|a base di|usando|di)\\s+(.+)$").find(text)?.groupValues?.get(1)
             if (part != null && part.isNotBlank()) {
-                val cleaned = part.replace(Regex("\\s+(?:per\\s+)?(?:pranzo|cena)(?:\\s+(?:oggi|domani))?$"), "")
+                val cleaned = part.replace(Regex("\\s+(?:per\\s+)?(?:pranzo|cena)?\\s*(?:oggi|domani|dopodomani)$"), "")
+                    .replace(Regex("\\s+(?:per\\s+)?(?:pranzo|cena)$"), "")
                 val items = cleaned.split(Regex("\\s*(?:,|;|\\s+e\\s+)\\s*"))
                     .map { it.trim().trim('.', ',', ';') }
                     .filter { it.isNotBlank() }.distinct().take(10)
