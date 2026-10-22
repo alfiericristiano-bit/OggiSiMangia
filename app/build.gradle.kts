@@ -40,5 +40,6 @@ dependencies {
     implementation("org.jsoup:jsoup:1.18.3")
     implementation("com.google.mlkit:text-recognition:16.0.1")
     implementation("androidx.core:core:1.15.0")
+    implementation("androidx.exifinterface:exifinterface:1.3.7")
 }
 
