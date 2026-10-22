@@ -1184,7 +1184,7 @@ class MainActivity : Activity() {
         if (searchForDay) label(selectedMeal + " · " + if (selectedAlternative) "Alternativa" else "Principale", 16f, true)
         actionRow("🔗 Ho un link", { showRecipeLink() }, "📅 Pasti del giorno", { showCalendar() })
         label("Quali ingredienti hai a disposizione?", 17f, true)
-        label("Primo campo: ingrediente principale obbligatorio (es. pasta, riso, pollo, patate). Gli altri ingredienti, fino a 10 in totale, devono essere presenti nella ricetta.", 13f)
+        label("Primo campo: ingrediente principale obbligatorio (es. pasta, riso, pollo, patate). Massimo 10 ingredienti in totale: anche gli altri devono essere presenti nella ricetta.", 13f)
         val ingredients = IngredientInputs(this, searchIngredients) { searchIngredients = it }
         content.addView(ingredients)
         val category = dropdown("Cerchi un...", categories, searchCategory)
