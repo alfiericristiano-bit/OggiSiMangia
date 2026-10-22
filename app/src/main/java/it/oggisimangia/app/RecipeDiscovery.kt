@@ -167,8 +167,11 @@ object RecipeDiscovery {
         require(page >= 1)
         require(RecipeSources.sites[site] == domain) { "Fonte non configurata" }
         val query = RecipeSearchQueries.variants(ingredients).lastOrNull() ?: return emptyList()
-        val hits = try {
-            candidates(download(RecipeSearchQueries.bing(domain, query, page * 10)), site, domain)
+        val url = RecipeSearchQueries.bing(domain, query, page * 10)
+        val rssHits = try { candidates(download(url), site, domain) }
+            catch (_: Exception) { emptyList() }
+        val hits = if (rssHits.isNotEmpty()) rssHits else try {
+            candidates(download(url.replace("&format=rss", "")), site, domain)
         } catch (_: Exception) { emptyList() }
         val pool = Executors.newFixedThreadPool(6)
         return try {
@@ -196,8 +199,13 @@ object RecipeDiscovery {
                 // Start with a normal query; commas and RSS syntax can suppress other sites.
                 for (query in queries.reversed()) {
                     try {
-                        candidates(download(RecipeSearchQueries.bing(domain, query)), site, domain)
-                            .forEach { found.putIfAbsent(it.url.substringBefore('?'), it) }
+                        val url = RecipeSearchQueries.bing(domain, query)
+                        var retrieved = candidates(download(url), site, domain)
+                        if (retrieved.isEmpty()) {
+                            retrieved = try { candidates(download(url.replace("&format=rss", "")), site, domain) }
+                                catch (_: Exception) { emptyList() }
+                        }
+                        retrieved.forEach { found.putIfAbsent(it.url.substringBefore('?'), it) }
                     } catch (_: Exception) { /* Continue with another query; don't discard other sites. */ }
                     if (found.size >= 8) break
                 }
