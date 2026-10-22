@@ -31,6 +31,11 @@ object VoiceFlowPlanner {
             .entries.firstOrNull { it.value.size > 1 }
         if (duplicate != null) return VoicePlan(emptyList(), conflict =
             "Hai richiesto più volte lo stesso piatto per lo stesso pasto. Vuoi correggere la sequenza?")
+        val sameMeal = planning.groupBy { it.day to it.meal }
+            .entries.firstOrNull { it.value.size > 1 }
+        if (sameMeal != null) return VoicePlan(emptyList(), conflict =
+            "Hai richiesto più ricette per lo stesso pasto e giorno. Dimmi quale sarà la principale " +
+                "e quale l'alternativa, oppure organizziamole una alla volta.")
         val searches = actions.filterIsInstance<VoiceCommand.Search>()
         if (actions.dropLast(1).any { it is VoiceCommand.Search || it is VoiceCommand.GuidedMealSearch })
             return VoicePlan(emptyList(), conflict =
