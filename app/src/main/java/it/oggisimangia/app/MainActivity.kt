@@ -294,7 +294,7 @@ class MainActivity : Activity() {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
             setPadding(dp(12), dp(7), dp(12), dp(8))
-            background = outlined(Color.WHITE, 17f)
+            this.background = outlined(Color.WHITE, 17f)
         }
         hero.addView(ImageView(this).apply {
             setImageResource(R.drawable.app_icon_clean)
