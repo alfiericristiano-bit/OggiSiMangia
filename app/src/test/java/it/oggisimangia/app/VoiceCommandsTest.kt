@@ -55,4 +55,15 @@ class VoiceCommandsTest {
         assertEquals(VoiceCommand.Unknown, VoiceCommands.parse("Elimina tutte le ricette", today))
         assertEquals(VoiceCommand.Unknown, VoiceCommands.parse("Cancella il database", today))
     }
+
+    @Test fun destructiveRequestsWithNavigationWordsAreNotInterpretedAsOpen() {
+        assertEquals(VoiceCommand.Unknown, VoiceCommands.parse("Elimina il ricettario", today))
+        assertEquals(VoiceCommand.Unknown, VoiceCommands.parse("Svuota il calendario", today))
+        assertEquals(VoiceCommand.Unknown, VoiceCommands.parse("Cancella tutte le fonti", today))
+    }
+
+    @Test fun relativeDayDoesNotBecomeAnIngredient() {
+        assertEquals(VoiceCommand.Search(listOf("pasta", "pomodoro")),
+            VoiceCommands.parse("Cerca ricette con pasta e pomodoro per domani", today))
+    }
 }
