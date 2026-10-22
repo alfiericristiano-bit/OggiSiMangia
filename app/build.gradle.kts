@@ -10,8 +10,8 @@ android {
         applicationId = "it.oggisimangia.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = providers.gradleProperty("verificationVersionCode").orNull?.toInt() ?: 23
-        versionName = "1.9.1"
+        versionCode = providers.gradleProperty("verificationVersionCode").orNull?.toInt() ?: 24
+        versionName = "1.10.0"
     }
     val signingPath = System.getenv("ANDROID_KEYSTORE_PATH")
     if (!signingPath.isNullOrBlank()) {
@@ -40,5 +40,6 @@ dependencies {
     implementation("org.jsoup:jsoup:1.18.3")
     implementation("com.google.mlkit:text-recognition:16.0.1")
     implementation("androidx.core:core:1.15.0")
+    implementation("androidx.exifinterface:exifinterface:1.3.7")
 }
 

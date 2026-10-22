@@ -52,8 +52,27 @@ class MainActivity : Activity() {
     private var searchDifficulty = "Facile"
     private var searchDuration = "Veloce"
     private var searchCategory = "Primo"
+    private var searchType = "Qualsiasi"
     private var selectedPhoto = ""
     private val magazinePages = mutableListOf<String>()
+    private val scanPageRoles = linkedMapOf<String, String>()
+    private val scanPageTexts = linkedMapOf<String, String>()
+    private var pendingGalleryRole = MagazineRecipeText.WHOLE
+    private var editorPrep: EditText? = null
+    private var editorCook: EditText? = null
+    private var editorRest: EditText? = null
+    private var editorTotal: EditText? = null
+    private var editorPortions: EditText? = null
+    private var editorDifficulty: Spinner? = null
+    private var autoTitle = ""
+    private var autoIngredients = ""
+    private var autoSteps = ""
+    private var autoPrep = ""
+    private var autoCook = ""
+    private var autoRest = ""
+    private var autoTotal = ""
+    private var autoPortions = ""
+    private var autoDifficulty = ""
     private val dishPhotoChoices = linkedMapOf<String, Boolean>()
     private var magazinePagesContainer: LinearLayout? = null
     private var dishPhotosContainer: LinearLayout? = null
@@ -694,6 +713,11 @@ class MainActivity : Activity() {
         selectedPhoto = existing?.imagePath ?: ""
         magazinePages.clear()
         magazinePages.addAll(photoPaths(existing?.scanPages))
+        scanPageRoles.clear()
+        scanPageRoles.putAll(photoRoles(existing?.scanPages))
+        scanPageTexts.clear()
+        autoTitle = ""; autoIngredients = ""; autoSteps = ""
+        autoPrep = ""; autoCook = ""; autoRest = ""; autoTotal = ""; autoPortions = ""; autoDifficulty = ""
         dishPhotoChoices.clear()
         dishPhotoChoices.putAll(photoChoices(existing?.dishPhotos))
         photoPreview = null
@@ -714,17 +738,27 @@ class MainActivity : Activity() {
         val titleField = input("Nome del piatto *", existing?.title ?: suggestedTitle)
         editorTitle = titleField
         label("RICETTA DA RIVISTA · SCANSIONE E OCR", 19f, true)
-        label("Fotografa una o più pagine. Puoi archiviare le fotografie anche senza OCR, oppure trasformare il testo in campi modificabili. Nessuna foto viene caricata online.", 13f)
+        label("Segui le fasi nell'ordine: 1) pagina intera (anche più pagine); 2) primo piano degli ingredienti; 3) preparazione; 4) tempi, difficoltà e dosi. L'OCR locale parte dopo ogni foto. Manteniamo sia le fotografie originali sia tutti i testi correggibili.", 13f)
+        label("1 · PAGINA INTERA DELLA RICETTA", 15f, true)
+        actionRow("📷 Fotografa pagina", { launchCamera("scan:" + MagazineRecipeText.WHOLE) },
+            "🖼️ Importa pagine", { chooseMagazineFiles(MAGAZINE_PAGES_REQUEST, MagazineRecipeText.WHOLE) })
+        label("2 · INGREDIENTI (foto ravvicinata)", 15f, true)
+        actionRow("📷 Foto ingredienti", { launchCamera("scan:" + MagazineRecipeText.INGREDIENTS) },
+            "🖼️ Importa ingredienti", { chooseMagazineFiles(MAGAZINE_PAGES_REQUEST, MagazineRecipeText.INGREDIENTS) })
+        label("3 · PREPARAZIONE (foto ravvicinata)", 15f, true)
+        actionRow("📷 Foto preparazione", { launchCamera("scan:" + MagazineRecipeText.STEPS) },
+            "🖼️ Importa preparazione", { chooseMagazineFiles(MAGAZINE_PAGES_REQUEST, MagazineRecipeText.STEPS) })
+        label("4 · TEMPI, DOSI E DIFFICOLTÀ", 15f, true)
+        actionRow("📷 Foto dati", { launchCamera("scan:" + MagazineRecipeText.DETAILS) },
+            "🖼️ Importa dati", { chooseMagazineFiles(MAGAZINE_PAGES_REQUEST, MagazineRecipeText.DETAILS) })
         magazinePagesContainer = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         content.addView(magazinePagesContainer)
         refreshMagazinePages()
-        actionRow("📷 Fotografa pagina", { launchCamera("scan") },
-            "🖼️ Aggiungi pagine", { chooseMagazineFiles(MAGAZINE_PAGES_REQUEST) })
         label("TESTO RICONOSCIUTO (MODIFICABILE)", 15f, true)
         val ocrField = input("Testo OCR delle pagine, correggibile anche prima di salvare", existing?.scanOcrText.orEmpty(), true)
         editorOcr = ocrField
         ocrStatusLabel = label("OCR pronto: ogni pagina fotografata verrà letta automaticamente e aggiunta qui sotto.", 13f)
-        action("📝 Compila titolo, ingredienti e preparazione dal testo OCR") {
+        action("📝 Ricostruisci i campi dalla scansione (controlla prima di salvare)") {
             AlertDialog.Builder(this).setTitle("Usare il testo OCR?")
                 .setMessage("I campi della ricetta saranno compilati con suggerimenti automatici. Controlla sempre dosi e preparazione: il riconoscimento può sbagliare.")
                 .setPositiveButton("Compila") { _, _ -> applyMagazineSuggestions(false) }
@@ -740,8 +774,10 @@ class MainActivity : Activity() {
         val descriptionField = input("Descrizione breve / presentazione", existing?.description.orEmpty(), true)
         val categoryPicker = dropdown("Portata", categories, existing?.category ?: selectedCategory)
         val difficultyPicker = dropdown("Difficoltà", difficulties, existing?.difficulty ?: searchDifficulty)
+        editorDifficulty = difficultyPicker
         val cuisineField = input("Tipo di cucina / provenienza (es. italiana)", existing?.cuisine.orEmpty())
         val portionsField = input("Dosi / numero persone (es. 4 persone)", existing?.portions.orEmpty())
+        editorPortions = portionsField
         val authorField = input("Autore della ricetta (facoltativo)", existing?.author.orEmpty())
         val costField = input("Costo indicativo (facoltativo)", existing?.cost.orEmpty())
         val tagsField = input("Etichette (es. vegetariano, senza glutine)", existing?.tags.orEmpty())
@@ -764,6 +800,8 @@ class MainActivity : Activity() {
         val cookField = input("Tempo di cottura (es. 25 min)", existing?.cookTime.orEmpty())
         val restField = input("Riposo / lievitazione (es. 2 ore)", existing?.restTime.orEmpty())
         val totalField = input("Tempo totale (facoltativo)", existing?.totalTime.orEmpty())
+        editorPrep = prepField; editorCook = cookField
+        editorRest = restField; editorTotal = totalField
         val temperatureField = input("Temperatura forno / cottura (es. 180 °C)", existing?.temperature.orEmpty())
         val savedDuration = existing?.duration ?: searchDuration
         val durationPicker = dropdown("Fascia di tempo", (durations.toList() + savedDuration).distinct().toTypedArray(), savedDuration)
@@ -859,7 +897,12 @@ class MainActivity : Activity() {
                 url = url,
                 alternative = alternativePicker.selectedItem.toString() == "Alternativa",
                 imagePath = selectedPhoto,
-                scanPages = JSONArray(magazinePages).toString(),
+                scanPages = JSONArray().apply {
+                    magazinePages.forEach { path ->
+                        put(JSONObject().put("path", path)
+                            .put("role", scanPageRoles[path] ?: MagazineRecipeText.WHOLE))
+                    }
+                }.toString(),
                 dishPhotos = JSONObject(dishPhotoChoices as Map<*, *>).toString(),
                 scanOcrText = ocrField.text.toString().trim(),
                 originalInstructions = originalField?.text?.toString()?.trim() ?: existing?.originalInstructions.orEmpty(),
@@ -898,17 +941,33 @@ class MainActivity : Activity() {
     }
 
 
+    // Old archives contain ["path.jpg"]; new ones contain {path,role}.
     private fun photoPaths(json: String?): List<String> = try {
         val data = JSONArray(json ?: "[]")
-        (0 until data.length()).mapNotNull { data.optString(it).takeIf(String::isNotBlank) }
+        (0 until data.length()).mapNotNull { at ->
+            (data.optJSONObject(at)?.optString("path") ?: data.optString(at))
+                .takeIf(String::isNotBlank)
+        }
     } catch (_: Exception) { emptyList() }
+
+    private fun photoRoles(json: String?): Map<String, String> = try {
+        val data = JSONArray(json ?: "[]")
+        (0 until data.length()).mapNotNull { at ->
+            data.optJSONObject(at)?.let { obj ->
+                obj.optString("path").takeIf(String::isNotBlank)?.let { path ->
+                    path to obj.optString("role", MagazineRecipeText.WHOLE)
+                }
+            }
+        }.toMap()
+    } catch (_: Exception) { emptyMap() }
 
     private fun photoChoices(json: String?): Map<String, Boolean> = try {
         val data = JSONObject(json ?: "{}")
         data.keys().asSequence().associateWith { data.optBoolean(it, false) }
     } catch (_: Exception) { emptyMap() }
 
-    private fun chooseMagazineFiles(request: Int) {
+    private fun chooseMagazineFiles(request: Int, role: String = MagazineRecipeText.WHOLE) {
+        pendingGalleryRole = role
         startActivityForResult(Intent(Intent.ACTION_GET_CONTENT).apply {
             type = "image/*"
             addCategory(Intent.CATEGORY_OPENABLE)
@@ -932,7 +991,13 @@ class MainActivity : Activity() {
                 LinearLayout.LayoutParams(dp(70), dp(92)))
             val info = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
             info.addView(TextView(this).apply {
-                text = "Pagina " + (index + 1) + " · foto archiviata"
+                text = "Foto " + (index + 1) + " · " +
+                    when (scanPageRoles[path]) {
+                        MagazineRecipeText.INGREDIENTS -> "Ingredienti"
+                        MagazineRecipeText.STEPS -> "Preparazione"
+                        MagazineRecipeText.DETAILS -> "Tempi, dosi e difficoltà"
+                        else -> "Pagina intera"
+                    }
                 textSize = 14f
                 setTextColor(familyInk)
             })
@@ -940,6 +1005,8 @@ class MainActivity : Activity() {
                 text = "✕ Elimina pagina"; isAllCaps = false
                 setOnClickListener {
                     magazinePages.remove(path)
+                    scanPageRoles.remove(path)
+                    scanPageTexts.remove(path)
                     pendingOcrPages.remove(path)
                     scanOcrResults.remove(path)
                     processedOcrPages.remove(path)
@@ -1006,13 +1073,14 @@ class MainActivity : Activity() {
     private fun addMagazineImage(uri: Uri, kind: String) {
         try {
             val path = compressPhoto(uri, if (kind == "scan") 2000 else 960)
-            if (kind == "scan") {
+            if (kind.startsWith("scan")) {
                 if (magazinePages.size >= 20) {
                     File(path).delete()
                     Toast.makeText(this, "Massimo 20 pagine per ricetta", Toast.LENGTH_LONG).show()
                     return
                 }
                 magazinePages.add(path)
+                scanPageRoles[path] = kind.substringAfter(':', MagazineRecipeText.WHOLE)
                 pendingOcrPages.add(path)
                 refreshMagazinePages()
                 updateOcrStatus()
@@ -1027,21 +1095,73 @@ class MainActivity : Activity() {
         }
     }
 
+    /** OCR page headers include photo roles so user corrections are also re-interpreted. */
+    private fun editableScanSections(raw: String): List<MagazineRecipeText.Section> {
+        val marker = Regex("^Pagina\\s+[0-9]+\\s*\\((intera|ingredienti|preparazione|dettagli)\\)\\s*$",
+            RegexOption.IGNORE_CASE)
+        val sections = mutableListOf<MagazineRecipeText.Section>()
+        var role = MagazineRecipeText.WHOLE
+        val body = StringBuilder()
+        fun flush() {
+            if (body.isNotBlank()) sections.add(MagazineRecipeText.Section(role, body.toString()))
+            body.clear()
+        }
+        raw.lines().forEach { line ->
+            val match = marker.matchEntire(line.trim())
+            if (match != null) { flush(); role = match.groupValues[1].lowercase() }
+            else body.append(line).append('\n')
+        }
+        flush()
+        return sections
+    }
+
     private fun applyMagazineSuggestions(onlyMissing: Boolean) {
         val text = editorOcr?.text?.toString().orEmpty()
         if (text.isBlank()) {
-            Toast.makeText(this, "Nessun testo OCR disponibile. Le foto restano salvabili.", Toast.LENGTH_LONG).show()
+            if (!onlyMissing) Toast.makeText(this,
+                "Nessun testo OCR disponibile. Le fotografie restano salvabili.",
+                Toast.LENGTH_LONG).show()
             return
         }
-        val guess = MagazineRecipeText.suggest(text)
-        if (guess.title.isNotBlank() && (!onlyMissing || editorTitle?.text.isNullOrBlank()))
-            editorTitle?.setText(guess.title)
-        if (guess.ingredients.isNotBlank() && (!onlyMissing || editorIngredients?.entries().isNullOrEmpty()))
+        val sections = editableScanSections(text)
+        val guess = MagazineRecipeText.suggestSections(sections)
+        fun update(field: EditText?, value: String, previous: String, save: (String) -> Unit) {
+            if (value.isNotBlank() && field != null &&
+                (!onlyMissing || field.text.isNullOrBlank() ||
+                    (previous.isNotBlank() && field.text.toString() == previous))) {
+                field.setText(value)
+                save(value)
+            }
+        }
+        update(editorTitle, guess.title, autoTitle) { autoTitle = it }
+        if (guess.ingredients.isNotBlank() && editorIngredients != null &&
+            (!onlyMissing || editorIngredients!!.entries().isEmpty() ||
+                (autoIngredients.isNotBlank() && editorIngredients!!.value() == autoIngredients))) {
             editorIngredients?.replaceValues(guess.ingredients)
-        if (guess.steps.isNotBlank() && (!onlyMissing || editorSteps?.entries().isNullOrEmpty()))
+            autoIngredients = guess.ingredients
+        }
+        if (guess.steps.isNotBlank() && editorSteps != null &&
+            (!onlyMissing || editorSteps!!.entries().isEmpty() ||
+                (autoSteps.isNotBlank() && editorSteps!!.value() == autoSteps))) {
             editorSteps?.replaceValues(guess.steps)
+            autoSteps = guess.steps
+        }
+        update(editorPrep, guess.prepTime, autoPrep) { autoPrep = it }
+        update(editorCook, guess.cookTime, autoCook) { autoCook = it }
+        update(editorRest, guess.restTime, autoRest) { autoRest = it }
+        update(editorTotal, guess.totalTime, autoTotal) { autoTotal = it }
+        update(editorPortions, guess.portions, autoPortions) { autoPortions = it }
+        if (guess.difficulty.isNotBlank()) editorDifficulty?.let { picker ->
+            if (!onlyMissing || autoDifficulty == picker.selectedItem?.toString() ||
+                (autoDifficulty.isBlank() && picker.selectedItem?.toString() == searchDifficulty)) {
+                val position = difficulties.indexOf(guess.difficulty)
+                if (position >= 0) {
+                    picker.setSelection(position)
+                    autoDifficulty = guess.difficulty
+                }
+            }
+        }
     }
-
 
     private fun updateOcrStatus() {
         val total = magazinePages.size
@@ -1064,8 +1184,10 @@ class MainActivity : Activity() {
             if (text.isNotBlank()) {
                 val current = editorOcr?.text?.toString().orEmpty()
                 val page = magazinePages.indexOf(nextPath) + 1
+                scanPageTexts[nextPath] = text
+                val role = scanPageRoles[nextPath] ?: MagazineRecipeText.WHOLE
                 editorOcr?.append((if (current.isBlank()) "" else "\n\n") +
-                    "Pagina $page\n" + text.trim())
+                    "Pagina $page ($role)\n" + text.trim())
                 applyMagazineSuggestions(true)
             }
         }
@@ -1184,21 +1306,22 @@ class MainActivity : Activity() {
         if (searchForDay) label(selectedMeal + " · " + if (selectedAlternative) "Alternativa" else "Principale", 16f, true)
         actionRow("🔗 Ho un link", { showRecipeLink() }, "📅 Pasti del giorno", { showCalendar() })
         label("Quali ingredienti hai a disposizione?", 17f, true)
-        label("Primo campo: ingrediente principale obbligatorio (es. pasta, riso, pollo, patate). Massimo 10 ingredienti in totale: anche gli altri devono essere presenti nella ricetta.", 13f)
+        label("Primo campo: ingrediente principale obbligatorio (es. pasta, riso, pollo, patate). Massimo 10 ingredienti: gli altri sono preferenze; le ricette con corrispondenza parziale vengono segnalate.", 13f)
         val ingredients = IngredientInputs(this, searchIngredients) { searchIngredients = it }
         content.addView(ingredients)
-        val category = dropdown("Cerchi un...", categories, searchCategory)
+        val category = dropdown("Portata", categories, searchCategory)
+        val type = dropdown("Tipologia alimentare", RecipeTypeFilter.options, searchType)
         val difficulty = dropdown("Difficoltà desiderata", difficulties, searchDifficulty)
         val duration = dropdown("Tempo a disposizione", durations, searchDuration)
         action("Priorità dei siti e nuove fonti") {
             searchIngredients = ingredients.values().joinToString(", ")
             searchCategory = category.selectedItem.toString()
+            searchType = type.selectedItem.toString()
             searchDifficulty = difficulty.selectedItem.toString()
             searchDuration = duration.selectedItem.toString()
             showSourceSettings()
         }
-        label("Ingredienti obbligatori, anche singolare/plurale e preparazioni equivalenti. " +
-            "Categoria, difficoltà e tempi sono preferenze: gli scostamenti vengono segnalati.", 13f)
+        label("Ingrediente principale obbligatorio. Le ricette con tutti gli ingredienti sono preferite; quelle parziali mostrano le differenze. Il filtro vegetariano/vegano e i filtri allergeni sono indicativi, non certificazioni.", 13f)
 
         primaryAction("⌕  Cerca ricette") search@{
             searchIngredients = ingredients.query() ?: return@search
@@ -1236,7 +1359,7 @@ class MainActivity : Activity() {
                             .values.map { duplicates -> duplicates.maxBy { r ->
                                 (if (r.rating != null) 2 else 0) + (if (r.feedbackCount != null) 2 else 0) + r.relevance
                             } }
-                        RecipeRanking.order(unique, selectedIngredients)
+                        RecipeRanking.orderFlexible(unique, selectedIngredients)
                     } finally { executor.shutdownNow() }
                 } catch (_: Exception) { emptyList() }
                 runOnUiThread {
@@ -1400,30 +1523,47 @@ class MainActivity : Activity() {
     }
 
 
+    private fun filterByType(items: List<WebRecipe>): List<WebRecipe> {
+        if (searchType == "Qualsiasi") return items
+        return items.filter {
+            RecipeTypeFilter.match(it.ingredients, searchType) != false
+        }
+    }
+
     /** First show the configured sites separately in their saved priority order. */
     private fun showRecipeResults(items: List<WebRecipe>, offset: Int = 0) {
         lastSearchResults = items
         lastSearchOffset = 0
         screen("Risultati per sito", "Ricette raggruppate per fonte, senza taglio globale a 10.",
             "recipe-sites") { showRecipeResults(lastSearchResults) }
-        val confirmedCount = items.count { it.verified }
+        val visible = filterByType(items)
+        val confirmedCount = visible.count { it.verified }
+        val completeCount = visible.count { it.verified &&
+            RecipeValidation.containsEvery(it.ingredients, searchIngredients) }
         label("Ingrediente principale: " + RecipeValidation.mainIngredient(searchIngredients), 15f, true)
-        label(confirmedCount.toString() + " ricette verificate · " +
-            (items.size - confirmedCount) + " collegamenti da controllare", 17f, true)
+        label("Tipologia richiesta: " + searchType, 14f, true)
+        RecipeTypeFilter.warning(searchType).takeIf { it.isNotBlank() }?.let { label("⚠ " + it, 13f) }
+        label(completeCount.toString() + " ricette con tutti gli ingredienti · " +
+            (confirmedCount - completeCount) + " con ingredienti parziali", 14f)
+        label(confirmedCount.toString() + " schede con ingredienti leggibili · " +
+            (visible.size - confirmedCount) + " collegamenti da controllare", 16f, true)
         label("Ricette singole, ordinate per fonte e per ingrediente principale. La dicitura 'Da controllare' appare solo se non è stato possibile leggere la pagina: gli ingredienti secondari restano da verificare.", 13f)
         actionRow("🔎 Modifica ricerca", { showSearch() },
             "⚙ Fonti e priorità", { showSourceSettings() })
-        if (items.isEmpty()) {
+        if (visible.isEmpty()) {
             label("Nessuna ricetta verificata per gli ingredienti indicati. Alcuni siti potrebbero bloccare la lettura automatica: puoi richiedere altre pagine per un sito oppure aprirlo manualmente.", 14f)
         }
         if (RecipeSources.sites.isEmpty()) {
             action("＋ Aggiungi un sito di ricette") { showSourceSettings() }
         }
         RecipeSources.sites.entries.forEachIndexed { index, (name, domain) ->
-            val siteRecipes = RecipeSourcePages.forSource(items, domain)
+            val siteRecipes = RecipeSourcePages.forSource(visible, domain)
             label((index + 1).toString() + "ª fonte · " + name, 18f, true)
-            label(domain + " · " + siteRecipes.count { it.verified } +
-                " verificate · " + siteRecipes.count { !it.verified } + " da controllare", 13f)
+            label(domain + " · " + siteRecipes.count { it.verified &&
+                RecipeValidation.containsEvery(it.ingredients, searchIngredients) } +
+                " complete · " + siteRecipes.count { it.verified &&
+                !RecipeValidation.containsEvery(it.ingredients, searchIngredients) } +
+                " parziali · " + siteRecipes.count { !it.verified } + " da controllare", 13f)
             if (siteRecipes.isNotEmpty()) {
                 siteRecipes.take(3).forEach { item ->
                     label((if (item.verified) "✅ " else "🔎 ") + item.title, 14f)
@@ -1447,7 +1587,7 @@ class MainActivity : Activity() {
 
     /** Pagination belongs to one website, not the complete search. */
     private fun showSiteRecipeResults(site: String, domain: String, offset: Int = 0) {
-        val items = RecipeSourcePages.forSource(lastSearchResults, domain)
+        val items = RecipeSourcePages.forSource(filterByType(lastSearchResults), domain)
         if (items.isEmpty()) {
             showRecipeResults(lastSearchResults)
             return
@@ -1488,7 +1628,8 @@ class MainActivity : Activity() {
                 val found = RecipeValidation.foundIngredients(recipe.ingredients, searchIngredients)
                 val pending = RecipeValidation.missingIngredients(recipe.ingredients, searchIngredients)
                 text = if (recipe.verified) {
-                    "✓ Ingredienti verificati: " + found.joinToString(", ") +
+                    (if (pending.isEmpty()) "✓ Corrispondenza completa. " else "⚠ Corrispondenza parziale. ") +
+                        "Ingredienti trovati: " + found.joinToString(", ") +
                         (if (pending.isEmpty()) "" else "\nNon trovati: " + pending.joinToString(", "))
                 } else {
                     "Da controllare: pagina non leggibile durante la ricerca. " +
@@ -1501,6 +1642,10 @@ class MainActivity : Activity() {
             })
             val differences = if (recipe.verified) RecipePreferences.notices(
                 recipe, searchCategory, searchDifficulty, searchDuration) else emptyList()
+            if (recipe.verified && searchType != "Qualsiasi") row.addView(TextView(this).apply {
+                text = "Tipologia: " + searchType + " (verifica sull'elenco pubblicato)"
+                textSize = 12f; setTextColor(familyDeep)
+            })
             if (differences.isNotEmpty()) row.addView(TextView(this).apply {
                 text = differences.joinToString("\n") { "⚠ " + it }
                 textSize = 13f; setTextColor(Color.rgb(139, 79, 15))
@@ -1579,7 +1724,7 @@ class MainActivity : Activity() {
                         ". Prova la ricerca manuale.", Toast.LENGTH_LONG).show()
                 } else {
                     val oldCount = lastSearchResults.count { RecipeSources.belongs(it.url, domain) }
-                    lastSearchResults = RecipeRanking.order(lastSearchResults + fresh, ingredients)
+                    lastSearchResults = RecipeRanking.orderFlexible(lastSearchResults + fresh, ingredients)
                     showSiteRecipeResults(site, domain, (oldCount / 10) * 10)
                 }
                 if (fresh.isEmpty()) showRecipeResults(lastSearchResults)
@@ -1623,6 +1768,15 @@ class MainActivity : Activity() {
                 if (!imported && (recipe.verified || fullMatch)) {
                     RecipePreferences.notices(recipe, searchCategory, searchDifficulty, searchDuration)
                         .forEach { label("⚠ " + it, 13f) }
+                }
+                if (!imported) {
+                    label("Link diretto alla ricetta:", 14f, true)
+                    action("🌐 Apri la ricetta originale su " + recipe.source) {
+                        openWeb(recipe.url)
+                    }
+                    label(recipe.url, 12f)
+                    if (searchType != "Qualsiasi") label("Tipologia richiesta: " + searchType +
+                        ". " + RecipeTypeFilter.warning(searchType), 13f)
                 }
                 label("Giorno scelto: " + selectedDate.format(dateFormatter), 14f)
                 val imageUrl = result.imageUrl.ifBlank { recipe.imageUrl }
@@ -1975,7 +2129,8 @@ class MainActivity : Activity() {
             }
         }
         if ((requestCode == MAGAZINE_PAGES_REQUEST || requestCode == DISH_PHOTOS_REQUEST) && resultCode == RESULT_OK) {
-            val kind = if (requestCode == MAGAZINE_PAGES_REQUEST) "scan" else "dish"
+            val kind = if (requestCode == MAGAZINE_PAGES_REQUEST)
+                "scan:" + pendingGalleryRole else "dish"
             val uris = mutableListOf<Uri>()
             data?.clipData?.let { clip ->
                 for (index in 0 until clip.itemCount.coerceAtMost(20)) uris.add(clip.getItemAt(index).uri)
@@ -1990,7 +2145,7 @@ class MainActivity : Activity() {
             pendingCameraKind = "cover"
             try {
                 if (resultCode == RESULT_OK && temporary?.isFile == true && temporary.length() > 0L) {
-                    if (kind == "scan" || kind == "dish") addMagazineImage(Uri.fromFile(temporary), kind)
+                    if (kind.startsWith("scan") || kind == "dish") addMagazineImage(Uri.fromFile(temporary), kind)
                     else {
                         selectedPhoto = compressPhoto(Uri.fromFile(temporary))
                         refreshPhotoPreview()
@@ -2015,14 +2170,35 @@ class MainActivity : Activity() {
         val bitmap = resolver.openInputStream(uri).use { stream ->
             BitmapFactory.decodeStream(stream, null, decoding)
         } ?: throw IllegalStateException("Foto non valida")
-        val ratio = minOf(1.0, maxEdge.toDouble() / maxOf(bitmap.width, bitmap.height))
-        val resized = if (ratio < 1.0) Bitmap.createScaledBitmap(bitmap,
-            (bitmap.width * ratio).toInt().coerceAtLeast(1),
-            (bitmap.height * ratio).toInt().coerceAtLeast(1), true) else bitmap
+        // Phone cameras often store rotation as EXIF instead of rotated pixel data.
+        // Correct it before compressing: otherwise ML Kit reads a sideways magazine.
+        val rotation = try {
+            contentResolver.openInputStream(uri)?.use { stream ->
+                val exif = androidx.exifinterface.media.ExifInterface(stream)
+                when (exif.getAttributeInt(
+                    androidx.exifinterface.media.ExifInterface.TAG_ORIENTATION,
+                    androidx.exifinterface.media.ExifInterface.ORIENTATION_NORMAL
+                )) {
+                    androidx.exifinterface.media.ExifInterface.ORIENTATION_ROTATE_90 -> 90f
+                    androidx.exifinterface.media.ExifInterface.ORIENTATION_ROTATE_180 -> 180f
+                    androidx.exifinterface.media.ExifInterface.ORIENTATION_ROTATE_270 -> 270f
+                    else -> 0f
+                }
+            } ?: 0f
+        } catch (_: Exception) { 0f }
+        val upright = if (rotation != 0f) {
+            Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height,
+                android.graphics.Matrix().apply { postRotate(rotation) }, true)
+        } else bitmap
+        val ratio = minOf(1.0, maxEdge.toDouble() / maxOf(upright.width, upright.height))
+        val resized = if (ratio < 1.0) Bitmap.createScaledBitmap(upright,
+            (upright.width * ratio).toInt().coerceAtLeast(1),
+            (upright.height * ratio).toInt().coerceAtLeast(1), true) else upright
         val folder = File(filesDir, "photos").apply { mkdirs() }
         val file = File(folder, UUID.randomUUID().toString() + ".jpg")
         FileOutputStream(file).use { resized.compress(Bitmap.CompressFormat.JPEG, 75, it) }
-        if (resized !== bitmap) bitmap.recycle()
+        if (resized !== upright) upright.recycle()
+        if (upright !== bitmap) bitmap.recycle()
         resized.recycle()
         return file.absolutePath
     }

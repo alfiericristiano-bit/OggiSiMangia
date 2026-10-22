@@ -121,7 +121,8 @@ object RecipeDiscovery {
         return found.maxByOrNull { it.optJSONArray("recipeIngredient")?.length() ?: 0 }
     }
 
-    internal fun preview(html: String, link: String, site: String, ingredients: String): WebRecipe? {
+    internal fun preview(html: String, link: String, site: String, ingredients: String,
+                         allowPartial: Boolean = false): WebRecipe? {
         if (!RecipeSources.trusted(link)) return null
         val recipe = schema(html) ?: return null // Reject articles and category pages.
         fun clean(s: String) = Jsoup.parse(s).text()
@@ -130,7 +131,9 @@ object RecipeDiscovery {
         val reader = RecipeReader.parse(recipe)
         val description = clean(recipe.optString("description")).take(240)
         if (!RecipeValidation.isDish(title, reader.ingredients, reader.original) ||
-            !RecipeValidation.containsEvery(reader.ingredients, ingredients)) return null
+            !(if (allowPartial) RecipeValidation.containsEvery(reader.ingredients,
+                RecipeValidation.mainIngredient(ingredients))
+              else RecipeValidation.containsEvery(reader.ingredients, ingredients))) return null
         val relevance = RecipeRanking.relevance(reader.ingredients, ingredients)
         val aggregate = recipe.optJSONObject("aggregateRating")
         fun number(key: String) = aggregate?.optString(key)?.replace(',', '.')?.toDoubleOrNull()
@@ -179,7 +182,7 @@ object RecipeDiscovery {
         return try {
             val jobs = hits.take(12).map { candidate -> Callable {
                 try {
-                    preview(download(candidate.url), candidate.url, candidate.site, ingredients)
+                    preview(download(candidate.url), candidate.url, candidate.site, ingredients, allowPartial = true)
                 } catch (_: Exception) {
                     // Network/robots/timeouts: only a plausible dish using the main
                     // ingredient is shown as genuinely not yet verified.
@@ -191,7 +194,7 @@ object RecipeDiscovery {
                     if (future.isCancelled) pendingPreview(hits[index], ingredients) else future.get()
                 } catch (_: Exception) { pendingPreview(hits[index], ingredients) }
             }
-            RecipeRanking.order(checked, ingredients)
+            RecipeRanking.orderFlexible(checked, ingredients)
         } finally { pool.shutdownNow() }
     }
 
@@ -228,7 +231,7 @@ object RecipeDiscovery {
                 .distinctBy { it.url.substringBefore('?').substringBefore('#').trimEnd('/') }
             val checks = candidates.map { candidate -> Callable {
                 try {
-                    preview(download(candidate.url), candidate.url, candidate.site, ingredients)
+                    preview(download(candidate.url), candidate.url, candidate.site, ingredients, allowPartial = true)
                 } catch (_: Exception) {
                     pendingPreview(candidate, ingredients)
                 }
@@ -240,7 +243,7 @@ object RecipeDiscovery {
                     else future.get()
                 } catch (_: Exception) { pendingPreview(candidates[index], ingredients) }
             }
-            return RecipeRanking.order(all, ingredients)
+            return RecipeRanking.orderFlexible(all, ingredients)
         } finally { executor.shutdownNow() }
     }
 }

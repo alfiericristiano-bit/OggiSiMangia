@@ -84,7 +84,7 @@ object RecipeFinder {
                     val html = Jsoup.connect(candidate.url)
                         .userAgent("Mozilla/5.0 (Android; OggiSiMangia/1.8.1)")
                         .timeout(7500).maxBodySize(2_000_000).get().outerHtml()
-                    RecipeDiscovery.preview(html, candidate.url, candidate.source, ingredients)
+                    RecipeDiscovery.preview(html, candidate.url, candidate.source, ingredients, allowPartial = true)
                 } catch (_: Exception) {
                     if (RecipeValidation.mentionsMainInTitle(candidate.title, ingredients))
                         candidate.copy(verified = false) else null
@@ -107,7 +107,7 @@ object RecipeFinder {
         } finally { pool.shutdownNow() }
 
         // Category, difficulty and duration remain preferences, not exclusions.
-        return RecipeRanking.order(verified, ingredients)
+        return RecipeRanking.orderFlexible(verified, ingredients)
     }
 
     private fun extract(doc: Document, source: String): List<WebRecipe> {
