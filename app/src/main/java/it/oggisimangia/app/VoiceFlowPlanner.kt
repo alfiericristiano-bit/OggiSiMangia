@@ -24,22 +24,21 @@ object VoiceFlowPlanner {
         // Ask for the missing part of an actionable goal rather than guessing.
         for ((index, raw) in statements.withIndex()) {
             val clause = raw.lowercase(Locale.ITALIAN).trim()
-            if (Regex("^(?:organizza|organizzami|prepara|preparami|pianifica|proponi|suggerisci)\\\\b").containsMatchIn(clause) &&
-                Regex("\\\\b(?:pranzo|cena)\\\\b").containsMatchIn(clause) &&
-                Regex("^(?:organizza|organizzami|prepara|preparami|proponi|suggerisci)").containsMatchIn(clause) &&
-                !Regex("\\\\b(?:con|a base di|usando)\\\\s+").containsMatchIn(clause)) {
+            if (Regex("^(?:organizza|organizzami|prepara|preparami|proponi|suggerisci)\\b").containsMatchIn(clause) &&
+                Regex("\\b(?:pranzo|cena)\\b").containsMatchIn(clause) &&
+                !Regex("\\b(?:con|a base di|usando)\\s+").containsMatchIn(clause)) {
                 return VoicePlan(emptyList(),
-                    "Nel passaggio ${index + 1}, quale ingrediente principale vuoi usare per questo pasto?")
+                    "Nel passaggio \${index + 1}, quale ingrediente principale vuoi usare per questo pasto?")
             }
-            if (Regex("^(?:pianifica|metti|aggiungi|programma)\\\\s+").containsMatchIn(clause) &&
-                !Regex("\\\\b(?:pranzo|cena)\\\\b").containsMatchIn(clause)) {
+            if (Regex("^(?:pianifica|metti|aggiungi|programma)\\s+").containsMatchIn(clause) &&
+                !Regex("\\b(?:pranzo|cena)\\b").containsMatchIn(clause)) {
                 return VoicePlan(emptyList(),
-                    "Nel passaggio ${index + 1}, vuoi pianificare la ricetta per pranzo o per cena?")
+                    "Nel passaggio \${index + 1}, vuoi pianificare la ricetta per pranzo o per cena?")
             }
-            if (Regex("\\\\b(?:oggi|domani|dopodomani)\\\\b").containsMatchIn(clause) &&
-                Regex("\\\\bieri\\\\b").containsMatchIn(clause)) {
+            if (Regex("\\b(?:oggi|domani|dopodomani)\\b").containsMatchIn(clause) &&
+                Regex("\\bieri\\b").containsMatchIn(clause)) {
                 return VoicePlan(emptyList(),
-                    "Nel passaggio ${index + 1}, hai indicato giorni in conflitto: quale giorno intendi?")
+                    "Nel passaggio \${index + 1}, hai indicato giorni in conflitto: quale giorno intendi?")
             }
         }
         val actions = statements.map { VoiceCommands.parse(it, today) }
