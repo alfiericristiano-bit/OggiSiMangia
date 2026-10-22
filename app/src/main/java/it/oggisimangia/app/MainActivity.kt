@@ -70,6 +70,9 @@ class MainActivity : Activity() {
     private var pendingCameraPath: String? = null
     private var lastSearchResults: List<WebRecipe> = emptyList()
     private var lastSearchOffset = 0
+    private val siteMorePages = mutableMapOf<String, Int>()
+    private val siteResultsExhausted = mutableSetOf<String>()
+    private var searchResultGeneration = 0
     private var photoLabel: TextView? = null
     private val expandedMeals = mutableSetOf<String>()
     private var currentPageKey = ""
@@ -1157,6 +1160,11 @@ class MainActivity : Activity() {
 
         primaryAction("🔎 CERCA RICETTE NEI SITI") search@{
             searchIngredients = ingredients.query() ?: return@search
+            searchResultGeneration++
+            val generation = searchResultGeneration
+            siteMorePages.clear()
+            siteResultsExhausted.clear()
+            lastSearchResults = emptyList()
             searchCategory = category.selectedItem.toString()
             searchDifficulty = difficulty.selectedItem.toString()
             searchDuration = duration.selectedItem.toString()
@@ -1192,16 +1200,7 @@ class MainActivity : Activity() {
                 runOnUiThread {
                     if (isFinishing || isDestroyed) return@runOnUiThread
                     progress.dismiss()
-                    if (results.isEmpty()) {
-                        AlertDialog.Builder(this)
-                            .setTitle("Nessuna ricetta verificabile")
-                            .setMessage("Non ho potuto verificare ricette con tutti gli ingredienti richiesti. " +
-                                "Questo non significa che non esistano: alcuni siti potrebbero " +
-                                "non rispondere o bloccare la consultazione automatica. " +
-                                "Puoi riprovare, cercare direttamente sui siti oppure importare un link.")
-                            .setNeutralButton("Cerca sui siti") { _, _ -> showSitePicker(selectedIngredients) }
-                            .setPositiveButton("Chiudi", null).show()
-                    } else showRecipeResults(results)
+                    if (generation == searchResultGeneration) showRecipeResults(results)
                 }
             }.start()
         }
@@ -1356,12 +1355,58 @@ class MainActivity : Activity() {
             .setNegativeButton("Chiudi", null).show()
     }
 
+
+    /** First show the configured sites separately in their saved priority order. */
     private fun showRecipeResults(items: List<WebRecipe>, offset: Int = 0) {
-        if (items.isEmpty()) return
+        lastSearchResults = items
+        lastSearchOffset = 0
+        screen("Risultati per sito", "Ricette raggruppate per fonte, senza taglio globale a 10.",
+            "recipe-sites") { showRecipeResults(lastSearchResults) }
+        label("Trovate " + items.size + " ricette da " + RecipeSources.sites.size + " fonti.", 17f, true)
+        label("Apri un sito per vedere le sue ricette, 10 alla volta. Da ogni elenco puoi selezionare una ricetta, salvarla o assegnarla al calendario.", 13f)
+        actionRow("🔎 Modifica ricerca", { showSearch() },
+            "⚙ Fonti e priorità", { showSourceSettings() })
+        if (items.isEmpty()) {
+            label("Nessuna ricetta verificata per gli ingredienti indicati. Alcuni siti potrebbero bloccare la lettura automatica: puoi richiedere altre pagine per un sito oppure aprirlo manualmente.", 14f)
+        }
+        if (RecipeSources.sites.isEmpty()) {
+            action("＋ Aggiungi un sito di ricette") { showSourceSettings() }
+        }
+        RecipeSources.sites.entries.forEachIndexed { index, (name, domain) ->
+            val siteRecipes = items.filter { RecipeSources.belongs(it.url, domain) }
+            label((index + 1).toString() + "ª fonte · " + name, 18f, true)
+            label(domain + " · " + siteRecipes.size + " ricette verificate", 13f)
+            if (siteRecipes.isNotEmpty()) {
+                siteRecipes.take(3).forEach { item ->
+                    label("🍽 " + item.title, 14f)
+                }
+                action("📚 Sfoglia " + name + " (" + siteRecipes.size + " ricette)") {
+                    showSiteRecipeResults(name, domain, 0)
+                }
+            } else {
+                label("Nessuna proposta verificata da questo sito al momento.", 13f)
+            }
+            if (name !in siteResultsExhausted) {
+                action("＋ Cerca altre ricette su " + name) {
+                    searchMoreRecipesOnSite(name, domain)
+                }
+            }
+            action("🌐 Cerca manualmente su " + name) {
+                openWeb(RecipeSearchQueries.bing(domain, searchIngredients))
+            }
+        }
+    }
+
+    /** Pagination belongs to one website, not the complete search. */
+    private fun showSiteRecipeResults(site: String, domain: String, offset: Int = 0) {
+        val items = lastSearchResults.filter { RecipeSources.belongs(it.url, domain) }
+        if (items.isEmpty()) {
+            showRecipeResults(lastSearchResults)
+            return
+        }
         val start = offset.coerceIn(0, items.lastIndex)
         val page = items.drop(start).take(10)
         val end = start + page.size
-        lastSearchResults = items
         lastSearchOffset = start
         val scroll = ScrollView(this)
         val rows = LinearLayout(this).apply {
@@ -1370,38 +1415,31 @@ class MainActivity : Activity() {
         }
         scroll.addView(rows)
         val popup = AlertDialog.Builder(this)
-            .setTitle("Ricette ${start + 1}–$end di ${items.size}")
+            .setTitle(site + " · " + (start + 1) + "–" + end + " di " + items.size)
             .setView(scroll)
-            .setNegativeButton("Chiudi", null)
+            .setNegativeButton("Tutti i siti") { _, _ -> showRecipeResults(lastSearchResults) }
             .setPositiveButton("Prossime 10") { _, _ ->
-                showRecipeResults(items, end)
+                if (end < items.size) showSiteRecipeResults(site, domain, end)
+                else searchMoreRecipesOnSite(site, domain)
             }
             .setNeutralButton("Precedenti 10") { _, _ ->
-                showRecipeResults(items, (start - 10).coerceAtLeast(0))
-            }
-            .create()
+                showSiteRecipeResults(site, domain, (start - 10).coerceAtLeast(0))
+            }.create()
         for (recipe in page) {
             val row = LinearLayout(this).apply {
                 orientation = LinearLayout.VERTICAL
                 setPadding(dp(12), dp(10), dp(12), dp(12))
                 background = shape(Color.rgb(242, 248, 245), 12f)
             }
-            val heading = TextView(this).apply {
-                text = recipe.title
-                textSize = 17f
-                setTypeface(null, Typeface.BOLD)
-                setTextColor(Color.rgb(21, 103, 91))
-            }
-            row.addView(heading)
+            row.addView(TextView(this).apply {
+                text = recipe.title; textSize = 17f
+                setTypeface(null, Typeface.BOLD); setTextColor(familyDeep)
+            })
             val differences = RecipePreferences.notices(recipe, searchCategory, searchDifficulty, searchDuration)
-            if (differences.isNotEmpty()) {
-                row.addView(TextView(this).apply {
-                    text = differences.joinToString("\n") { "⚠ " + it }
-                    textSize = 13f
-                    setTextColor(Color.rgb(139, 79, 15))
-                    setPadding(0, dp(4), 0, dp(4))
-                })
-            }
+            if (differences.isNotEmpty()) row.addView(TextView(this).apply {
+                text = differences.joinToString("\n") { "⚠ " + it }
+                textSize = 13f; setTextColor(Color.rgb(139, 79, 15))
+            })
             if (recipe.imageUrl.isNotBlank()) {
                 val preview = ImageView(this).apply {
                     scaleType = ImageView.ScaleType.CENTER_CROP
@@ -1410,58 +1448,76 @@ class MainActivity : Activity() {
                 row.addView(preview, LinearLayout.LayoutParams(-1, dp(130)))
                 fetchPreview(recipe.imageUrl, preview)
             }
-            val details = listOfNotNull(
-                recipe.source,
-                recipe.minutes?.let { "⏱ " + it + " min" },
-                recipe.difficulty.takeIf { it.isNotBlank() },
-                recipe.rating?.let { "⭐ " + it },
-                recipe.feedbackCount?.let { it.toString() + " voti/recensioni" }
-            ).joinToString(" · ")
             row.addView(TextView(this).apply {
-                text = details
-                textSize = 13f
-                setTextColor(Color.DKGRAY)
+                text = listOfNotNull(
+                    recipe.minutes?.let { "⏱ " + it + " min" },
+                    recipe.difficulty.takeIf { it.isNotBlank() },
+                    recipe.rating?.let { "⭐ " + it },
+                    recipe.feedbackCount?.let { it.toString() + " voti/recensioni" }
+                ).joinToString(" · ")
+                textSize = 13f; setTextColor(Color.DKGRAY)
             })
-            if (recipe.summary.isNotBlank()) {
-                row.addView(TextView(this).apply {
-                    text = recipe.summary
-                    setPadding(0, dp(5), 0, dp(5))
-                    textSize = 14f
-                })
-            }
-            val buttons = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-            buttons.addView(Button(this).apply {
-                text = "👀 Scheda"
+            if (recipe.summary.isNotBlank()) row.addView(TextView(this).apply {
+                text = recipe.summary; textSize = 14f
+                setPadding(0, dp(5), 0, dp(5))
+            })
+            row.addView(Button(this).apply {
+                text = "👀 Apri scheda · Salva o pianifica"
                 isAllCaps = false
                 setOnClickListener { popup.dismiss(); showOnlineDetail(recipe) }
-            }, LinearLayout.LayoutParams(0, dp(44), 1f))
-            buttons.addView(Button(this).apply {
-                text = "💾 Salva"
-                isAllCaps = false
-                setOnClickListener {
-                    popup.dismiss()
-                    showOnlineDetail(recipe)
-                }
-            }, LinearLayout.LayoutParams(0, dp(44), 1f))
-            row.addView(buttons)
-            rows.addView(row, LinearLayout.LayoutParams(-1, -2).apply {
-                bottomMargin = dp(12)
-            })
-        }
-        if (end == items.size) {
-            rows.addView(TextView(this).apply {
-                text = "Non ci sono altre ricette disponibili per questa ricerca. Puoi cambiare ingredienti o filtri."
-                textSize = 14f
-                setPadding(dp(8), dp(8), dp(8), dp(8))
-            })
+            }, LinearLayout.LayoutParams(-1, dp(44)))
+            rows.addView(row, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(12) })
         }
         popup.show()
-        popup.getButton(AlertDialog.BUTTON_POSITIVE).isEnabled = end < items.size
-        popup.getButton(AlertDialog.BUTTON_NEUTRAL).visibility = if (start > 0) View.VISIBLE else View.GONE
+        popup.getButton(AlertDialog.BUTTON_POSITIVE).text =
+            if (end < items.size) "Prossime 10" else "Cerca altre"
+        popup.getButton(AlertDialog.BUTTON_POSITIVE).isEnabled =
+            end < items.size || site !in siteResultsExhausted
+        popup.getButton(AlertDialog.BUTTON_NEUTRAL).visibility =
+            if (start > 0) View.VISIBLE else View.GONE
         popup.window?.setLayout(
             android.view.ViewGroup.LayoutParams.MATCH_PARENT,
             (resources.displayMetrics.heightPixels * 0.83).toInt()
         )
+    }
+
+    /** Discover more on the selected website only; all other results remain available. */
+    private fun searchMoreRecipesOnSite(site: String, domain: String) {
+        if (RecipeSources.sites[site] != domain) return
+        val generation = searchResultGeneration
+        val nextPage = siteMorePages[site] ?: 1
+        val ingredients = searchIngredients
+        val progress = AlertDialog.Builder(this)
+            .setTitle("Altre ricette da " + site)
+            .setMessage("Consulto la pagina successiva di questa fonte...")
+            .setCancelable(false).create()
+        progress.show()
+        Thread {
+            val more = try { RecipeDiscovery.searchNextPage(ingredients, site, domain, nextPage) }
+                catch (_: Exception) { emptyList() }
+            runOnUiThread {
+                if (isFinishing || isDestroyed) return@runOnUiThread
+                progress.dismiss()
+                if (generation != searchResultGeneration || RecipeSources.sites[site] != domain) return@runOnUiThread
+                siteMorePages[site] = nextPage + 1
+                val old = lastSearchResults.map {
+                    it.url.substringBefore('?').substringBefore('#').trimEnd('/')
+                }.toSet()
+                val fresh = more.filter {
+                    it.url.substringBefore('?').substringBefore('#').trimEnd('/') !in old
+                }
+                if (fresh.isEmpty()) {
+                    siteResultsExhausted.add(site)
+                    Toast.makeText(this, "Non sono disponibili altre ricette verificate su " + site +
+                        ". Prova la ricerca manuale.", Toast.LENGTH_LONG).show()
+                } else {
+                    val oldCount = lastSearchResults.count { RecipeSources.belongs(it.url, domain) }
+                    lastSearchResults = RecipeRanking.order(lastSearchResults + fresh, ingredients)
+                    showSiteRecipeResults(site, domain, (oldCount / 10) * 10)
+                }
+                if (fresh.isEmpty()) showRecipeResults(lastSearchResults)
+            }
+        }.start()
     }
 
     private fun showOnlineDetail(sourceRecipe: WebRecipe, imported: Boolean = false) {
@@ -1527,7 +1583,7 @@ class MainActivity : Activity() {
                 }
                 action("💾 Salva ricetta") { chooseOnlineRecipe(recipe, result) }
                 if (lastSearchResults.isNotEmpty()) {
-                    action("← Torna ai risultati") { showRecipeResults(lastSearchResults, lastSearchOffset) }
+                    action("← Torna ai risultati") { showRecipeResults(lastSearchResults) }
                 }
                 action("🔎 Modifica ricerca") { showSearch() }
             }
