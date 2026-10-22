@@ -41,6 +41,7 @@ class MainActivity : Activity() {
     private lateinit var db: RecipeDb
     private lateinit var sourcePreferences: SourcePreferences
     private lateinit var nano: LocalNanoAssistant
+    private lateinit var voice: VoiceAssistantController
     private var nanoRequestedText = ""
     private var pendingReport: File? = null
     private lateinit var content: LinearLayout
@@ -123,6 +124,7 @@ class MainActivity : Activity() {
         RecipeSources.configure(sourcePreferences.load())
         nano = LocalNanoAssistant(this)
         nano.refresh()
+        voice = VoiceAssistantController(this) { command, done -> executeVoiceCommand(command, done) }
         window.statusBarColor = Color.rgb(45, 91, 61)
         window.navigationBarColor = Color.rgb(45, 91, 61)
         showSplash()
@@ -334,6 +336,14 @@ class MainActivity : Activity() {
             setTextColor(Color.rgb(88, 103, 94)); maxLines = 2
         })
         hero.addView(headerText, LinearLayout.LayoutParams(0, -2, 1f))
+        hero.addView(Button(this).apply {
+            text = "🎙"
+            textSize = 21f
+            isAllCaps = false
+            contentDescription = "Apri assistente vocale OggiSiMangia"
+            background = shape(familyPale, 14f)
+            setOnClickListener { voice.open() }
+        }, LinearLayout.LayoutParams(dp(48), dp(48)))
         content.addView(hero, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(9) })
         if (key != "calendar") {
             val back = Button(this).apply {
@@ -382,7 +392,7 @@ class MainActivity : Activity() {
         })
     }
 
-    private fun primaryAction(value: String, onClick: () -> Unit) {
+    private fun primaryAction(value: String, onClick: () -> Unit): Button {
         val btn = Button(this).apply {
             text = value; isAllCaps = false; textSize = 16f
             setTypeface(null, Typeface.BOLD)
@@ -397,6 +407,7 @@ class MainActivity : Activity() {
         content.addView(btn, LinearLayout.LayoutParams(-1, dp(54)).apply {
             topMargin = dp(7); bottomMargin = dp(9)
         })
+        return btn
     }
 
     /** Two related actions on one row; 48 dp touch targets remain accessible. */
@@ -1432,7 +1443,7 @@ class MainActivity : Activity() {
         )
     }
 
-    private fun showSearch() {
+    private fun showSearch(autoSearch: Boolean = false) {
         screen("Cerca ricetta", "Scopri nuove ricette dai tuoi ingredienti.",
             "search") { showSearch() }
         label("Giorno scelto: " + selectedDate.format(dateFormatter), 16f, true)
@@ -1456,7 +1467,7 @@ class MainActivity : Activity() {
         }
         label("Ingrediente principale obbligatorio. Le ricette con tutti gli ingredienti sono preferite; quelle parziali mostrano le differenze. Il filtro vegetariano/vegano e i filtri allergeni sono indicativi, non certificazioni.", 13f)
 
-        primaryAction("⌕  Cerca ricette") search@{
+        val voiceSearchButton = primaryAction("⌕  Cerca ricette") search@{
             searchIngredients = ingredients.query() ?: return@search
             searchResultGeneration++
             val generation = searchResultGeneration
@@ -1502,6 +1513,7 @@ class MainActivity : Activity() {
                 }
             }.start()
         }
+        if (autoSearch) voiceSearchButton.post { if (voiceSearchButton.isAttachedToWindow) voiceSearchButton.performClick() }
         actionRow("↻ Azzera ingredienti", {
             searchIngredients = ""
             showSearch()
@@ -2242,6 +2254,10 @@ class MainActivity : Activity() {
     @Deprecated("Activity result used for system photo picker compatibility")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == VoiceAssistantController.SPEECH_REQUEST) {
+            voice.onSpeechResult(resultCode, data)
+            return
+        }
         if (requestCode == PDF_REQUEST && resultCode == RESULT_OK) {
             val file = pendingReport ?: return
             val uri = data?.data ?: return
@@ -2338,6 +2354,7 @@ class MainActivity : Activity() {
     }
 
     override fun onDestroy() {
+        voice.close()
         nano.close()
         db.close()
         super.onDestroy()
