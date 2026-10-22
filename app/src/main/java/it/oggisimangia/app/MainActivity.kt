@@ -42,6 +42,7 @@ class MainActivity : Activity() {
     private lateinit var sourcePreferences: SourcePreferences
     private var pendingReport: File? = null
     private lateinit var content: LinearLayout
+    private lateinit var screenRoot: LinearLayout
     private var selectedDate = LocalDate.now()
     private var selectedMeal = "Pranzo"
     private var selectedAlternative = false
@@ -101,7 +102,7 @@ class MainActivity : Activity() {
         RecipeSources.configure(sourcePreferences.load())
         window.statusBarColor = Color.rgb(45, 91, 61)
         window.navigationBarColor = Color.rgb(45, 91, 61)
-        if (displayName().isBlank()) showNameIntroduction() else showCalendar()
+        showSplash()
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
@@ -110,6 +111,24 @@ class MainActivity : Activity() {
         super.onSaveInstanceState(outState)
     }
 
+
+    /** Opening illustration; returning users go back to their calendar. */
+    private fun showSplash() {
+        currentPageKey = "splash"
+        pageHistory.clear()
+        val layout = onboardingRoot("", "Le tue ricette ogni giorno")
+        layout.addView(TextView(this).apply {
+            text = "━━━━━  ●"
+            textSize = 18f
+            gravity = Gravity.CENTER
+            setTextColor(familyDeep)
+        }, LinearLayout.LayoutParams(-1, dp(38)))
+        android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+            if (!isFinishing && !isDestroyed) {
+                if (displayName().isBlank()) showNameIntroduction() else showCalendar()
+            }
+        }, 650L)
+    }
 
     private fun displayName(): String = getSharedPreferences("user_profile", MODE_PRIVATE)
         .getString("display_name", "").orEmpty().trim()
@@ -120,7 +139,7 @@ class MainActivity : Activity() {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER_HORIZONTAL
             setPadding(dp(24), dp(32), dp(24), dp(28))
-            setBackgroundColor(Color.rgb(250, 252, 244))
+            setBackgroundColor(Color.rgb(255, 250, 238))
         }
         wrapper.addView(layout)
         setContentView(wrapper)
@@ -162,10 +181,10 @@ class MainActivity : Activity() {
     private fun showNameIntroduction() {
         currentPageKey = "onboarding-name"
         pageHistory.clear()
-        val layout = onboardingRoot("Ciao! Come ti chiami?",
-            "Mettiamo il tuo nome sul menu, così ogni giornata in cucina inizia con un sorriso.")
+        val layout = onboardingRoot("Come ti chiami?",
+            "Così posso darti il benvenuto ogni volta che apri l’app!")
         val nameInput = EditText(this).apply {
-            hint = "Il tuo nome"
+            hint = "Il tuo nome..."
             setSingleLine(true)
             textSize = 18f
             setText(displayName())
@@ -200,8 +219,8 @@ class MainActivity : Activity() {
 
     private fun showPersonalWelcome(name: String = displayName()) {
         currentPageKey = "onboarding-welcome"
-        val layout = onboardingRoot("Benvenuto, $name! 🍃",
-            "Il tuo ricettario, il calendario dei pasti e le ricette fotografate sono pronti.")
+        val layout = onboardingRoot("Benvenuto, $name!",
+            "Da oggi organizzare i tuoi pasti sarà più semplice e gustoso!")
         layout.addView(TextView(this).apply {
             text = "📅  Pianifica i pasti    🍝  Scopri ricette    📷  Digitalizza le riviste"
             textSize = 14f
@@ -209,7 +228,7 @@ class MainActivity : Activity() {
             setTextColor(Color.rgb(55, 92, 63))
         })
         layout.addView(Button(this).apply {
-            text = "Inizia a cucinare  →"
+            text = "Inizia  →"
             isAllCaps = false
             textSize = 17f
             setTextColor(Color.WHITE)
@@ -240,11 +259,11 @@ class MainActivity : Activity() {
         return super.dispatchTouchEvent(ev)
     }
 
-    /** FamilyChat visual tokens, used only by the UI; stored recipe data remains unchanged. */
-    private val familyTeal = Color.rgb(167, 193, 96)
-    private val familyDeep = Color.rgb(45, 91, 61)
-    private val familyInk = Color.rgb(42, 57, 43)
-    private val familyPale = Color.rgb(241, 247, 226)
+    /** Palette used by the approved thirteen-screen mockup. */
+    private val familyTeal = Color.rgb(41, 163, 65)
+    private val familyDeep = Color.rgb(21, 123, 52)
+    private val familyInk = Color.rgb(15, 47, 48)
+    private val familyPale = Color.rgb(239, 248, 237)
     private fun shape(color: Int, radius: Float = 16f): GradientDrawable =
         GradientDrawable().apply { setColor(color); cornerRadius = dp(radius.toInt()).toFloat() }
     private fun outlined(color: Int = Color.WHITE, radius: Float = 12f): GradientDrawable =
@@ -259,7 +278,7 @@ class MainActivity : Activity() {
         currentPageRestore = restore
         val background = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setBackgroundColor(Color.rgb(249, 250, 245))
+            setBackgroundColor(Color.rgb(255, 250, 241))
         }
         val scroll = ScrollView(this).apply { isFillViewport = true }
         content = LinearLayout(this).apply {
@@ -267,39 +286,32 @@ class MainActivity : Activity() {
             setPadding(dp(12), dp(10), dp(12), dp(22))
         }
         scroll.addView(content)
-        background.addView(scroll)
+        screenRoot = background
+        background.addView(scroll, LinearLayout.LayoutParams(-1, 0, 1f))
         setContentView(background)
-        // FamilyChat-inspired teal brand header with rounded corners and native controls.
+        // Compact white top bar and rounded cards from the approved previews.
         val hero = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
-            setPadding(dp(13), dp(10), dp(13), dp(11))
-            this.background = GradientDrawable(GradientDrawable.Orientation.TL_BR,
-                intArrayOf(familyTeal, Color.rgb(207, 224, 154))).apply {
-                cornerRadius = dp(22).toFloat()
-            }
-            elevation = dp(3).toFloat()
+            setPadding(dp(12), dp(7), dp(12), dp(8))
+            background = outlined(Color.WHITE, 17f)
         }
         hero.addView(ImageView(this).apply {
             setImageResource(R.drawable.app_icon_clean)
             scaleType = ImageView.ScaleType.FIT_CENTER
             contentDescription = "OggiSiMangia: calendario e piatto"
-        }, LinearLayout.LayoutParams(dp(44), dp(44)).apply { marginEnd = dp(8) })
+        }, LinearLayout.LayoutParams(dp(32), dp(32)).apply { marginEnd = dp(9) })
         val headerText = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         headerText.addView(TextView(this).apply {
-            text = "OggiSiMangia..."; textSize = 21f
+            text = title; textSize = 19f
             setTextColor(familyInk); setTypeface(null, Typeface.BOLD)
         })
-        headerText.addView(TextView(this).apply {
-            text = title; textSize = 15f; setTextColor(familyInk)
-            setTypeface(null, Typeface.BOLD)
-        })
-        headerText.addView(TextView(this).apply {
+        if (subtitle.isNotBlank()) headerText.addView(TextView(this).apply {
             text = subtitle; textSize = 11f
-            setTextColor(familyDeep); maxLines = 3
+            setTextColor(Color.rgb(88, 103, 94)); maxLines = 2
         })
         hero.addView(headerText, LinearLayout.LayoutParams(0, -2, 1f))
-        content.addView(hero, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(7) })
+        content.addView(hero, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(9) })
         if (key != "calendar") {
             val back = Button(this).apply {
                 text = "‹  Indietro"
@@ -310,7 +322,7 @@ class MainActivity : Activity() {
             }
             content.addView(back, LinearLayout.LayoutParams(-1, dp(44)).apply { bottomMargin = dp(6) })
         }
-        navigation(title)
+        navigation(key)
     }
 
     private fun goBack() {
@@ -353,7 +365,7 @@ class MainActivity : Activity() {
             setTypeface(null, Typeface.BOLD)
             setTextColor(Color.WHITE)
             background = GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT,
-                intArrayOf(familyDeep, Color.rgb(20, 150, 126))).apply {
+                intArrayOf(Color.rgb(51, 181, 58), Color.rgb(18, 136, 60))).apply {
                 cornerRadius = dp(19).toFloat()
             }
             elevation = dp(4).toFloat()
@@ -430,37 +442,65 @@ class MainActivity : Activity() {
         return spinner
     }
 
-    private fun navigation(title: String) {
+    /** Fixed five-tab bottom navigation, outside the scrollable content. */
+    private fun navigation(key: String) {
         val nav = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
-            setPadding(dp(4), dp(4), dp(4), dp(4))
-            background = outlined(Color.WHITE, 15f)
+            gravity = Gravity.CENTER
+            setPadding(dp(3), dp(4), dp(3), dp(3))
+            background = outlined(Color.WHITE, 13f)
+            elevation = dp(4).toFloat()
         }
         val active = when {
-            title.contains("calendario", true) -> 0
-            title.contains("trova", true) || title.contains("ricerca", true) -> 1
-            title.contains("ricettario", true) -> 2
+            key == "calendar" -> 0
+            key == "archive" || key.startsWith("detail-") -> 1
+            key.startsWith("editor-") -> 2
+            key == "summary" -> 3
+            key == "sources" -> 4
             else -> -1
         }
-        listOf("📅 Calendario", "🔎 Cerca", "📚 Ricettario").forEachIndexed { index, name ->
-            val b = Button(this).apply {
-                text = name; isAllCaps = false; textSize = 11f
-                setPadding(dp(2), 0, dp(2), 0)
-                background = shape(if (active == index) Color.rgb(229,246,239) else Color.WHITE, 11f)
-                setTextColor(if (active == index) familyDeep else Color.rgb(93,118,112))
-                setTypeface(null, if (active == index) Typeface.BOLD else Typeface.NORMAL)
+        val destinations = listOf(
+            "▦" to "Calendario", "♧" to "Ricette", "⊕" to "Aggiungi",
+            "▤" to "Riepilogo", "•••" to "Altro"
+        )
+        destinations.forEachIndexed { index, destination ->
+            val selected = index == active
+            val cell = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                gravity = Gravity.CENTER
+                contentDescription = destination.second
+                isClickable = true
+                isFocusable = true
+                background = shape(if (selected) familyPale else Color.WHITE, 12f)
                 setOnClickListener {
                     hideKeyboard()
                     when (index) {
                         0 -> showCalendar()
-                        1 -> showSearch()
-                        else -> showArchive()
+                        1 -> showArchive()
+                        2 -> showEditor()
+                        3 -> showSummary()
+                        else -> showSourceSettings()
                     }
                 }
             }
-            nav.addView(b, LinearLayout.LayoutParams(0, dp(44), 1f))
+            cell.addView(TextView(this).apply {
+                text = destination.first
+                gravity = Gravity.CENTER
+                textSize = if (index == 4) 18f else 23f
+                setTextColor(if (selected) familyDeep else Color.rgb(92, 101, 96))
+            })
+            cell.addView(TextView(this).apply {
+                text = destination.second
+                gravity = Gravity.CENTER
+                textSize = 9f
+                setTextColor(if (selected) familyDeep else Color.rgb(92, 101, 96))
+                setTypeface(null, if (selected) Typeface.BOLD else Typeface.NORMAL)
+            })
+            nav.addView(cell, LinearLayout.LayoutParams(0, dp(58), 1f).apply {
+                if (index > 0) marginStart = dp(2)
+            })
         }
-        content.addView(nav, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(8) })
+        screenRoot.addView(nav, LinearLayout.LayoutParams(-1, -2))
     }
 
     private fun chooseDate(after: () -> Unit) {
