@@ -45,16 +45,16 @@
   }
   function formatDate(value, options) { return new Intl.DateTimeFormat("it-IT",options || {weekday:"long",day:"numeric",month:"long"}).format(fromISO(value)); }
   function uid() { return "r-"+Date.now().toString(36)+"-"+Math.random().toString(36).slice(2,8); }
-  const fresh = () => ({recipes:copy(INITIAL_RECIPES),sources:copy(DEFAULT_SOURCES),tipsHidden:false,dark:false});
+  const fresh = () => ({recipes:copy(INITIAL_RECIPES),sources:copy(DEFAULT_SOURCES),tipsHidden:false,dark:false,profileName:""});
   function load() {
     try {
       const saved=JSON.parse(localStorage.getItem(STORAGE)||"null");
       if (saved && Array.isArray(saved.recipes) && Array.isArray(saved.sources))
-        return {recipes:saved.recipes,sources:saved.sources,tipsHidden:!!saved.tipsHidden,dark:!!saved.dark};
+        return {recipes:saved.recipes,sources:saved.sources,tipsHidden:!!saved.tipsHidden,dark:!!saved.dark,profileName:typeof saved.profileName==="string"?saved.profileName:""};
     } catch(e) { /* Revert to demo without writing over unreadable saved data. */ }
     return fresh();
   }
-  let state=load(), view="calendar", selected=todayISO(), month=fromISO(todayISO());
+  let state=load(), view=(state.profileName?"calendar":"onboarding-name"), selected=todayISO(), month=fromISO(todayISO());
   let editingId=null,photoDraft="",formIngredients=[""],formSteps=[""];
   let scanDraft=[],dishDraft=[],scanOcrDraft="";
   let archiveSearch="",archiveCategory="Tutte",archiveIngredientFields=[""];
@@ -104,22 +104,45 @@
     render();
     restoringPage=false;
   }
+
+  function renderNameIntroduction() {
+    app.innerHTML='<section class="intro-card"><img src="./icon.svg" class="intro-symbol" alt="OggiSiMangia calendario e piatto">'+
+      '<p class="kicker">Benvenuto in OggiSiMangia...</p><h1>Come ti chiami? 🌿</h1>'+
+      '<p>Ci piace salutarti per nome quando organizzi i pasti e scopri nuove ricette!</p>'+
+      '<label class="field" for="onboard-name">Il tuo nome</label>'+
+      '<input class="input intro-name" id="onboard-name" autocomplete="given-name" placeholder="Scrivi il tuo nome" maxlength="40">'+
+      '<p id="onboard-error" class="intro-error" role="alert"></p>'+
+      button("Continua →","onboarding-continue","primary intro-go")+'</section>';
+  }
+
+  function renderPersonalWelcome() {
+    app.innerHTML='<section class="intro-card welcome-card"><p class="kicker">Il tuo menu, ogni giorno</p>'+
+      '<h1>Benvenuto, '+escape(state.profileName)+'! 🍃</h1>'+
+      '<div class="welcome-dish"><img src="./icon.svg" alt="Calendario di ricette, piatto di pasta e basilico">'+
+      '<span>🍅 &nbsp; 🥬 &nbsp; 🍝</span></div>'+
+      '<p>Un calendario da riempire, tante ricette da provare e persino le foto delle tue riviste da conservare.</p>'+
+      button("Inizia a cucinare →","onboarding-start","primary intro-go")+'</section>';
+  }
+
   function render() {
     if(previousView!==null && view!==previousView && !restoringPage) {
       pageHistory.push({view:previousView,recipeId:previousRecipeId});
       if(pageHistory.length>20)pageHistory.shift();
     }
     document.body.classList.toggle("dark",state.dark);
+    document.body.classList.toggle("onboarding",view==="onboarding-name"||view==="onboarding-welcome");
     document.querySelectorAll("[data-view]").forEach(btn=>btn.classList.toggle("active",btn.dataset.view===view));
     document.getElementById("today-caption").textContent=formatDate(todayISO(),{weekday:"long",day:"numeric",month:"long",year:"numeric"});
-    if(view==="calendar") renderCalendar();
+    if(view==="onboarding-name") renderNameIntroduction();
+    else if(view==="onboarding-welcome") renderPersonalWelcome();
+    else if(view==="calendar") renderCalendar();
     else if(view==="archive") renderArchive();
     else if(view==="planned") renderPlannedDays();
     else if(view==="editor") renderEditor();
     else if(view==="detail") renderDetail();
     else if(view==="sources") renderSources();
     else renderAbout();
-    if(view!=="calendar") {
+    if(view!=="calendar"&&view!=="onboarding-name"&&view!=="onboarding-welcome") {
       app.insertAdjacentHTML("afterbegin",'<div class="app-backbar">'+button("‹ Indietro","go-back","back-pill")+'</div>');
     }
     previousView=view;previousRecipeId=editingId;
@@ -164,7 +187,7 @@
     }
     app.innerHTML=
       '<section class="headline calendar-hero"><div><p class="kicker">Calendario dei pasti</p><h1>Organizza i tuoi pasti</h1><p class="subtitle">Tocca un giorno per selezionarlo; tienilo premuto a lungo per aggiungere un piatto.</p></div>'+
-      '<div class="head-actions">'+button("ⓘ Come funziona","show-help")+button("＋ Nuova ricetta","new-recipe","primary")+'</div></section>'+
+      '<div class="head-actions">'+button("🔎 Cerca ricetta","stat-recipes","primary") +button("＋ Nuova ricetta","new-recipe","soft")+button("ⓘ Aiuto","show-help")+'</div></section>'+
       '<div class="calendar-layout"><section class="card"><div class="card-head"><h2>Il tuo calendario</h2><div class="month-picker">'+
       button("‹","prev-month","icon")+'<strong>'+escape(new Intl.DateTimeFormat("it-IT",{month:"long",year:"numeric"}).format(first))+'</strong>'+button("›","next-month","icon")+'</div></div>'+
       '<div class="week-grid">'+["L","M","M","G","V","S","D"].map(s=>'<span>'+s+'</span>').join("")+'</div><div class="day-grid" id="calendar-grid">'+cells+'</div>'+
@@ -442,6 +465,19 @@
     const b=e.target.closest("[data-action]");if(!b)return;
     const action=b.dataset.action,id=b.dataset.id,aid=b.dataset.aid,idx=Number(b.dataset.index);
     if(action==="close-modal"){closeModal();return;}
+    if(action==="onboarding-continue"){
+      const input=document.getElementById("onboard-name");
+      const name=String(input?.value||"").trim().replace(/\s+/g," ");
+      if(!name||name.length>40){
+        document.getElementById("onboard-error").textContent="Inserisci un nome (massimo 40 caratteri).";
+        return;
+      }
+      state.profileName=name;
+      if(!persist())return;
+      view="onboarding-welcome";render();return;
+    }
+    if(action==="onboarding-start"){pageHistory.length=0;previousView=null;setView("calendar");return;}
+    if(action==="edit-profile"){setView("onboarding-name");return;}
     if(action==="scan-remove"){scanDraft.splice(idx,1);refreshScanPhotos();return;}
     if(action==="scan-as-dish"){
       if(scanDraft[idx]&&!dishDraft.some(x=>x.photo===scanDraft[idx]))dishDraft.push({photo:scanDraft[idx],keep:true});
