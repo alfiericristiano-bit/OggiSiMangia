@@ -124,7 +124,9 @@ class MainActivity : Activity() {
         RecipeSources.configure(sourcePreferences.load())
         nano = LocalNanoAssistant(this)
         nano.refresh()
-        voice = VoiceAssistantController(this) { command, done -> executeVoiceCommand(command, done) }
+        voice = VoiceAssistantController(this,
+            executor = { command, done -> executeVoiceCommand(command, done) },
+            aiInterpret = { phrase, done -> nano.interpretVoiceGoal(phrase, done) })
         window.statusBarColor = Color.rgb(45, 91, 61)
         window.navigationBarColor = Color.rgb(45, 91, 61)
         showSplash()
