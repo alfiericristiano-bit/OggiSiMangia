@@ -56,6 +56,7 @@
   }
   let state=load(), view="calendar", selected=todayISO(), month=fromISO(todayISO());
   let editingId=null,photoDraft="",formIngredients=[""],formSteps=[""];
+  let scanDraft=[],dishDraft=[],scanOcrDraft="";
   let archiveSearch="",archiveCategory="Tutte",archiveIngredientFields=[""];
   let expandedMeals=new Set();
   const pageHistory=[];
@@ -241,6 +242,16 @@
       field("cuisine","Cucina / provenienza",r.cuisine)+field("portions","Dosi / numero persone",r.portions)+
       field("author","Autore",r.author)+field("cost","Costo indicativo",r.cost)+
       field("tags","Etichette",r.tags)+field("allergens","Allergeni",r.allergens)+'</div>'+
+      '<div class="form-section scan-section"><h2>📖 Ricetta fotografata da rivista</h2>'+
+      '<p class="subtitle">Aggiungi una o più fotografie o pagine. Le immagini vengono salvate in locale. Il riconoscimento OCR automatico è disponibile nell’APK Android; qui puoi incollare una trascrizione e modificarla.</p>'+
+      '<div class="head-actions"><label class="btn">📷 Fotografa pagina<input type="file" id="scan-camera-input" accept="image/*" capture="environment" hidden></label>'+
+      '<label class="btn">🖼 Aggiungi più pagine<input type="file" id="scan-pages-input" accept="image/*" multiple hidden></label></div>'+
+      '<div id="scan-page-gallery" class="scan-gallery">'+scanPhotosElement()+'</div>'+
+      field("scanOcr","Testo OCR modificabile",scanOcrDraft,{textarea:true,wide:true,rows:5})+
+      '<p class="subtitle">Se hai soltanto le foto, puoi salvare la ricetta con il nome senza compilare ingredienti e passaggi.</p>'+
+      '<h3>Foto del piatto: scegli quali conservare</h3>'+
+      '<label class="btn">🖼 Aggiungi più immagini del piatto<input type="file" id="dish-photos-input" accept="image/*" multiple hidden></label>'+
+      '<div id="dish-photo-gallery" class="scan-gallery">'+dishPhotosElement()+'</div></div>'+
       '<div class="form-section"><h2>Ingredienti *</h2><p class="subtitle">Un ingrediente per riga, con quantità e unità di misura.</p>'+
       '<div id="ingredients-list" class="inline-list" style="margin:15px 0">'+makeListRows("ingredients",formIngredients)+'</div>'+
       button("＋ Aggiungi ingrediente","add-row","soft",'data-list="ingredients"')+'</div>'+
@@ -276,6 +287,25 @@
       '<div class="head-actions" style="margin-top:22px"><button type="submit" class="btn primary">✓ Salva ricetta</button>'+
       button("Annulla","back-archive")+'</div></form>';
   }
+  function scanPhotosElement() {
+    return scanDraft.map((photo,index)=>'<div class="photo-choice"><img src="'+escape(photo)+'" alt="Pagina fotografata '+(index+1)+'">'+
+      '<strong>Pagina '+(index+1)+'</strong>'+
+      button("Usa come foto","scan-as-dish","tiny",'data-index="'+index+'"')+
+      button("✕ Rimuovi","scan-remove","tiny danger",'data-index="'+index+'"')+'</div>').join("")||
+      '<div class="empty">Nessuna pagina fotografata.</div>';
+  }
+  function dishPhotosElement() {
+    return dishDraft.map((entry,index)=>'<div class="photo-choice"><img src="'+escape(entry.photo)+'" alt="Foto del piatto '+(index+1)+'">'+
+      '<label><input type="checkbox" data-dish-include="'+index+'" '+(entry.keep?"checked":"")+'> Conserva questa foto</label>'+
+      button("Copertina","dish-cover","tiny",'data-index="'+index+'"')+
+      button("✕ Rimuovi","dish-remove","tiny danger",'data-index="'+index+'"')+'</div>').join("")||
+      '<div class="empty">Nessuna foto del piatto aggiunta.</div>';
+  }
+  function refreshScanPhotos() {
+    const pages=document.getElementById("scan-page-gallery"),dishes=document.getElementById("dish-photo-gallery");
+    if(pages)pages.innerHTML=scanPhotosElement();
+    if(dishes)dishes.innerHTML=dishPhotosElement();
+  }
   function photoElement(data) {
     return data?'<img src="'+escape(data)+'" alt="Anteprima fotografica della ricetta" class="photo-large" style="max-height:225px;max-width:350px">':
       '<div class="empty">Nessuna fotografia selezionata</div>';
@@ -300,6 +330,9 @@
     editingId=recipeId||null;
     const original=state.recipes.find(r=>r.id===editingId);
     photoDraft=original?.photo||"";
+    scanDraft=(original?.scanPages||[]).slice();
+    dishDraft=(original?.dishPhotos||[]).map(x=>({photo:x.photo,keep:!!x.keep}));
+    scanOcrDraft=original?.scanOcrText||"";
     formIngredients=original?.ingredients?.slice()||[""];
     formSteps=original?.steps?.slice()||[""];
     if(!formIngredients.length)formIngredients=[""];
@@ -318,6 +351,9 @@
       button("🖨 Stampa","print-recipe")+'</div></section>'+
       '<div class="details"><article class="card">'+
       (r.photo?'<img class="photo-large" src="'+escape(r.photo)+'" alt="Foto di '+escape(r.title)+'">':"")+
+      ((r.scanPages||[]).length?'<div class="form-section"><h2>Pagine della rivista</h2><div class="scan-gallery">'+r.scanPages.map((photo,index)=>'<img class="scan-detail" src="'+escape(photo)+'" alt="Pagina '+(index+1)+'"></div>').join("")+'</div>':"")+
+      ((r.dishPhotos||[]).some(x=>x.keep)?'<div class="form-section"><h2>Foto del piatto</h2><div class="scan-gallery">'+r.dishPhotos.filter(x=>x.keep).map(x=>'<img class="scan-detail" src="'+escape(x.photo)+'" alt="Foto del piatto">').join("")+'</div></div>':"")+
+      (r.scanOcrText?'<div class="form-section"><h2>Testo OCR originale</h2><p>'+escape(r.scanOcrText).replace(/\n/g,"<br>")+'</p></div>':"")+
       '<div class="info-grid" style="margin:15px 0">'+info("Portata",r.category)+info("Difficoltà",r.difficulty)+info("Porzioni",r.portions)+
       info("Preparazione",r.prepTime)+info("Cottura",r.cookTime)+info("Riposo",r.restTime)+info("Totale",r.totalTime)+info("Temperatura",r.temperature)+info("Cucina",r.cuisine)+'</div>'+
       '<div class="form-section"><h2>Ingredienti</h2><ul class="recipe-lines">'+(r.ingredients||[]).map(x=>'<li>'+escape(x)+'</li>').join("")+'</ul></div>'+
@@ -406,6 +442,18 @@
     const b=e.target.closest("[data-action]");if(!b)return;
     const action=b.dataset.action,id=b.dataset.id,aid=b.dataset.aid,idx=Number(b.dataset.index);
     if(action==="close-modal"){closeModal();return;}
+    if(action==="scan-remove"){scanDraft.splice(idx,1);refreshScanPhotos();return;}
+    if(action==="scan-as-dish"){
+      if(scanDraft[idx]&&!dishDraft.some(x=>x.photo===scanDraft[idx]))dishDraft.push({photo:scanDraft[idx],keep:true});
+      refreshScanPhotos();return;
+    }
+    if(action==="dish-remove"){dishDraft.splice(idx,1);refreshScanPhotos();return;}
+    if(action==="dish-cover"){
+      if(dishDraft[idx]){dishDraft[idx].keep=true;photoDraft=dishDraft[idx].photo;
+        document.getElementById("editor-photo-area").innerHTML=photoElement(photoDraft);
+        refreshScanPhotos();}
+      return;
+    }
     if(action==="go-back"){goBack();return;}
     if(action==="stat-recipes"){setView("archive");return;}
     if(action==="stat-planned"){setView("planned");return;}
@@ -538,6 +586,23 @@
     } finally {URL.revokeObjectURL(objectUrl);}
   }
   async function change(e) {
+    if(e.target.matches("[data-dish-include]")){
+      const n=Number(e.target.dataset.dishInclude);
+      if(dishDraft[n])dishDraft[n].keep=e.target.checked;
+      return;
+    }
+    if(["scan-camera-input","scan-pages-input","dish-photos-input"].includes(e.target.id)){
+      const files=Array.from(e.target.files||[]).slice(0,12);
+      const pages=e.target.id!=="dish-photos-input";
+      try {
+        for(const file of files){
+          const photo=await compressPhoto(file);
+          if(pages)scanDraft.push(photo);else dishDraft.push({photo,keep:true});
+        }
+        refreshScanPhotos();toast(files.length+" immagine/i aggiunte.");
+      }catch(err){toast(err.message||"Immagini non leggibili");}
+      return;
+    }
     if(e.target.id==="gallery-input"||e.target.id==="camera-input"){
       const file=e.target.files?.[0];if(!file)return;
       try {photoDraft=await compressPhoto(file);document.getElementById("editor-photo-area").innerHTML=photoElement(photoDraft);toast("Foto compressa e pronta.");}
@@ -563,8 +628,9 @@
     const form=e.target, f=new FormData(form);
     const val=n=>String(f.get(n)||"").trim();
     const ingredients=readRows("ingredients").map(x=>x.trim()).filter(Boolean),steps=readRows("steps").map(x=>x.trim()).filter(Boolean);
+    scanOcrDraft=val("scanOcr");
     if(!val("title")){toast("Indica il nome della ricetta.");return;}
-    if(!ingredients.length||!steps.length){toast("Inserisci almeno un ingrediente e un passaggio.");return;}
+    if((!ingredients.length||!steps.length)&&!scanDraft.length){toast("Inserisci almeno un ingrediente e un passaggio oppure almeno una pagina fotografata.");return;}
     const original=state.recipes.find(x=>x.id===editingId);
     const id=original?.id||uid();
     const recipe=Object.assign({},original||{},{
@@ -574,7 +640,8 @@
       cookTime:val("cookTime"),restTime:val("restTime"),totalTime:val("totalTime"),
       temperature:val("temperature"),equipment:val("equipment"),tips:val("tips"),
       variations:val("variations"),storage:val("storage"),nutrition:val("nutrition"),
-      notes:val("notes"),photo:photoDraft,assignments:original?.assignments||[],demo:false
+      notes:val("notes"),photo:photoDraft,scanPages:scanDraft.slice(),dishPhotos:dishDraft.map(x=>({photo:x.photo,keep:x.keep})),
+      scanOcrText:scanOcrDraft,assignments:original?.assignments||[],demo:false
     });
     if(document.getElementById("plan-on-save").checked){
       const date=val("planDate"),meal=val("meal");
