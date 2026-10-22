@@ -19,7 +19,10 @@ fixture = out / 'fixture.db'
 fixture.unlink(missing_ok=True)
 db = sqlite3.connect(fixture)
 db.execute('CREATE TABLE recipes (' + schema + ')')
-db.execute('PRAGMA user_version=4')
+# Fixture already has the newest schema; never run ALTER TABLE twice.
+version = re.search(r'SQLiteOpenHelper\(context, "oggisimangia\\.db", null, (\\d+)\)', source)
+assert version, 'Database schema version not found'
+db.execute('PRAGMA user_version=' + version.group(1))
 today = adb('shell', 'date', '+%F').decode().strip()
 for meal, title, ingredients in [('Pranzo', 'Pasta alle zucchine', 'pasta, zucchine'), ('Cena', 'Frittata', '2 uova, sale')]:
     db.execute('INSERT INTO recipes (day,meal,category,title,ingredients,prepTime,cookTime,portions) VALUES (?,?,?,?,?,?,?,?)',
