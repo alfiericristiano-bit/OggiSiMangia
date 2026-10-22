@@ -61,6 +61,11 @@ class MainActivity : Activity() {
     private var editorSteps: RecipeListFields? = null
     private var editorOcr: EditText? = null
     private var pendingCameraKind = "cover"
+    private val scanOcrResults = mutableMapOf<String, String>()
+    private val processedOcrPages = mutableSetOf<String>()
+    private val pendingOcrPages = mutableSetOf<String>()
+    private var ocrStatusLabel: TextView? = null
+    private var scanSession = 0
     private var photoPreview: ImageView? = null
     private var pendingCameraPath: String? = null
     private var lastSearchResults: List<WebRecipe> = emptyList()
@@ -647,6 +652,12 @@ class MainActivity : Activity() {
         dishPhotoChoices.clear()
         dishPhotoChoices.putAll(photoChoices(existing?.dishPhotos))
         photoPreview = null
+        scanSession++
+        scanOcrResults.clear()
+        pendingOcrPages.clear()
+        processedOcrPages.clear()
+        processedOcrPages.addAll(magazinePages)
+        ocrStatusLabel = null
         magazinePagesContainer = null
         dishPhotosContainer = null
         screen(if (existing == null || existing.id == 0L) "Scrivi la tua ricetta" else "Modifica ricetta",
@@ -667,6 +678,7 @@ class MainActivity : Activity() {
         label("TESTO RICONOSCIUTO (MODIFICABILE)", 15f, true)
         val ocrField = input("Testo OCR delle pagine, correggibile anche prima di salvare", existing?.scanOcrText.orEmpty(), true)
         editorOcr = ocrField
+        ocrStatusLabel = label("OCR pronto: ogni pagina fotografata verrà letta automaticamente e aggiunta qui sotto.", 13f)
         action("📝 Compila titolo, ingredienti e preparazione dal testo OCR") {
             AlertDialog.Builder(this).setTitle("Usare il testo OCR?")
                 .setMessage("I campi della ricetta saranno compilati con suggerimenti automatici. Controlla sempre dosi e preparazione: il riconoscimento può sbagliare.")
@@ -883,6 +895,10 @@ class MainActivity : Activity() {
                 text = "✕ Elimina pagina"; isAllCaps = false
                 setOnClickListener {
                     magazinePages.remove(path)
+                    pendingOcrPages.remove(path)
+                    scanOcrResults.remove(path)
+                    processedOcrPages.remove(path)
+                    appendCompletedOcrPages()
                     refreshMagazinePages()
                 }
             })
@@ -952,8 +968,10 @@ class MainActivity : Activity() {
                     return
                 }
                 magazinePages.add(path)
+                pendingOcrPages.add(path)
                 refreshMagazinePages()
-                recognizeMagazinePage(path, magazinePages.size)
+                updateOcrStatus()
+                recognizeMagazinePage(path, magazinePages.size, scanSession)
             } else {
                 dishPhotoChoices[path] = true
                 if (selectedPhoto.isBlank()) { selectedPhoto = path; refreshPhotoPreview() }
@@ -979,31 +997,66 @@ class MainActivity : Activity() {
             editorSteps?.replaceValues(guess.steps)
     }
 
-    private fun recognizeMagazinePage(path: String, page: Int) {
+
+    private fun updateOcrStatus() {
+        val total = magazinePages.size
+        val remaining = pendingOcrPages.size
+        ocrStatusLabel?.text = if (remaining > 0) {
+            "⏳ OCR in corso su $remaining pagina/e di $total. Il testo compare qui appena pronto."
+        } else if (total > 0) {
+            "✓ OCR completato. Controlla il testo: puoi correggerlo liberamente."
+        } else {
+            "Fotografa una pagina e il riconoscimento partirà immediatamente."
+        }
+    }
+
+    /** Append in capture order; text already corrected manually is not overwritten. */
+    private fun appendCompletedOcrPages() {
+        while (true) {
+            val nextPath = magazinePages.firstOrNull { it !in processedOcrPages } ?: break
+            val text = scanOcrResults.remove(nextPath) ?: break
+            processedOcrPages.add(nextPath)
+            if (text.isNotBlank()) {
+                val current = editorOcr?.text?.toString().orEmpty()
+                val page = magazinePages.indexOf(nextPath) + 1
+                editorOcr?.append((if (current.isBlank()) "" else "\n\n") +
+                    "Pagina $page\n" + text.trim())
+                applyMagazineSuggestions(true)
+            }
+        }
+        updateOcrStatus()
+    }
+
+    private fun recognizeMagazinePage(path: String, page: Int, session: Int) {
         val client = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
         try {
-            val inputImage = InputImage.fromFilePath(this, Uri.fromFile(File(path)))
-            client.process(inputImage)
+            val input = InputImage.fromFilePath(this, Uri.fromFile(File(path)))
+            client.process(input)
                 .addOnSuccessListener { result ->
-                    if (path in magazinePages && currentPageKey.startsWith("editor-")) {
-                        if (result.text.isNotBlank()) {
-                            val current = editorOcr?.text?.toString().orEmpty()
-                            editorOcr?.setText(current + (if (current.isBlank()) "" else "\n\n") +
-                                "Pagina $page\n" + result.text.trim())
-                            applyMagazineSuggestions(true)
-                            Toast.makeText(this, "Testo pagina $page riconosciuto: controlla i campi.", Toast.LENGTH_SHORT).show()
-                        } else {
-                            Toast.makeText(this, "Nessun testo leggibile; pagina fotografata conservata.", Toast.LENGTH_LONG).show()
-                        }
+                    if (session == scanSession && path in magazinePages) {
+                        pendingOcrPages.remove(path)
+                        scanOcrResults[path] = result.text
+                        appendCompletedOcrPages()
+                        if (result.text.isBlank())
+                            Toast.makeText(this, "Pagina $page fotografata, testo non rilevato.", Toast.LENGTH_LONG).show()
                     }
                 }
                 .addOnFailureListener {
-                    Toast.makeText(this, "OCR non riuscito: fotografia conservata e modificabile.", Toast.LENGTH_LONG).show()
+                    if (session == scanSession && path in magazinePages) {
+                        pendingOcrPages.remove(path)
+                        scanOcrResults[path] = ""
+                        appendCompletedOcrPages()
+                        Toast.makeText(this, "OCR pagina $page non disponibile; foto conservata.", Toast.LENGTH_LONG).show()
+                    }
                 }
                 .addOnCompleteListener { client.close() }
         } catch (_: Exception) {
             client.close()
-            Toast.makeText(this, "OCR non disponibile, pagina conservata.", Toast.LENGTH_LONG).show()
+            if (session == scanSession && path in magazinePages) {
+                pendingOcrPages.remove(path)
+                scanOcrResults[path] = ""
+                appendCompletedOcrPages()
+            }
         }
     }
 
