@@ -2170,14 +2170,35 @@ class MainActivity : Activity() {
         val bitmap = resolver.openInputStream(uri).use { stream ->
             BitmapFactory.decodeStream(stream, null, decoding)
         } ?: throw IllegalStateException("Foto non valida")
-        val ratio = minOf(1.0, maxEdge.toDouble() / maxOf(bitmap.width, bitmap.height))
-        val resized = if (ratio < 1.0) Bitmap.createScaledBitmap(bitmap,
-            (bitmap.width * ratio).toInt().coerceAtLeast(1),
-            (bitmap.height * ratio).toInt().coerceAtLeast(1), true) else bitmap
+        // Phone cameras often store rotation as EXIF instead of rotated pixel data.
+        // Correct it before compressing: otherwise ML Kit reads a sideways magazine.
+        val rotation = try {
+            contentResolver.openInputStream(uri)?.use { stream ->
+                val exif = androidx.exifinterface.media.ExifInterface(stream)
+                when (exif.getAttributeInt(
+                    androidx.exifinterface.media.ExifInterface.TAG_ORIENTATION,
+                    androidx.exifinterface.media.ExifInterface.ORIENTATION_NORMAL
+                )) {
+                    androidx.exifinterface.media.ExifInterface.ORIENTATION_ROTATE_90 -> 90f
+                    androidx.exifinterface.media.ExifInterface.ORIENTATION_ROTATE_180 -> 180f
+                    androidx.exifinterface.media.ExifInterface.ORIENTATION_ROTATE_270 -> 270f
+                    else -> 0f
+                }
+            } ?: 0f
+        } catch (_: Exception) { 0f }
+        val upright = if (rotation != 0f) {
+            Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height,
+                android.graphics.Matrix().apply { postRotate(rotation) }, true)
+        } else bitmap
+        val ratio = minOf(1.0, maxEdge.toDouble() / maxOf(upright.width, upright.height))
+        val resized = if (ratio < 1.0) Bitmap.createScaledBitmap(upright,
+            (upright.width * ratio).toInt().coerceAtLeast(1),
+            (upright.height * ratio).toInt().coerceAtLeast(1), true) else upright
         val folder = File(filesDir, "photos").apply { mkdirs() }
         val file = File(folder, UUID.randomUUID().toString() + ".jpg")
         FileOutputStream(file).use { resized.compress(Bitmap.CompressFormat.JPEG, 75, it) }
-        if (resized !== bitmap) bitmap.recycle()
+        if (resized !== upright) upright.recycle()
+        if (upright !== bitmap) bitmap.recycle()
         resized.recycle()
         return file.absolutePath
     }
