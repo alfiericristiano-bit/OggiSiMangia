@@ -1,5 +1,13 @@
 # 🍽️ OggiSiMangia...
 
+## Correzione 1.8.1 — ricerca equa fra siti (melanzane + pomodoro)
+
+- Le ricerche distribuiscono il tempo di lettura fra **tutte** le fonti, invece di esaurire le verifiche prima sulle ricette di GialloZafferano.
+- Nuove query senza la parola obbligatoria "ricetta" e ricerca nei feed RSS con collegamenti e titoli: i risultati di Misya, Fatto in Casa da Benedetta, Sale&Pepe e degli altri siti non dipendono da un solo formato HTML.
+- Distingue **ingredienti verificati** tramite dati strutturati della fonte da **collegamenti da controllare** trovati tramite motore o indice, quando il sito non risponde o il parser non può leggere gli ingredienti. Solo i primi sono automaticamente considerati corrispondenti a tutti gli ingredienti obbligatori.
+- Le ricette non ancora verificate possono essere aperte, salvate con link originale e completate manualmente, ma l'aggiunta al calendario passa attraverso la revisione nell'editor.
+- Le preferenze esistenti di priorità siti, gli ingredienti obbligatori, le scelte di salvataggio e il backup locale restano invariati. **Versione Android 1.8.1, versionCode 21**, stesso applicationId e firma.
+
 ## Novità 1.8.0 — ricerca con elenchi separati per sito
 
 - La ricerca Android ora consulta tutte le fonti configurate (in ordine di priorità) senza limitare la visualizzazione ai primi 10 risultati di un unico sito.

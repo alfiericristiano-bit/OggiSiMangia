@@ -46,8 +46,12 @@ object RecipeRanking {
         return (rating * count.toDouble() + 3.5 * 20) / (count.toDouble() + 20)
     }
     fun order(items: List<WebRecipe>, ingredients: String): List<WebRecipe> = items
-        .filter { it.ingredients.isNotBlank() && RecipeValidation.containsEvery(it.ingredients, ingredients) }
+        // Only verified Recipe ingredient lists are treated as confirmed matches.
+        // Search-index links without readable ingredients remain visible, clearly unverified.
+        .filter { !it.verified || (it.ingredients.isNotBlank() &&
+            RecipeValidation.containsEvery(it.ingredients, ingredients)) }
         .sortedWith(compareBy<WebRecipe> { RecipeSources.priority(it.url) }
+            .thenByDescending { it.verified }
             .thenByDescending { relevance(it.ingredients, ingredients) }
             .thenByDescending { confidence(it.rating, it.feedbackCount) }
             .thenByDescending { it.feedbackCount ?: -1 }

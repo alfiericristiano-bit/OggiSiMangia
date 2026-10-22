@@ -42,6 +42,7 @@ class MainActivity : Activity() {
     private lateinit var sourcePreferences: SourcePreferences
     private var pendingReport: File? = null
     private lateinit var content: LinearLayout
+    private lateinit var screenRoot: LinearLayout
     private var selectedDate = LocalDate.now()
     private var selectedMeal = "Pranzo"
     private var selectedAlternative = false
@@ -101,7 +102,7 @@ class MainActivity : Activity() {
         RecipeSources.configure(sourcePreferences.load())
         window.statusBarColor = Color.rgb(45, 91, 61)
         window.navigationBarColor = Color.rgb(45, 91, 61)
-        if (displayName().isBlank()) showNameIntroduction() else showCalendar()
+        showSplash()
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
@@ -110,6 +111,24 @@ class MainActivity : Activity() {
         super.onSaveInstanceState(outState)
     }
 
+
+    /** Opening illustration; returning users go back to their calendar. */
+    private fun showSplash() {
+        currentPageKey = "splash"
+        pageHistory.clear()
+        val layout = onboardingRoot("", "Le tue ricette ogni giorno")
+        layout.addView(TextView(this).apply {
+            text = "━━━━━  ●"
+            textSize = 18f
+            gravity = Gravity.CENTER
+            setTextColor(familyDeep)
+        }, LinearLayout.LayoutParams(-1, dp(38)))
+        android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+            if (!isFinishing && !isDestroyed) {
+                if (displayName().isBlank()) showNameIntroduction() else showCalendar()
+            }
+        }, 650L)
+    }
 
     private fun displayName(): String = getSharedPreferences("user_profile", MODE_PRIVATE)
         .getString("display_name", "").orEmpty().trim()
@@ -120,7 +139,7 @@ class MainActivity : Activity() {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER_HORIZONTAL
             setPadding(dp(24), dp(32), dp(24), dp(28))
-            setBackgroundColor(Color.rgb(250, 252, 244))
+            setBackgroundColor(Color.rgb(255, 250, 238))
         }
         wrapper.addView(layout)
         setContentView(wrapper)
@@ -162,10 +181,10 @@ class MainActivity : Activity() {
     private fun showNameIntroduction() {
         currentPageKey = "onboarding-name"
         pageHistory.clear()
-        val layout = onboardingRoot("Ciao! Come ti chiami?",
-            "Mettiamo il tuo nome sul menu, così ogni giornata in cucina inizia con un sorriso.")
+        val layout = onboardingRoot("Come ti chiami?",
+            "Così posso darti il benvenuto ogni volta che apri l’app!")
         val nameInput = EditText(this).apply {
-            hint = "Il tuo nome"
+            hint = "Il tuo nome..."
             setSingleLine(true)
             textSize = 18f
             setText(displayName())
@@ -200,8 +219,8 @@ class MainActivity : Activity() {
 
     private fun showPersonalWelcome(name: String = displayName()) {
         currentPageKey = "onboarding-welcome"
-        val layout = onboardingRoot("Benvenuto, $name! 🍃",
-            "Il tuo ricettario, il calendario dei pasti e le ricette fotografate sono pronti.")
+        val layout = onboardingRoot("Benvenuto, $name!",
+            "Da oggi organizzare i tuoi pasti sarà più semplice e gustoso!")
         layout.addView(TextView(this).apply {
             text = "📅  Pianifica i pasti    🍝  Scopri ricette    📷  Digitalizza le riviste"
             textSize = 14f
@@ -209,7 +228,7 @@ class MainActivity : Activity() {
             setTextColor(Color.rgb(55, 92, 63))
         })
         layout.addView(Button(this).apply {
-            text = "Inizia a cucinare  →"
+            text = "Inizia  →"
             isAllCaps = false
             textSize = 17f
             setTextColor(Color.WHITE)
@@ -240,11 +259,11 @@ class MainActivity : Activity() {
         return super.dispatchTouchEvent(ev)
     }
 
-    /** FamilyChat visual tokens, used only by the UI; stored recipe data remains unchanged. */
-    private val familyTeal = Color.rgb(167, 193, 96)
-    private val familyDeep = Color.rgb(45, 91, 61)
-    private val familyInk = Color.rgb(42, 57, 43)
-    private val familyPale = Color.rgb(241, 247, 226)
+    /** Palette used by the approved thirteen-screen mockup. */
+    private val familyTeal = Color.rgb(41, 163, 65)
+    private val familyDeep = Color.rgb(21, 123, 52)
+    private val familyInk = Color.rgb(15, 47, 48)
+    private val familyPale = Color.rgb(239, 248, 237)
     private fun shape(color: Int, radius: Float = 16f): GradientDrawable =
         GradientDrawable().apply { setColor(color); cornerRadius = dp(radius.toInt()).toFloat() }
     private fun outlined(color: Int = Color.WHITE, radius: Float = 12f): GradientDrawable =
@@ -259,7 +278,7 @@ class MainActivity : Activity() {
         currentPageRestore = restore
         val background = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setBackgroundColor(Color.rgb(249, 250, 245))
+            setBackgroundColor(Color.rgb(255, 250, 241))
         }
         val scroll = ScrollView(this).apply { isFillViewport = true }
         content = LinearLayout(this).apply {
@@ -267,39 +286,32 @@ class MainActivity : Activity() {
             setPadding(dp(12), dp(10), dp(12), dp(22))
         }
         scroll.addView(content)
-        background.addView(scroll)
+        screenRoot = background
+        background.addView(scroll, LinearLayout.LayoutParams(-1, 0, 1f))
         setContentView(background)
-        // FamilyChat-inspired teal brand header with rounded corners and native controls.
+        // Compact white top bar and rounded cards from the approved previews.
         val hero = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
-            setPadding(dp(13), dp(10), dp(13), dp(11))
-            this.background = GradientDrawable(GradientDrawable.Orientation.TL_BR,
-                intArrayOf(familyTeal, Color.rgb(207, 224, 154))).apply {
-                cornerRadius = dp(22).toFloat()
-            }
-            elevation = dp(3).toFloat()
+            setPadding(dp(12), dp(7), dp(12), dp(8))
+            this.background = outlined(Color.WHITE, 17f)
         }
         hero.addView(ImageView(this).apply {
             setImageResource(R.drawable.app_icon_clean)
             scaleType = ImageView.ScaleType.FIT_CENTER
             contentDescription = "OggiSiMangia: calendario e piatto"
-        }, LinearLayout.LayoutParams(dp(44), dp(44)).apply { marginEnd = dp(8) })
+        }, LinearLayout.LayoutParams(dp(32), dp(32)).apply { marginEnd = dp(9) })
         val headerText = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         headerText.addView(TextView(this).apply {
-            text = "OggiSiMangia..."; textSize = 21f
+            text = title; textSize = 19f
             setTextColor(familyInk); setTypeface(null, Typeface.BOLD)
         })
-        headerText.addView(TextView(this).apply {
-            text = title; textSize = 15f; setTextColor(familyInk)
-            setTypeface(null, Typeface.BOLD)
-        })
-        headerText.addView(TextView(this).apply {
+        if (subtitle.isNotBlank()) headerText.addView(TextView(this).apply {
             text = subtitle; textSize = 11f
-            setTextColor(familyDeep); maxLines = 3
+            setTextColor(Color.rgb(88, 103, 94)); maxLines = 2
         })
         hero.addView(headerText, LinearLayout.LayoutParams(0, -2, 1f))
-        content.addView(hero, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(7) })
+        content.addView(hero, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(9) })
         if (key != "calendar") {
             val back = Button(this).apply {
                 text = "‹  Indietro"
@@ -310,7 +322,7 @@ class MainActivity : Activity() {
             }
             content.addView(back, LinearLayout.LayoutParams(-1, dp(44)).apply { bottomMargin = dp(6) })
         }
-        navigation(title)
+        navigation(key)
     }
 
     private fun goBack() {
@@ -353,7 +365,7 @@ class MainActivity : Activity() {
             setTypeface(null, Typeface.BOLD)
             setTextColor(Color.WHITE)
             background = GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT,
-                intArrayOf(familyDeep, Color.rgb(20, 150, 126))).apply {
+                intArrayOf(Color.rgb(51, 181, 58), Color.rgb(18, 136, 60))).apply {
                 cornerRadius = dp(19).toFloat()
             }
             elevation = dp(4).toFloat()
@@ -430,37 +442,65 @@ class MainActivity : Activity() {
         return spinner
     }
 
-    private fun navigation(title: String) {
+    /** Fixed five-tab bottom navigation, outside the scrollable content. */
+    private fun navigation(key: String) {
         val nav = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
-            setPadding(dp(4), dp(4), dp(4), dp(4))
-            background = outlined(Color.WHITE, 15f)
+            gravity = Gravity.CENTER
+            setPadding(dp(3), dp(4), dp(3), dp(3))
+            background = outlined(Color.WHITE, 13f)
+            elevation = dp(4).toFloat()
         }
         val active = when {
-            title.contains("calendario", true) -> 0
-            title.contains("trova", true) || title.contains("ricerca", true) -> 1
-            title.contains("ricettario", true) -> 2
+            key == "calendar" -> 0
+            key == "archive" || key.startsWith("detail-") -> 1
+            key.startsWith("editor-") -> 2
+            key == "summary" -> 3
+            key == "sources" -> 4
             else -> -1
         }
-        listOf("📅 Calendario", "🔎 Cerca", "📚 Ricettario").forEachIndexed { index, name ->
-            val b = Button(this).apply {
-                text = name; isAllCaps = false; textSize = 11f
-                setPadding(dp(2), 0, dp(2), 0)
-                background = shape(if (active == index) Color.rgb(229,246,239) else Color.WHITE, 11f)
-                setTextColor(if (active == index) familyDeep else Color.rgb(93,118,112))
-                setTypeface(null, if (active == index) Typeface.BOLD else Typeface.NORMAL)
+        val destinations = listOf(
+            "▦" to "Calendario", "♧" to "Ricette", "⊕" to "Aggiungi",
+            "▤" to "Riepilogo", "•••" to "Altro"
+        )
+        destinations.forEachIndexed { index, destination ->
+            val selected = index == active
+            val cell = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                gravity = Gravity.CENTER
+                contentDescription = destination.second
+                isClickable = true
+                isFocusable = true
+                background = shape(if (selected) familyPale else Color.WHITE, 12f)
                 setOnClickListener {
                     hideKeyboard()
                     when (index) {
                         0 -> showCalendar()
-                        1 -> showSearch()
-                        else -> showArchive()
+                        1 -> showArchive()
+                        2 -> showEditor()
+                        3 -> showSummary()
+                        else -> showSourceSettings()
                     }
                 }
             }
-            nav.addView(b, LinearLayout.LayoutParams(0, dp(44), 1f))
+            cell.addView(TextView(this).apply {
+                text = destination.first
+                gravity = Gravity.CENTER
+                textSize = if (index == 4) 18f else 23f
+                setTextColor(if (selected) familyDeep else Color.rgb(92, 101, 96))
+            })
+            cell.addView(TextView(this).apply {
+                text = destination.second
+                gravity = Gravity.CENTER
+                textSize = 9f
+                setTextColor(if (selected) familyDeep else Color.rgb(92, 101, 96))
+                setTypeface(null, if (selected) Typeface.BOLD else Typeface.NORMAL)
+            })
+            nav.addView(cell, LinearLayout.LayoutParams(0, dp(58), 1f).apply {
+                if (index > 0) marginStart = dp(2)
+            })
         }
-        content.addView(nav, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(8) })
+        screenRoot.addView(nav, LinearLayout.LayoutParams(-1, -2))
     }
 
     private fun chooseDate(after: () -> Unit) {
@@ -471,13 +511,12 @@ class MainActivity : Activity() {
     }
 
     private fun showCalendar() {
-        screen("Il calendario dei pasti", "Organizza pranzo e cena, anche per i prossimi giorni.",
+        screen("Calendario", "Organizza pranzo e cena, anche per i prossimi giorni.",
             "calendar") { showCalendar() }
         searchForDay = false
         selectedAlternative = false
         label("Tocca un giorno per vederne i pasti. Tieni premuto come da impostazioni Android per aggiungere una ricetta.", 13f)
-        actionRow("🔎 Cerca ricetta", { showSearch() },
-            "＋ Nuova ricetta", { showEditor() })
+
         action("ⓘ Come funziona il calendario") {
             AppHints.showAgain(this, "calendar_long_press", "Come funziona il calendario",
                 "Tocca una data per scegliere il giorno e vedere pranzo e cena. " +
@@ -489,6 +528,7 @@ class MainActivity : Activity() {
             showCalendar()
         }, { day -> confirmDaySearch(day) })
         content.addView(calendar, LinearLayout.LayoutParams(-1, -2))
+        primaryAction("⌕  Cerca ricetta") { showSearch() }
         content.post {
             AppHints.showOnce(this, "calendar_long_press", "Come funziona il calendario",
                 "Tocca una data per scegliere il giorno e vedere pranzo e cena. " +
@@ -522,7 +562,9 @@ class MainActivity : Activity() {
             })
             if (planned.isEmpty()) label("Nessun piatto assegnato.", 13f)
             planned.forEach { recipe ->
-                action((if (recipe.alternative) "↪ " else "• ") + recipe.title) { showDetail(recipe.id) }
+                recipeListCard(recipe,
+                    if (recipe.alternative) "Alternativa · " + recipe.category else recipe.category
+                ) { showDetail(recipe.id) }
                 if (expanded) {
                     actionRow("✏️ Modifica", { changePlanning(recipe) },
                         "🗑 Dal giorno", { removeFromDay(recipe) })
@@ -663,7 +705,7 @@ class MainActivity : Activity() {
         ocrStatusLabel = null
         magazinePagesContainer = null
         dishPhotosContainer = null
-        screen(if (existing == null || existing.id == 0L) "Scrivi la tua ricetta" else "Modifica ricetta",
+        screen(if (existing == null || existing.id == 0L) "Nuova ricetta da foto" else "Modifica ricetta",
             "Compila i campi che conosci. Nome, ingredienti e preparazione sono obbligatori.",
             "editor-${existing?.id ?: 0L}") {
             showEditor(existing, initialAlternative, suggestedTitle, suggestedUrl, planByDefault)
@@ -750,7 +792,7 @@ class MainActivity : Activity() {
             scaleType = ImageView.ScaleType.CENTER_CROP
             contentDescription = "Anteprima della foto della ricetta"
         }
-        content.addView(photoPreview, LinearLayout.LayoutParams(-1, dp(140)).apply { bottomMargin = dp(6) })
+        content.addView(photoPreview, LinearLayout.LayoutParams(dp(124), dp(100)).apply { bottomMargin = dp(6) })
         refreshPhotoPreview()
         actionRow("📷 Fotocamera", { launchCamera() }, "🖼️ Galleria", {
             startActivityForResult(Intent(Intent.ACTION_GET_CONTENT).apply {
@@ -1136,7 +1178,7 @@ class MainActivity : Activity() {
     }
 
     private fun showSearch() {
-        screen("Trova cosa cucinare", "Scopri le proposte senza uscire dall'app.",
+        screen("Cerca ricetta", "Scopri nuove ricette dai tuoi ingredienti.",
             "search") { showSearch() }
         label("Giorno scelto: " + selectedDate.format(dateFormatter), 16f, true)
         if (searchForDay) label(selectedMeal + " · " + if (selectedAlternative) "Alternativa" else "Principale", 16f, true)
@@ -1158,7 +1200,7 @@ class MainActivity : Activity() {
         label("Ingredienti obbligatori, anche singolare/plurale e preparazioni equivalenti. " +
             "Categoria, difficoltà e tempi sono preferenze: gli scostamenti vengono segnalati.", 13f)
 
-        primaryAction("🔎 CERCA RICETTE NEI SITI") search@{
+        primaryAction("⌕  Cerca ricette") search@{
             searchIngredients = ingredients.query() ?: return@search
             searchResultGeneration++
             val generation = searchResultGeneration
@@ -1212,7 +1254,7 @@ class MainActivity : Activity() {
     }
 
     private fun showSourceSettings() {
-        screen("Priorità dei siti", "L'ordine viene memorizzato per le prossime ricerche.",
+        screen("Fonti di ricerca", "L'ordine viene memorizzato per le prossime ricerche.",
             "sources") { showSourceSettings() }
         label("Le fonti con priorità più alta vengono prima nei risultati compatibili. Seguono pertinenza e valutazioni degli utenti, quando disponibili.", 14f)
         action("Aggiungi un sito") {
@@ -1251,6 +1293,8 @@ class MainActivity : Activity() {
             val row = LinearLayout(this).apply {
                 orientation = LinearLayout.HORIZONTAL
                 gravity = Gravity.CENTER_VERTICAL
+                setPadding(dp(7), dp(6), dp(7), dp(6))
+                background = outlined(Color.WHITE, 15f)
             }
             val spinner = Spinner(this).apply {
                 adapter = ArrayAdapter(this@MainActivity,
@@ -1362,8 +1406,10 @@ class MainActivity : Activity() {
         lastSearchOffset = 0
         screen("Risultati per sito", "Ricette raggruppate per fonte, senza taglio globale a 10.",
             "recipe-sites") { showRecipeResults(lastSearchResults) }
-        label("Trovate " + items.size + " ricette da " + RecipeSources.sites.size + " fonti.", 17f, true)
-        label("Apri un sito per vedere le sue ricette, 10 alla volta. Da ogni elenco puoi selezionare una ricetta, salvarla o assegnarla al calendario.", 13f)
+        val confirmedCount = items.count { it.verified }
+        label(confirmedCount.toString() + " ricette verificate · " +
+            (items.size - confirmedCount) + " collegamenti da controllare", 17f, true)
+        label("Apri un sito per vedere le sue ricette, 10 alla volta. I collegamenti 'da controllare' provengono dalla ricerca web, ma non è stato possibile verificarne automaticamente tutti gli ingredienti.", 13f)
         actionRow("🔎 Modifica ricerca", { showSearch() },
             "⚙ Fonti e priorità", { showSourceSettings() })
         if (items.isEmpty()) {
@@ -1375,16 +1421,17 @@ class MainActivity : Activity() {
         RecipeSources.sites.entries.forEachIndexed { index, (name, domain) ->
             val siteRecipes = RecipeSourcePages.forSource(items, domain)
             label((index + 1).toString() + "ª fonte · " + name, 18f, true)
-            label(domain + " · " + siteRecipes.size + " ricette verificate", 13f)
+            label(domain + " · " + siteRecipes.count { it.verified } +
+                " verificate · " + siteRecipes.count { !it.verified } + " da controllare", 13f)
             if (siteRecipes.isNotEmpty()) {
                 siteRecipes.take(3).forEach { item ->
-                    label("🍽 " + item.title, 14f)
+                    label((if (item.verified) "✅ " else "🔎 ") + item.title, 14f)
                 }
-                action("📚 Sfoglia " + name + " (" + siteRecipes.size + " ricette)") {
+                action("📚 Sfoglia " + name + " (" + siteRecipes.size + " proposte)") {
                     showSiteRecipeResults(name, domain, 0)
                 }
             } else {
-                label("Nessuna proposta verificata da questo sito al momento.", 13f)
+                label("Non ho recuperato proposte da questa fonte: il sito o il motore di ricerca potrebbero limitare l'accesso. Puoi cercare su altre pagine o aprire il sito.", 13f)
             }
             if (name !in siteResultsExhausted) {
                 action("＋ Cerca altre ricette su " + name) {
@@ -1429,13 +1476,19 @@ class MainActivity : Activity() {
             val row = LinearLayout(this).apply {
                 orientation = LinearLayout.VERTICAL
                 setPadding(dp(12), dp(10), dp(12), dp(12))
-                background = shape(Color.rgb(242, 248, 245), 12f)
+                background = outlined(Color.WHITE, 15f)
             }
             row.addView(TextView(this).apply {
-                text = recipe.title; textSize = 17f
+                text = (if (recipe.verified) "✅ " else "🔎 ") + recipe.title
+                textSize = 17f
                 setTypeface(null, Typeface.BOLD); setTextColor(familyDeep)
             })
-            val differences = RecipePreferences.notices(recipe, searchCategory, searchDifficulty, searchDuration)
+            if (!recipe.verified) row.addView(TextView(this).apply {
+                text = "Da controllare: gli ingredienti della ricetta non sono ancora stati verificati automaticamente."
+                textSize = 13f; setTextColor(Color.rgb(140, 84, 20))
+            })
+            val differences = if (recipe.verified) RecipePreferences.notices(
+                recipe, searchCategory, searchDifficulty, searchDuration) else emptyList()
             if (differences.isNotEmpty()) row.addView(TextView(this).apply {
                 text = differences.joinToString("\n") { "⚠ " + it }
                 textSize = 13f; setTextColor(Color.rgb(139, 79, 15))
@@ -1445,7 +1498,7 @@ class MainActivity : Activity() {
                     scaleType = ImageView.ScaleType.CENTER_CROP
                     contentDescription = "Anteprima: " + recipe.title
                 }
-                row.addView(preview, LinearLayout.LayoutParams(-1, dp(130)))
+                row.addView(preview, LinearLayout.LayoutParams(dp(108), dp(90)).apply { topMargin = dp(6); bottomMargin = dp(5) })
                 fetchPreview(recipe.imageUrl, preview)
             }
             row.addView(TextView(this).apply {
@@ -1462,8 +1515,10 @@ class MainActivity : Activity() {
                 setPadding(0, dp(5), 0, dp(5))
             })
             row.addView(Button(this).apply {
-                text = "👀 Apri scheda · Salva o pianifica"
+                text = "Apri ricetta · Salva o pianifica →"
                 isAllCaps = false
+                setTextColor(Color.WHITE)
+                background = shape(familyDeep, 13f)
                 setOnClickListener { popup.dismiss(); showOnlineDetail(recipe) }
             }, LinearLayout.LayoutParams(-1, dp(44)))
             rows.addView(row, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(12) })
@@ -1538,7 +1593,14 @@ class MainActivity : Activity() {
                 screen(recipe.title, recipe.source, "online-" + recipe.url) {
                     showOnlineDetail(sourceRecipe, imported)
                 }
-                if (!imported) {
+                val fullMatch = result.ingredients.isNotBlank() &&
+                    RecipeValidation.containsEvery(result.ingredients, searchIngredients)
+                if (!recipe.verified && !fullMatch) {
+                    label("⚠ Ingredienti non verificati per tutti i termini cercati. Controlla la ricetta originale prima di salvarla o assegnarla al calendario.", 14f, true)
+                } else if (!recipe.verified && fullMatch) {
+                    label("✅ Ingredienti richiesti trovati nella scheda letta ora.", 14f)
+                }
+                if (!imported && (recipe.verified || fullMatch)) {
                     RecipePreferences.notices(recipe, searchCategory, searchDifficulty, searchDuration)
                         .forEach { label("⚠ " + it, 13f) }
                 }
@@ -1549,13 +1611,19 @@ class MainActivity : Activity() {
                         scaleType = ImageView.ScaleType.CENTER_CROP
                         contentDescription = "Foto della ricetta da " + recipe.source
                     }
-                    content.addView(photo, LinearLayout.LayoutParams(-1, dp(200)))
+                    content.addView(photo, LinearLayout.LayoutParams(-1, dp(132)))
                     fetchPreview(imageUrl, photo)
                     label("Foto: " + recipe.source, 12f)
                 }
                 val details = onlineDraft(recipe, result, "Entrambe")
                 showRecipeMetadata(details)
-                action("📅 Aggiungi al calendario") {
+                action(if (recipe.verified || fullMatch) "📅 Aggiungi al calendario" else "📅 Controlla e pianifica la ricetta") {
+                    if (!recipe.verified && !fullMatch) {
+                        prepareOnlineDraft(recipe, result, "Entrambe") { draft ->
+                            showEditor(draft, planByDefault = true)
+                        }
+                        return@action
+                    }
                     chooseDate {
                         chooseMeal { meal, alternative ->
                             chooseSaveMode { mode ->
@@ -1677,9 +1745,38 @@ class MainActivity : Activity() {
         }.start()
     }
 
+    /** Compact day overview and statistics derived from existing records. */
+    private fun showSummary(statistics: Boolean = false) {
+        screen("Riepilogo", "I tuoi giorni e pasti pianificati.", "summary") { showSummary(statistics) }
+        actionRow("Giorni pianificati", { showSummary(false) },
+            "Statistiche", { showSummary(true) })
+        val all = db.archive("", "Tutte", "Tutte", "Data (recenti)")
+        val scheduled = all.filter { it.day.isNotBlank() }
+        val days = scheduled.groupBy { it.day }.toSortedMap(compareByDescending { it })
+        val lunches = scheduled.count { it.meal == "Pranzo" || it.meal == "Entrambi" }
+        val dinners = scheduled.count { it.meal == "Cena" || it.meal == "Entrambi" }
+        label("📅  Giorni pianificati: " + days.size, 18f, true)
+        label("☀  Pranzi pianificati: " + lunches, 17f, true)
+        label("🌙  Cene pianificate: " + dinners, 17f, true)
+        if (statistics) {
+            label("📚  Ricette nel ricettario: " + all.size, 17f, true)
+            label("🍽  Pasti complessivi: " + (lunches + dinners), 17f, true)
+            label("Le ricette alternative sono comprese nei conteggi.", 13f)
+        } else {
+            label("Ultimi giorni", 19f, true)
+            if (days.isEmpty()) label("Nessun giorno pianificato: scegli una data nel calendario.", 14f)
+            days.entries.take(20).forEach { (day, recipes) ->
+                action("📅 " + day + "    " + recipes.joinToString(" · ") { it.title }) {
+                    selectedDate = LocalDate.parse(day)
+                    showCalendar()
+                }
+            }
+        }
+    }
+
     private fun showArchive(search: String = "", category: String = "Tutte",
                             difficulty: String = "Tutte", order: String = "Nome A–Z", ingredientQuery: String = "") {
-        screen("Il mio ricettario", "Ricette salvate sul telefono, consultabili anche offline.",
+        screen("Le mie ricette", "Ricette salvate sul telefono, consultabili anche offline.",
             "archive") { showArchive(search, category, difficulty, order, ingredientQuery) }
         val queryField = input("Cerca per nome o parola chiave", search)
         label("Ingredienti: la ricetta deve contenerli tutti", 14f, true)
@@ -1700,12 +1797,61 @@ class MainActivity : Activity() {
         label("Risultati: " + items.size, 17f, true)
         if (items.isEmpty()) label("Nessuna ricetta trovata. Cambia i filtri o aggiungine una.", 14f)
         items.forEach { r ->
-            action("🍴 " + r.title + "\n" + r.category + " · " + r.difficulty + " · " + r.duration) {
+            recipeListCard(r, r.category + " · " + r.difficulty + " · " + r.duration) {
                 showDetail(r.id)
             }
             action("📅 Pianifica «" + r.title + "»") { planSavedRecipe(r) }
         }
         action("＋ Nuova ricetta") { showEditor() }
+    }
+
+    /** Compact card used by both meal calendar and saved recipe lists. */
+    private fun recipeListCard(recipe: Recipe, subtitle: String, onClick: () -> Unit) {
+        val row = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(9), dp(7), dp(9), dp(7))
+            background = outlined(Color.WHITE, 15f)
+            isClickable = true
+            isFocusable = true
+            setOnClickListener { onClick() }
+        }
+        if (recipe.imagePath.isNotBlank() && File(recipe.imagePath).exists()) {
+            val thumb = ImageView(this).apply {
+                scaleType = ImageView.ScaleType.CENTER_CROP
+                background = shape(familyPale, 10f)
+                clipToOutline = true
+                contentDescription = "Foto: " + recipe.title
+                val image = BitmapFactory.decodeFile(recipe.imagePath,
+                    BitmapFactory.Options().apply { inSampleSize = 4 })
+                setImageBitmap(image)
+            }
+            row.addView(thumb, LinearLayout.LayoutParams(dp(57), dp(57)).apply {
+                marginEnd = dp(11)
+            })
+        }
+        val texts = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        texts.addView(TextView(this).apply {
+            text = recipe.title
+            textSize = 16f
+            setTextColor(familyInk)
+            setTypeface(null, Typeface.BOLD)
+            maxLines = 2
+        })
+        texts.addView(TextView(this).apply {
+            text = subtitle
+            textSize = 12f
+            setTextColor(Color.rgb(88, 103, 94))
+        })
+        row.addView(texts, LinearLayout.LayoutParams(0, -2, 1f))
+        row.addView(TextView(this).apply {
+            text = "›"
+            textSize = 25f
+            setTextColor(familyDeep)
+        })
+        content.addView(row, LinearLayout.LayoutParams(-1, -2).apply {
+            bottomMargin = dp(7)
+        })
     }
 
     private fun addPhotoPreview(path: String) {
@@ -1717,7 +1863,7 @@ class MainActivity : Activity() {
             scaleType = ImageView.ScaleType.CENTER_CROP
             contentDescription = "Foto della ricetta"
         }
-        content.addView(photo, LinearLayout.LayoutParams(-1, dp(145)).apply { bottomMargin = dp(8) })
+        content.addView(photo, LinearLayout.LayoutParams(dp(126), dp(100)).apply { bottomMargin = dp(8) })
     }
 
     private fun showDetail(id: Long) {

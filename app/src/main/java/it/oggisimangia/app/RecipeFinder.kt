@@ -23,7 +23,8 @@ data class WebRecipe(
     val rating: Double? = null,
     val feedbackCount: Int? = null,
     val relevance: Int = 0,
-    val ingredients: String = ""
+    val ingredients: String = "",
+    val verified: Boolean = true
 )
 
 object RecipeFinder {
@@ -65,24 +66,33 @@ object RecipeFinder {
             sourcePool.invokeAll(calls, 27, java.util.concurrent.TimeUnit.SECONDS)
                 .flatMap { try { if (it.isCancelled) emptyList() else it.get() }
                     catch (_: Exception) { emptyList() } }
-                .distinctBy { it.url.substringBefore('?') }.take(42)
+                .distinctBy { it.url.substringBefore('?') }
         } finally { sourcePool.shutdownNow() }
 
         // Source cards are not enough: only published Recipe JSON-LD with
         // the full ingredient list AND cooking steps may become a result.
         val pool = java.util.concurrent.Executors.newFixedThreadPool(6)
         val verified = try {
-            val calls = collected.map { candidate -> java.util.concurrent.Callable {
+            // Interleave the three editorial websites. Previously 18 Giallo hits
+            // occupied every worker before other sites were checked.
+            val sourcesInOrder = sources.map { site ->
+                collected.filter { it.source == site }.take(10)
+            }
+            val balanced = RecipeDiscovery.roundRobin(sourcesInOrder)
+            val calls = balanced.map { candidate -> java.util.concurrent.Callable {
                 try {
                     val html = Jsoup.connect(candidate.url)
-                        .userAgent("Mozilla/5.0 (Android; OggiSiMangia/1.5.3)")
+                        .userAgent("Mozilla/5.0 (Android; OggiSiMangia/1.8.1)")
                         .timeout(7500).maxBodySize(2_000_000).get().outerHtml()
                     RecipeDiscovery.preview(html, candidate.url, candidate.source, ingredients)
                 } catch (_: Exception) { null }
             } }
-            pool.invokeAll(calls, 36, java.util.concurrent.TimeUnit.SECONDS).mapNotNull {
-                try { if (it.isCancelled) null else it.get() } catch (_: Exception) { null }
-            }
+            pool.invokeAll(calls, 39, java.util.concurrent.TimeUnit.SECONDS)
+                .mapIndexed { index, future ->
+                    val confirmed = try { if (future.isCancelled) null else future.get() }
+                        catch (_: Exception) { null }
+                    confirmed ?: balanced[index].copy(verified = false)
+                }
         } finally { pool.shutdownNow() }
 
         // Category, difficulty and duration remain preferences, not exclusions.
