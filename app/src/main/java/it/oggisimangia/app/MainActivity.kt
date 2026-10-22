@@ -473,6 +473,8 @@ class MainActivity : Activity() {
         searchForDay = false
         selectedAlternative = false
         label("Tocca un giorno per vederne i pasti. Tieni premuto come da impostazioni Android per aggiungere una ricetta.", 13f)
+        actionRow("🔎 Cerca ricetta", { showSearch() },
+            "＋ Nuova ricetta", { showEditor() })
         action("ⓘ Come funziona il calendario") {
             AppHints.showAgain(this, "calendar_long_press", "Come funziona il calendario",
                 "Tocca una data per scegliere il giorno e vedere pranzo e cena. " +
@@ -530,8 +532,6 @@ class MainActivity : Activity() {
                 }, "🔎 Alternativa", { startMealSearch(meal, true) })
             }
         }
-        actionRow("🔎 Cerca ricetta", { showSearch() },
-            "＋ Nuova ricetta", { showEditor() })
         action("👤 " + displayName().ifBlank { "Il mio profilo" } + " · Cambia nome") {
             showNameIntroduction()
         }
