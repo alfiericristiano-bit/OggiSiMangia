@@ -1362,8 +1362,10 @@ class MainActivity : Activity() {
         lastSearchOffset = 0
         screen("Risultati per sito", "Ricette raggruppate per fonte, senza taglio globale a 10.",
             "recipe-sites") { showRecipeResults(lastSearchResults) }
-        label("Trovate " + items.size + " ricette da " + RecipeSources.sites.size + " fonti.", 17f, true)
-        label("Apri un sito per vedere le sue ricette, 10 alla volta. Da ogni elenco puoi selezionare una ricetta, salvarla o assegnarla al calendario.", 13f)
+        val confirmedCount = items.count { it.verified }
+        label(confirmedCount.toString() + " ricette verificate · " +
+            (items.size - confirmedCount) + " collegamenti da controllare", 17f, true)
+        label("Apri un sito per vedere le sue ricette, 10 alla volta. I collegamenti 'da controllare' provengono dalla ricerca web, ma non è stato possibile verificarne automaticamente tutti gli ingredienti.", 13f)
         actionRow("🔎 Modifica ricerca", { showSearch() },
             "⚙ Fonti e priorità", { showSourceSettings() })
         if (items.isEmpty()) {
@@ -1375,16 +1377,17 @@ class MainActivity : Activity() {
         RecipeSources.sites.entries.forEachIndexed { index, (name, domain) ->
             val siteRecipes = RecipeSourcePages.forSource(items, domain)
             label((index + 1).toString() + "ª fonte · " + name, 18f, true)
-            label(domain + " · " + siteRecipes.size + " ricette verificate", 13f)
+            label(domain + " · " + siteRecipes.count { it.verified } +
+                " verificate · " + siteRecipes.count { !it.verified } + " da controllare", 13f)
             if (siteRecipes.isNotEmpty()) {
                 siteRecipes.take(3).forEach { item ->
-                    label("🍽 " + item.title, 14f)
+                    label((if (item.verified) "✅ " else "🔎 ") + item.title, 14f)
                 }
-                action("📚 Sfoglia " + name + " (" + siteRecipes.size + " ricette)") {
+                action("📚 Sfoglia " + name + " (" + siteRecipes.size + " proposte)") {
                     showSiteRecipeResults(name, domain, 0)
                 }
             } else {
-                label("Nessuna proposta verificata da questo sito al momento.", 13f)
+                label("Non ho recuperato proposte da questa fonte: il sito o il motore di ricerca potrebbero limitare l'accesso. Puoi cercare su altre pagine o aprire il sito.", 13f)
             }
             if (name !in siteResultsExhausted) {
                 action("＋ Cerca altre ricette su " + name) {
@@ -1432,10 +1435,16 @@ class MainActivity : Activity() {
                 background = shape(Color.rgb(242, 248, 245), 12f)
             }
             row.addView(TextView(this).apply {
-                text = recipe.title; textSize = 17f
+                text = (if (recipe.verified) "✅ " else "🔎 ") + recipe.title
+                textSize = 17f
                 setTypeface(null, Typeface.BOLD); setTextColor(familyDeep)
             })
-            val differences = RecipePreferences.notices(recipe, searchCategory, searchDifficulty, searchDuration)
+            if (!recipe.verified) row.addView(TextView(this).apply {
+                text = "Da controllare: gli ingredienti della ricetta non sono ancora stati verificati automaticamente."
+                textSize = 13f; setTextColor(Color.rgb(140, 84, 20))
+            })
+            val differences = if (recipe.verified) RecipePreferences.notices(
+                recipe, searchCategory, searchDifficulty, searchDuration) else emptyList()
             if (differences.isNotEmpty()) row.addView(TextView(this).apply {
                 text = differences.joinToString("\n") { "⚠ " + it }
                 textSize = 13f; setTextColor(Color.rgb(139, 79, 15))
@@ -1538,7 +1547,14 @@ class MainActivity : Activity() {
                 screen(recipe.title, recipe.source, "online-" + recipe.url) {
                     showOnlineDetail(sourceRecipe, imported)
                 }
-                if (!imported) {
+                val fullMatch = result.ingredients.isNotBlank() &&
+                    RecipeValidation.containsEvery(result.ingredients, searchIngredients)
+                if (!recipe.verified && !fullMatch) {
+                    label("⚠ Ingredienti non verificati per tutti i termini cercati. Controlla la ricetta originale prima di salvarla o assegnarla al calendario.", 14f, true)
+                } else if (!recipe.verified && fullMatch) {
+                    label("✅ Ingredienti richiesti trovati nella scheda letta ora.", 14f)
+                }
+                if (!imported && (recipe.verified || fullMatch)) {
                     RecipePreferences.notices(recipe, searchCategory, searchDifficulty, searchDuration)
                         .forEach { label("⚠ " + it, 13f) }
                 }
@@ -1555,7 +1571,13 @@ class MainActivity : Activity() {
                 }
                 val details = onlineDraft(recipe, result, "Entrambe")
                 showRecipeMetadata(details)
-                action("📅 Aggiungi al calendario") {
+                action(if (recipe.verified || fullMatch) "📅 Aggiungi al calendario" else "📅 Controlla e pianifica la ricetta") {
+                    if (!recipe.verified && !fullMatch) {
+                        prepareOnlineDraft(recipe, result, "Entrambe") { draft ->
+                            showEditor(draft, planByDefault = true)
+                        }
+                        return@action
+                    }
                     chooseDate {
                         chooseMeal { meal, alternative ->
                             chooseSaveMode { mode ->
