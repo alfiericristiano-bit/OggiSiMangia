@@ -351,7 +351,7 @@
       button("🖨 Stampa","print-recipe")+'</div></section>'+
       '<div class="details"><article class="card">'+
       (r.photo?'<img class="photo-large" src="'+escape(r.photo)+'" alt="Foto di '+escape(r.title)+'">':"")+
-      ((r.scanPages||[]).length?'<div class="form-section"><h2>Pagine della rivista</h2><div class="scan-gallery">'+r.scanPages.map((photo,index)=>'<img class="scan-detail" src="'+escape(photo)+'" alt="Pagina '+(index+1)+'"></div>').join("")+'</div>':"")+
+      ((r.scanPages||[]).length?'<div class="form-section"><h2>Pagine della rivista</h2><div class="scan-gallery">'+r.scanPages.map((photo,index)=>'<img class="scan-detail" src="'+escape(photo)+'" alt="Pagina '+(index+1)+'">').join("")+'</div>':"")+
       ((r.dishPhotos||[]).some(x=>x.keep)?'<div class="form-section"><h2>Foto del piatto</h2><div class="scan-gallery">'+r.dishPhotos.filter(x=>x.keep).map(x=>'<img class="scan-detail" src="'+escape(x.photo)+'" alt="Foto del piatto">').join("")+'</div></div>':"")+
       (r.scanOcrText?'<div class="form-section"><h2>Testo OCR originale</h2><p>'+escape(r.scanOcrText).replace(/\n/g,"<br>")+'</p></div>':"")+
       '<div class="info-grid" style="margin:15px 0">'+info("Portata",r.category)+info("Difficoltà",r.difficulty)+info("Porzioni",r.portions)+
