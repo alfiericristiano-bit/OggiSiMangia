@@ -144,11 +144,15 @@ class LocalNanoAssistant(private val context: Context) {
                 if (model.checkStatus() != FeatureStatus.AVAILABLE) {
                     setState(State.UNAVAILABLE); onResult(null); return@launch
                 }
-                val answer = model.generateContent(prompt).candidates.firstOrNull()?.text.orEmpty()
+                val answer = model.generateContent(prompt).text.orEmpty()
                 onResult(NanoRecipeResponse.parse(answer, text))
             } catch (_: Exception) { onResult(null) }
         }
     }
 
-    fun close() { scope.cancel(); stateListener = null }
+    fun close() {
+        scope.cancel()
+        stateListener = null
+        try { client?.close() } catch (_: Exception) { }
+    }
 }
