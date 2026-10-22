@@ -8,6 +8,7 @@ import java.util.Locale
 sealed interface VoiceCommand {
     data class Open(val destination: Destination) : VoiceCommand
     data class Search(val ingredients: List<String>) : VoiceCommand
+    data class GuidedMealSearch(val ingredients: List<String>, val meal: String, val day: LocalDate) : VoiceCommand
     data class ShowDay(val day: LocalDate) : VoiceCommand
     data class ReadMeals(val day: LocalDate, val meal: String?) : VoiceCommand
     data class PlanSaved(val title: String, val meal: String, val day: LocalDate) : VoiceCommand
@@ -36,6 +37,19 @@ object VoiceCommands {
         val text = normalized(spoken).trim(' ', '.', '!', '?')
         if (text.isBlank()) return VoiceCommand.Unknown
         if (Regex("\\b(aiuto|help|comandi|cosa sai fare|come funziona)\\b").containsMatchIn(text)) return VoiceCommand.Help
+
+        val guided = Regex(
+            "^(?:organizza|organizzami|prepara|preparami|proponi|suggerisci|suggeriscimi|cerca|trova)" +
+                ".*?\\\\b(pranzo|cena)\\\\b.*?\\\\b(?:con|a base di|usando)\\\\s+(.+)$"
+        ).matchEntire(text)
+        if (guided != null) {
+            val ingredients = guided.groupValues[2]
+                .split(Regex("\\\\s*(?:,|;|\\\\s+e\\\\s+)\\\\s*"))
+                .map { it.trim() }.filter { it.isNotBlank() }.distinct().take(10)
+            if (ingredients.isNotEmpty()) return VoiceCommand.GuidedMealSearch(
+                ingredients, guided.groupValues[1].replaceFirstChar { it.uppercase() }, date(text, today)
+            )
+        }
 
         val plan = Regex(
             "^(?:aggiungi|metti|pianifica|inserisci|programma)\\s+(?:la ricetta\\s+|il piatto\\s+)?" +
