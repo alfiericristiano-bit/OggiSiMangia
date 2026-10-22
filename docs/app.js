@@ -440,7 +440,8 @@
       button("◐ Tema chiaro / scuro","toggle-theme")+
       button("ⓘ Rivedi guida","show-help")+
       button("Reimposta i dati di prova","reset-data","danger")+'</div>'+
-      '<p class="muted" style="font-size:12px;margin-top:18px">Ultima versione Android di riferimento: 1.7.0. Le modifiche del browser non passano automaticamente all’APK.</p></section>';
+      '<div class="notice" style="margin-top:14px"><strong>AI locale nell’app Android 1.11.0:</strong> Gemini Nano viene rilevato automaticamente soltanto sui telefoni compatibili. Il download richiede conferma e Wi-Fi non a consumo. L’OCR ML Kit rimane disponibile quando Nano non è supportato. Nessuna ricetta o fotografia viene inviata ad AI online. Questa anteprima web NON può usare Gemini Nano né simulare una scansione OCR reale: tali funzioni richiedono l’APK Android.</div>'+
+      '<p class="muted" style="font-size:12px;margin-top:18px">Ultima versione Android di riferimento: 1.11.0. L’anteprima è una simulazione smartphone distinta dall’APK.</p></section>';
   }
   function showHelp(force) {
     if(!force&&state.tipsHidden)return;
