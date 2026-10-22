@@ -511,13 +511,12 @@ class MainActivity : Activity() {
     }
 
     private fun showCalendar() {
-        screen("Il calendario dei pasti", "Organizza pranzo e cena, anche per i prossimi giorni.",
+        screen("Calendario", "Organizza pranzo e cena, anche per i prossimi giorni.",
             "calendar") { showCalendar() }
         searchForDay = false
         selectedAlternative = false
         label("Tocca un giorno per vederne i pasti. Tieni premuto come da impostazioni Android per aggiungere una ricetta.", 13f)
-        actionRow("🔎 Cerca ricetta", { showSearch() },
-            "＋ Nuova ricetta", { showEditor() })
+
         action("ⓘ Come funziona il calendario") {
             AppHints.showAgain(this, "calendar_long_press", "Come funziona il calendario",
                 "Tocca una data per scegliere il giorno e vedere pranzo e cena. " +
@@ -529,6 +528,7 @@ class MainActivity : Activity() {
             showCalendar()
         }, { day -> confirmDaySearch(day) })
         content.addView(calendar, LinearLayout.LayoutParams(-1, -2))
+        primaryAction("⌕  Cerca ricetta") { showSearch() }
         content.post {
             AppHints.showOnce(this, "calendar_long_press", "Come funziona il calendario",
                 "Tocca una data per scegliere il giorno e vedere pranzo e cena. " +
@@ -703,7 +703,7 @@ class MainActivity : Activity() {
         ocrStatusLabel = null
         magazinePagesContainer = null
         dishPhotosContainer = null
-        screen(if (existing == null || existing.id == 0L) "Scrivi la tua ricetta" else "Modifica ricetta",
+        screen(if (existing == null || existing.id == 0L) "Nuova ricetta da foto" else "Modifica ricetta",
             "Compila i campi che conosci. Nome, ingredienti e preparazione sono obbligatori.",
             "editor-${existing?.id ?: 0L}") {
             showEditor(existing, initialAlternative, suggestedTitle, suggestedUrl, planByDefault)
@@ -790,7 +790,7 @@ class MainActivity : Activity() {
             scaleType = ImageView.ScaleType.CENTER_CROP
             contentDescription = "Anteprima della foto della ricetta"
         }
-        content.addView(photoPreview, LinearLayout.LayoutParams(-1, dp(140)).apply { bottomMargin = dp(6) })
+        content.addView(photoPreview, LinearLayout.LayoutParams(dp(124), dp(100)).apply { bottomMargin = dp(6) })
         refreshPhotoPreview()
         actionRow("📷 Fotocamera", { launchCamera() }, "🖼️ Galleria", {
             startActivityForResult(Intent(Intent.ACTION_GET_CONTENT).apply {
@@ -1176,7 +1176,7 @@ class MainActivity : Activity() {
     }
 
     private fun showSearch() {
-        screen("Trova cosa cucinare", "Scopri le proposte senza uscire dall'app.",
+        screen("Cerca ricetta", "Scopri nuove ricette dai tuoi ingredienti.",
             "search") { showSearch() }
         label("Giorno scelto: " + selectedDate.format(dateFormatter), 16f, true)
         if (searchForDay) label(selectedMeal + " · " + if (selectedAlternative) "Alternativa" else "Principale", 16f, true)
@@ -1198,7 +1198,7 @@ class MainActivity : Activity() {
         label("Ingredienti obbligatori, anche singolare/plurale e preparazioni equivalenti. " +
             "Categoria, difficoltà e tempi sono preferenze: gli scostamenti vengono segnalati.", 13f)
 
-        primaryAction("🔎 CERCA RICETTE NEI SITI") search@{
+        primaryAction("⌕  Cerca ricette") search@{
             searchIngredients = ingredients.query() ?: return@search
             searchResultGeneration++
             val generation = searchResultGeneration
@@ -1252,7 +1252,7 @@ class MainActivity : Activity() {
     }
 
     private fun showSourceSettings() {
-        screen("Priorità dei siti", "L'ordine viene memorizzato per le prossime ricerche.",
+        screen("Fonti di ricerca", "L'ordine viene memorizzato per le prossime ricerche.",
             "sources") { showSourceSettings() }
         label("Le fonti con priorità più alta vengono prima nei risultati compatibili. Seguono pertinenza e valutazioni degli utenti, quando disponibili.", 14f)
         action("Aggiungi un sito") {
@@ -1494,7 +1494,7 @@ class MainActivity : Activity() {
                     scaleType = ImageView.ScaleType.CENTER_CROP
                     contentDescription = "Anteprima: " + recipe.title
                 }
-                row.addView(preview, LinearLayout.LayoutParams(-1, dp(130)))
+                row.addView(preview, LinearLayout.LayoutParams(dp(108), dp(90)).apply { topMargin = dp(6); bottomMargin = dp(5) })
                 fetchPreview(recipe.imageUrl, preview)
             }
             row.addView(TextView(this).apply {
@@ -1605,7 +1605,7 @@ class MainActivity : Activity() {
                         scaleType = ImageView.ScaleType.CENTER_CROP
                         contentDescription = "Foto della ricetta da " + recipe.source
                     }
-                    content.addView(photo, LinearLayout.LayoutParams(-1, dp(200)))
+                    content.addView(photo, LinearLayout.LayoutParams(-1, dp(132)))
                     fetchPreview(imageUrl, photo)
                     label("Foto: " + recipe.source, 12f)
                 }
@@ -1739,9 +1739,38 @@ class MainActivity : Activity() {
         }.start()
     }
 
+    /** Compact day overview and statistics derived from existing records. */
+    private fun showSummary(statistics: Boolean = false) {
+        screen("Riepilogo", "I tuoi giorni e pasti pianificati.", "summary") { showSummary(statistics) }
+        actionRow("Giorni pianificati", { showSummary(false) },
+            "Statistiche", { showSummary(true) })
+        val all = db.archive("", "Tutte", "Tutte", "Data (recenti)")
+        val scheduled = all.filter { it.day.isNotBlank() }
+        val days = scheduled.groupBy { it.day }.toSortedMap(compareByDescending { it })
+        val lunches = scheduled.count { it.meal == "Pranzo" || it.meal == "Entrambi" }
+        val dinners = scheduled.count { it.meal == "Cena" || it.meal == "Entrambi" }
+        label("📅  Giorni pianificati: " + days.size, 18f, true)
+        label("☀  Pranzi pianificati: " + lunches, 17f, true)
+        label("🌙  Cene pianificate: " + dinners, 17f, true)
+        if (statistics) {
+            label("📚  Ricette nel ricettario: " + all.size, 17f, true)
+            label("🍽  Pasti complessivi: " + (lunches + dinners), 17f, true)
+            label("Le ricette alternative sono comprese nei conteggi.", 13f)
+        } else {
+            label("Ultimi giorni", 19f, true)
+            if (days.isEmpty()) label("Nessun giorno pianificato: scegli una data nel calendario.", 14f)
+            days.entries.take(20).forEach { (day, recipes) ->
+                action("📅 " + day + "    " + recipes.joinToString(" · ") { it.title }) {
+                    selectedDate = LocalDate.parse(day)
+                    showCalendar()
+                }
+            }
+        }
+    }
+
     private fun showArchive(search: String = "", category: String = "Tutte",
                             difficulty: String = "Tutte", order: String = "Nome A–Z", ingredientQuery: String = "") {
-        screen("Il mio ricettario", "Ricette salvate sul telefono, consultabili anche offline.",
+        screen("Le mie ricette", "Ricette salvate sul telefono, consultabili anche offline.",
             "archive") { showArchive(search, category, difficulty, order, ingredientQuery) }
         val queryField = input("Cerca per nome o parola chiave", search)
         label("Ingredienti: la ricetta deve contenerli tutti", 14f, true)
@@ -1779,7 +1808,7 @@ class MainActivity : Activity() {
             scaleType = ImageView.ScaleType.CENTER_CROP
             contentDescription = "Foto della ricetta"
         }
-        content.addView(photo, LinearLayout.LayoutParams(-1, dp(145)).apply { bottomMargin = dp(8) })
+        content.addView(photo, LinearLayout.LayoutParams(dp(126), dp(100)).apply { bottomMargin = dp(8) })
     }
 
     private fun showDetail(id: Long) {
