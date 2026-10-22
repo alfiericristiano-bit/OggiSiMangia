@@ -187,6 +187,16 @@ class MainActivity : Activity() {
             setTextColor(Color.rgb(82, 103, 76))
             gravity = Gravity.CENTER
         })
+        if (title.isNotBlank()) {
+            layout.addView(Button(this).apply {
+                text = "? Guida"
+                isAllCaps = false
+                contentDescription = "Apri guida di OggiSiMangia"
+                setTextColor(Color.rgb(21, 123, 52))
+                background = outlined(Color.WHITE, 14f)
+                setOnClickListener { GuideDialog.show(this@MainActivity) }
+            }, LinearLayout.LayoutParams(dp(132), dp(46)).apply { topMargin = dp(9) })
+        }
         val image = ImageView(this).apply {
             setImageResource(R.drawable.app_icon_clean)
             contentDescription = "Calendario, pasta e basilico di OggiSiMangia"
@@ -334,6 +344,18 @@ class MainActivity : Activity() {
             setTextColor(Color.rgb(88, 103, 94)); maxLines = 2
         })
         hero.addView(headerText, LinearLayout.LayoutParams(0, -2, 1f))
+        // Contextual help stays visible in every screen and opens as a non-destructive
+        // overlay: unsaved form fields, photos, scroll position and back history stay intact.
+        hero.addView(Button(this).apply {
+            text = "? Guida"
+            isAllCaps = false
+            textSize = 13f
+            setTypeface(null, Typeface.BOLD)
+            setTextColor(familyDeep)
+            contentDescription = "Apri guida della schermata " + title
+            background = outlined(familyPale, 13f)
+            setOnClickListener { GuideDialog.show(this@MainActivity, key) }
+        }, LinearLayout.LayoutParams(dp(80), dp(46)).apply { marginStart = dp(5) })
         content.addView(hero, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(9) })
         if (key != "calendar") {
             val back = Button(this).apply {
@@ -1601,6 +1623,9 @@ class MainActivity : Activity() {
             content.addView(row, LinearLayout.LayoutParams(-1, -2).apply {
                 bottomMargin = dp(5)
             })
+        }
+        action("❔ Guida completa: spiegazioni di schede e pulsanti") {
+            GuideDialog.show(this)
         }
         action("🤖 Impostazioni AI locale e privacy") { showAiSettings() }
         action("Ripristina siti e ordine iniziali") {
