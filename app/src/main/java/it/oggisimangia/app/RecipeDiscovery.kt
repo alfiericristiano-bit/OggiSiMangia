@@ -37,8 +37,67 @@ object RecipeDiscovery {
         if (rss.isNotEmpty()) return rss
         return Jsoup.parse(body).select("li.b_algo h2 a[href], #b_results h2 a[href]")
             .map { it.attr("href").trim() }
-            .filter { RecipeSources.belongs(it, domain) }.distinct().take(4)
+            .filter { RecipeSources.belongs(it, domain) }.distinct().take(12)
     }
+
+
+    internal data class Candidate(val url: String, val title: String, val site: String)
+
+    private fun acceptableLink(link: String, domain: String): Boolean {
+        if (!RecipeSources.belongs(link, domain)) return false
+        val path = try { java.net.URI(link).path.orEmpty().lowercase() } catch (_: Exception) { return false }
+        if (path.length < 7) return false
+        return listOf("/ricerca", "/search", "/category/", "/categoria/", "/categorie/",
+            "/tag/", "/author/", "/autori/", "/page/", "/privacy", "/contatti").none { it in path }
+    }
+
+    private fun cleanCandidateTitle(raw: String, link: String): String {
+        val title = Jsoup.parse(raw).text().trim()
+            .substringBefore(" - Ricetta").substringBefore(" | ").substringBefore(" - Misya")
+            .trim()
+        if (title.length in 6..130) return title
+        val slug = try { java.net.URI(link).path.substringAfterLast('/').ifBlank {
+            java.net.URI(link).path.trimEnd('/').substringAfterLast('/')
+        } } catch (_: Exception) { "" }
+        return slug.substringBefore('.').replace('-', ' ').replace('_', ' ')
+            .trim().replaceFirstChar { it.uppercase() }.take(130)
+    }
+
+    /** RSS/HTML may provide a valid recipe link even when the site blocks metadata reading.
+     * Such hits remain unverified and are NEVER claimed to match all ingredient lists.
+     */
+    internal fun candidates(body: String, site: String, domain: String): List<Candidate> {
+        val found = linkedMapOf<String, Candidate>()
+        fun add(url: String, title: String) {
+            val normalized = url.trim().substringBefore('#')
+            if (!acceptableLink(normalized, domain)) return
+            val name = cleanCandidateTitle(title, normalized)
+            if (name.length < 5) return
+            found.putIfAbsent(normalized.substringBefore('?'),
+                Candidate(normalized, name, site))
+        }
+        val rss = Jsoup.parse(body, "", Parser.xmlParser())
+        rss.select("item").forEach { item ->
+            add(item.selectFirst("link")?.text().orEmpty(),
+                item.selectFirst("title")?.text().orEmpty())
+        }
+        if (found.isEmpty()) {
+            val html = Jsoup.parse(body)
+            html.select("li.b_algo h2 a[href], #b_results h2 a[href], article h2 a[href], .result a[href]").forEach {
+                add(it.attr("href"), it.text())
+            }
+        }
+        return found.values.take(16)
+    }
+
+    /** Interleave sources before HTTP verification so one site cannot consume all time slots. */
+    internal fun <T> roundRobin(groups: List<List<T>>): List<T> {
+        val largest = groups.maxOfOrNull { it.size } ?: 0
+        return (0 until largest).flatMap { index -> groups.mapNotNull { it.getOrNull(index) } }
+    }
+
+    private fun pendingPreview(candidate: Candidate) = WebRecipe(
+        candidate.title, "", candidate.url, candidate.site, verified = false)
 
     internal fun schema(html: String): JSONObject? {
         val found = mutableListOf<JSONObject>()
@@ -102,60 +161,64 @@ object RecipeDiscovery {
         return WebRecipe(title, description, link, site, image, category, difficulty, mins, rating, count, relevance, reader.ingredients)
     }
 
-    /** Request the next search-engine page for one source only; other sources are unaffected. */
+
+    /** Query only the selected source, returning verified recipes first plus separately labelled candidates. */
     fun searchNextPage(ingredients: String, site: String, domain: String, page: Int): List<WebRecipe> {
         require(page >= 1)
         require(RecipeSources.sites[site] == domain) { "Fonte non configurata" }
-        val queries = RecipeSearchQueries.variants(ingredients)
-        if (queries.isEmpty()) return emptyList()
-        val links = linkedSetOf<String>()
-        for (query in queries) {
-            try {
-                links += searchLinks(download(RecipeSearchQueries.bing(domain, query, page * 10)), domain)
-            } catch (_: Exception) { /* Other configured sites remain available. */ }
-            if (links.size >= 12) break
-        }
+        val query = RecipeSearchQueries.variants(ingredients).lastOrNull() ?: return emptyList()
+        val hits = try {
+            candidates(download(RecipeSearchQueries.bing(domain, query, page * 10)), site, domain)
+        } catch (_: Exception) { emptyList() }
         val pool = Executors.newFixedThreadPool(6)
         return try {
-            val jobs = links.take(12).map { link -> Callable {
-                try { preview(download(link), link, site, ingredients) }
+            val jobs = hits.take(12).map { candidate -> Callable {
+                try { preview(download(candidate.url), candidate.url, candidate.site, ingredients) }
                 catch (_: Exception) { null }
             } }
-            val items = pool.invokeAll(jobs, 33, TimeUnit.SECONDS).mapNotNull {
-                try { if (it.isCancelled) null else it.get() } catch (_: Exception) { null }
+            val checked = pool.invokeAll(jobs, 29, TimeUnit.SECONDS).mapIndexed { index, future ->
+                try { if (future.isCancelled) null else future.get() } catch (_: Exception) { null }
+                    ?: pendingPreview(hits[index])
             }
-            RecipeRanking.order(items.distinctBy { it.url.substringBefore('?').substringBefore('#').trimEnd('/') }, ingredients)
+            RecipeRanking.order(checked, ingredients)
         } finally { pool.shutdownNow() }
     }
 
     fun search(ingredients: String, category: String, difficulty: String, duration: String): List<WebRecipe> {
         val queries = RecipeSearchQueries.variants(ingredients)
-        if (queries.isEmpty()) return emptyList()
-        // One task per configured source. A punctuation fallback should not
-        // prevent sources at the end of the user's priority list from running.
+        val sites = RecipeSources.sites.toList()
+        if (queries.isEmpty() || sites.isEmpty()) return emptyList()
         val executor = Executors.newFixedThreadPool(12)
         try {
-            val searches = RecipeSources.sites.toList().map { (site, domain) -> Callable {
-                val found = linkedSetOf<String>()
-                for (query in queries) {
+            // Candidate discovery and page verification have separate budgets.
+            val discoveryJobs = sites.map { (site, domain) -> Callable {
+                val found = linkedMapOf<String, Candidate>()
+                // Start with a normal query; commas and RSS syntax can suppress other sites.
+                for (query in queries.reversed()) {
                     try {
-                        found += searchLinks(download(RecipeSearchQueries.bing(domain, query)), domain)
-                    } catch (_: Exception) {
-                        // Try a form without the trailing comma if this one fails.
-                    }
-                    if (found.size >= 12) break
+                        candidates(download(RecipeSearchQueries.bing(domain, query)), site, domain)
+                            .forEach { found.putIfAbsent(it.url.substringBefore('?'), it) }
+                    } catch (_: Exception) { /* Continue with another query; don't discard other sites. */ }
+                    if (found.size >= 8) break
                 }
-                found.take(12).map { site to it }
+                found.values.take(8)
             } }
-            // Keep a bounded network budget so UI search does not hang.
-            val links = executor.invokeAll(searches, 25, TimeUnit.SECONDS).flatMap {
-                try { if (it.isCancelled) emptyList() else it.get() } catch (_: Exception) { emptyList() }
-            }.distinctBy { it.second }
-            val reads = links.map { (site, link) -> Callable {
-                try { preview(download(link), link, site, ingredients) } catch (_: Exception) { null }
+            val groups = executor.invokeAll(discoveryJobs, 28, TimeUnit.SECONDS).map {
+                try { if (it.isCancelled) emptyList() else it.get() }
+                catch (_: Exception) { emptyList() }
+            }
+            // Round-robin ensures the first verification wave covers every source.
+            val candidates = roundRobin(groups)
+                .distinctBy { it.url.substringBefore('?').substringBefore('#').trimEnd('/') }
+            val checks = candidates.map { candidate -> Callable {
+                try { preview(download(candidate.url), candidate.url, candidate.site, ingredients) }
+                catch (_: Exception) { null }
             } }
-            val all = executor.invokeAll(reads, 43, TimeUnit.SECONDS).mapNotNull {
-                try { if (it.isCancelled) null else it.get() } catch (_: Exception) { null }
+            val futures = executor.invokeAll(checks, 43, TimeUnit.SECONDS)
+            val all = futures.mapIndexed { index, future ->
+                val verified = try { if (future.isCancelled) null else future.get() }
+                    catch (_: Exception) { null }
+                verified ?: pendingPreview(candidates[index])
             }
             return RecipeRanking.order(all, ingredients)
         } finally { executor.shutdownNow() }
