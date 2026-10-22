@@ -74,6 +74,20 @@ class RecipeSearchTest {
         assertEquals(4.555555,r.rating!!,0.00001)
         assertNull(RecipeDiscovery.preview(html,"https://www.tavolartegusto.it/ricetta/pasta/","Tavolartegusto","cioccolato"))
     }
+    @Test fun nextPageSearchTargetsOnlyTheChosenDomain() {
+        val url = RecipeSearchQueries.bing("misya.info", "pasta zucchine", 10)
+        assertTrue(url.contains("site%3Amisya.info"))
+        assertTrue(url.contains("first=11"))
+        assertFalse(url.contains("giallozafferano.it"))
+    }
+    @Test fun rssDiscoveryNoLongerStopsAfterFourLinksPerSite() {
+        val links = (1..16).joinToString("") {
+            "<item><link>https://www.misya.info/ricetta/prova-" + it + ".htm</link></item>"
+        }
+        val xml = "<rss><channel>" + links + "</channel></rss>"
+        assertEquals(12, RecipeDiscovery.searchLinks(xml, "misya.info").size)
+    }
+
     @Test fun preferenceDeviationsAreDisplayedWithoutExcludingPublishedRecipes() {
         val r = WebRecipe("Lenticchie in umido", "", "https://www.misya.info/ricetta/lenticchie.htm",
             "Misya", category = "Contorno", difficulty = "Media", minutes = 50,
