@@ -40,11 +40,11 @@ object VoiceCommands {
 
         val guided = Regex(
             "^(?:organizza|organizzami|prepara|preparami|proponi|suggerisci|suggeriscimi|cerca|trova)" +
-                ".*?\\\\b(pranzo|cena)\\\\b.*?\\\\b(?:con|a base di|usando)\\\\s+(.+)$"
+                ".*?\\b(pranzo|cena)\\b.*?\\b(?:con|a base di|usando)\\s+(.+)$"
         ).matchEntire(text)
         if (guided != null) {
             val ingredients = guided.groupValues[2]
-                .split(Regex("\\\\s*(?:,|;|\\\\s+e\\\\s+)\\\\s*"))
+                .split(Regex("\\s*(?:,|;|\\s+e\\s+)\\s*"))
                 .map { it.trim() }.filter { it.isNotBlank() }.distinct().take(10)
             if (ingredients.isNotEmpty()) return VoiceCommand.GuidedMealSearch(
                 ingredients, guided.groupValues[1].replaceFirstChar { it.uppercase() }, date(text, today)
