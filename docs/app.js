@@ -409,12 +409,12 @@
       '<section class="card"><h2>Cosa puoi provare qui</h2><p>Calendario mensile, inserimento manuale delle ricette con foto compressa, ricettario, ricerca per tutti gli ingredienti, assegnazioni pranzo/cena, alternative, clonazione e preferenze dei siti.</p>'+
       '<h2 style="margin-top:23px">Differenze rispetto all’APK Android</h2><p>Questo sito non esegue l’APK. Non utilizza SQLite Android né sincronizza i dati del telefono. Le ricette sono salvate nello spazio locale del browser; pulire i dati del browser può eliminarle. La ricerca automatica nelle fonti esterne, le notifiche e la stampa Android non sono riprodotte. Puoi stampare una scheda usando la stampa del browser.</p>'+
       '<div class="notice"><strong>I tuoi dati di prova restano su questo dispositivo.</strong> Non è presente alcun server che raccolga le ricette. Ti consiglio di esportare un backup se vuoi conservarle.</div>'+
-      '<div class="head-actions" style="margin-top:20px">'+button("↓ Esporta backup JSON","export-json","primary")+
+      '<div class="head-actions" style="margin-top:20px">'+button("👤 Cambia nome ("+escape(state.profileName||"non impostato")+")","edit-profile","soft")+button("↓ Esporta backup JSON","export-json","primary")+
       '<label class="btn">↑ Importa backup<input id="import-json" type="file" accept=".json,application/json" hidden></label>'+
       button("◐ Tema chiaro / scuro","toggle-theme")+
       button("ⓘ Rivedi guida","show-help")+
       button("Reimposta i dati di prova","reset-data","danger")+'</div>'+
-      '<p class="muted" style="font-size:12px;margin-top:18px">Ultima versione Android di riferimento: 1.5.4. Le modifiche del browser non passano automaticamente all’APK.</p></section>';
+      '<p class="muted" style="font-size:12px;margin-top:18px">Ultima versione Android di riferimento: 1.7.0. Le modifiche del browser non passano automaticamente all’APK.</p></section>';
   }
   function showHelp(force) {
     if(!force&&state.tipsHidden)return;
@@ -605,7 +605,7 @@
       modal("Ripristinare i dati dimostrativi?",'<p>Le ricette e le preferenze salvate in questo browser saranno cancellate. Esporta prima un backup se vuoi conservarle.</p>'+
         '<div class="modal-actions">'+button("Annulla","close-modal")+button("Cancella dati di prova","confirm-reset","danger")+'</div>');return;
     }
-    if(action==="confirm-reset"){state=fresh();persist();closeModal();selected=todayISO();month=fromISO(selected);view="calendar";render();toast("Dati dimostrativi ripristinati.");return;}
+    if(action==="confirm-reset"){state=fresh();persist();closeModal();selected=todayISO();month=fromISO(selected);view="onboarding-name";render();toast("Dati dimostrativi ripristinati.");return;}
   }
   async function compressPhoto(file) {
     if(!file||!file.type.startsWith("image/"))throw Error("Formato non supportato");
