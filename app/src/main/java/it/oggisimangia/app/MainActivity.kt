@@ -562,7 +562,9 @@ class MainActivity : Activity() {
             })
             if (planned.isEmpty()) label("Nessun piatto assegnato.", 13f)
             planned.forEach { recipe ->
-                action((if (recipe.alternative) "↪ " else "• ") + recipe.title) { showDetail(recipe.id) }
+                recipeListCard(recipe,
+                    if (recipe.alternative) "Alternativa · " + recipe.category else recipe.category
+                ) { showDetail(recipe.id) }
                 if (expanded) {
                     actionRow("✏️ Modifica", { changePlanning(recipe) },
                         "🗑 Dal giorno", { removeFromDay(recipe) })
@@ -1291,6 +1293,8 @@ class MainActivity : Activity() {
             val row = LinearLayout(this).apply {
                 orientation = LinearLayout.HORIZONTAL
                 gravity = Gravity.CENTER_VERTICAL
+                setPadding(dp(7), dp(6), dp(7), dp(6))
+                background = outlined(Color.WHITE, 15f)
             }
             val spinner = Spinner(this).apply {
                 adapter = ArrayAdapter(this@MainActivity,
@@ -1472,7 +1476,7 @@ class MainActivity : Activity() {
             val row = LinearLayout(this).apply {
                 orientation = LinearLayout.VERTICAL
                 setPadding(dp(12), dp(10), dp(12), dp(12))
-                background = shape(Color.rgb(242, 248, 245), 12f)
+                background = outlined(Color.WHITE, 15f)
             }
             row.addView(TextView(this).apply {
                 text = (if (recipe.verified) "✅ " else "🔎 ") + recipe.title
@@ -1511,8 +1515,10 @@ class MainActivity : Activity() {
                 setPadding(0, dp(5), 0, dp(5))
             })
             row.addView(Button(this).apply {
-                text = "👀 Apri scheda · Salva o pianifica"
+                text = "Apri ricetta · Salva o pianifica →"
                 isAllCaps = false
+                setTextColor(Color.WHITE)
+                background = shape(familyDeep, 13f)
                 setOnClickListener { popup.dismiss(); showOnlineDetail(recipe) }
             }, LinearLayout.LayoutParams(-1, dp(44)))
             rows.addView(row, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(12) })
@@ -1791,12 +1797,61 @@ class MainActivity : Activity() {
         label("Risultati: " + items.size, 17f, true)
         if (items.isEmpty()) label("Nessuna ricetta trovata. Cambia i filtri o aggiungine una.", 14f)
         items.forEach { r ->
-            action("🍴 " + r.title + "\n" + r.category + " · " + r.difficulty + " · " + r.duration) {
+            recipeListCard(r, r.category + " · " + r.difficulty + " · " + r.duration) {
                 showDetail(r.id)
             }
             action("📅 Pianifica «" + r.title + "»") { planSavedRecipe(r) }
         }
         action("＋ Nuova ricetta") { showEditor() }
+    }
+
+    /** Compact card used by both meal calendar and saved recipe lists. */
+    private fun recipeListCard(recipe: Recipe, subtitle: String, onClick: () -> Unit) {
+        val row = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(9), dp(7), dp(9), dp(7))
+            background = outlined(Color.WHITE, 15f)
+            isClickable = true
+            isFocusable = true
+            setOnClickListener { onClick() }
+        }
+        if (recipe.imagePath.isNotBlank() && File(recipe.imagePath).exists()) {
+            val thumb = ImageView(this).apply {
+                scaleType = ImageView.ScaleType.CENTER_CROP
+                background = shape(familyPale, 10f)
+                clipToOutline = true
+                contentDescription = "Foto: " + recipe.title
+                val image = BitmapFactory.decodeFile(recipe.imagePath,
+                    BitmapFactory.Options().apply { inSampleSize = 4 })
+                setImageBitmap(image)
+            }
+            row.addView(thumb, LinearLayout.LayoutParams(dp(57), dp(57)).apply {
+                marginEnd = dp(11)
+            })
+        }
+        val texts = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        texts.addView(TextView(this).apply {
+            text = recipe.title
+            textSize = 16f
+            setTextColor(familyInk)
+            setTypeface(null, Typeface.BOLD)
+            maxLines = 2
+        })
+        texts.addView(TextView(this).apply {
+            text = subtitle
+            textSize = 12f
+            setTextColor(Color.rgb(88, 103, 94))
+        })
+        row.addView(texts, LinearLayout.LayoutParams(0, -2, 1f))
+        row.addView(TextView(this).apply {
+            text = "›"
+            textSize = 25f
+            setTextColor(familyDeep)
+        })
+        content.addView(row, LinearLayout.LayoutParams(-1, -2).apply {
+            bottomMargin = dp(7)
+        })
     }
 
     private fun addPhotoPreview(path: String) {
