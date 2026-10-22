@@ -1373,7 +1373,7 @@ class MainActivity : Activity() {
             action("＋ Aggiungi un sito di ricette") { showSourceSettings() }
         }
         RecipeSources.sites.entries.forEachIndexed { index, (name, domain) ->
-            val siteRecipes = items.filter { RecipeSources.belongs(it.url, domain) }
+            val siteRecipes = RecipeSourcePages.forSource(items, domain)
             label((index + 1).toString() + "ª fonte · " + name, 18f, true)
             label(domain + " · " + siteRecipes.size + " ricette verificate", 13f)
             if (siteRecipes.isNotEmpty()) {
@@ -1399,7 +1399,7 @@ class MainActivity : Activity() {
 
     /** Pagination belongs to one website, not the complete search. */
     private fun showSiteRecipeResults(site: String, domain: String, offset: Int = 0) {
-        val items = lastSearchResults.filter { RecipeSources.belongs(it.url, domain) }
+        val items = RecipeSourcePages.forSource(lastSearchResults, domain)
         if (items.isEmpty()) {
             showRecipeResults(lastSearchResults)
             return
