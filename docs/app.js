@@ -58,7 +58,7 @@
   let state=load(), view=(state.profileName?"calendar":"onboarding-name"), selected=todayISO(), month=fromISO(todayISO());
   let editingId=null,photoDraft="",formIngredients=[""],formSteps=[""];
   let scanDraft=[],dishDraft=[],scanOcrDraft="";
-  let archiveSearch="",archiveCategory="Tutte",archiveIngredientFields=[""];
+  let archiveSearch="",archiveCategory="Tutte",archiveType="Qualsiasi",archiveIngredientFields=[""];
   let expandedMeals=new Set();
   const pageHistory=[];
   let previousView=null,previousRecipeId=null,restoringPage=false;
@@ -218,19 +218,42 @@
       }).join(""):'<div class="empty">Nessun pasto assegnato in questo mese.</div>')+
       '</section>';
   }
+  const RECIPE_TYPES=["Qualsiasi","Vegetariana","Vegana","Con carne","Con pesce",
+    "Senza glutine (da verificare)","Senza lattosio (da verificare)"];
+  function typeMatches(ingredients,kind) {
+    if(kind==="Qualsiasi")return true;
+    const text=slug((ingredients||[]).join(" "));
+    if(!text)return true; // unknown, not certified
+    const contains=pattern=>new RegExp("(^|[^a-z])("+pattern+")(?![a-z])","i").test(text);
+    const meat="pollo|tacchino|manzo|vitello|maiale|salsiccia|pancetta|prosciutto|carne|salame|guanciale|speck";
+    const fish="pesce|tonno|salmone|acciughe|alici|gamberi|cozze|vongole|merluzzo|sardine";
+    const animal="uova|uovo|latte|burro|panna|parmigiano|formaggio|mozzarella|ricotta|miele|yogurt";
+    const gluten="pasta|spaghetti|penne|farina|pane|grano|frumento|semola|orzo|farro|segale|biscotti";
+    const dairy="latte|burro|panna|parmigiano|formaggio|mozzarella|ricotta|yogurt|lattosio";
+    if(kind==="Vegetariana")return !contains(meat)&&!contains(fish);
+    if(kind==="Vegana")return !contains(meat)&&!contains(fish)&&!contains(animal);
+    if(kind==="Con carne")return contains(meat);
+    if(kind==="Con pesce")return contains(fish);
+    if(kind.startsWith("Senza glutine"))return !contains(gluten);
+    if(kind.startsWith("Senza lattosio"))return !contains(dairy);
+    return true;
+  }
   function renderArchive() {
     const query=slug(archiveSearch.trim()),category=archiveCategory;
     const terms=archiveIngredientFields.map(x=>slug(x.trim())).filter(Boolean);
     const filtered=state.recipes.filter(function(r){
       return (!query||slug(r.title+" "+(r.description||"")).includes(query)) &&
         (category==="Tutte"||r.category===category) &&
+        typeMatches(r.ingredients, archiveType) &&
         terms.every(function(term){return (r.ingredients||[]).some(i=>ingredientMatch(i,term));});
     });
     app.innerHTML='<section class="headline"><div><p class="kicker">Il tuo archivio</p><h1>Ricettario</h1><p class="subtitle">Cerca tra le ricette salvate in questo browser. Tutti gli ingredienti inseriti sono obbligatori.</p></div>'+
       button("＋ Scrivi ricetta","new-recipe","primary")+'</section>'+
       '<section class="card" style="margin-bottom:19px"><form id="archive-form"><div class="filters">'+
       field("search","Nome del piatto",archiveSearch,{placeholder:"Es. pasta alle zucchine"})+
-      field("category","Categoria",archiveCategory,{select:["Tutte"].concat(CATEGORIES)})+'</div>'+
+      field("category","Categoria",archiveCategory,{select:["Tutte"].concat(CATEGORIES)})+
+      field("type","Tipologia alimentare (indicativa)",archiveType,{select:RECIPE_TYPES})+'</div>'+
+      '<p class="subtitle">Tipologia alimentare calcolata dagli ingredienti salvati. Vegano, vegetariano e i filtri senza allergeni NON sono certificazioni: controlla sempre la ricetta originale.</p>'+
       '<div class="field"><label>Ingrediente principale e altri ingredienti — tutti obbligatori quando inseriti (massimo 10)</label><div id="filter-ingredient-rows" class="select-ingredients">'+archiveIngredientFields.map((x,i)=>ingredientFilterLine(x,i)).join("")+'</div></div>'+
       '<div class="head-actions archive-search-actions" style="margin-top:12px">'+button("＋ Ingrediente","add-filter-ingredient","soft")+
       button("↻ Azzera ingredienti","reset-ingredients","soft")+'</div>'+
@@ -460,6 +483,8 @@
     if(q)archiveSearch=q.value;
     const cat=document.querySelector('#archive-form [name="category"]');
     if(cat)archiveCategory=cat.value;
+    const type=document.querySelector('#archive-form [name="type"]');
+    if(type)archiveType=type.value;
     archiveIngredientFields=Array.from(document.querySelectorAll("[data-filter-ingredient]")).map(x=>x.value);
   }
   function click(e) {
@@ -573,7 +598,7 @@
       render();return;
     }
     if(action==="reset-ingredients"){currentArchiveValues();archiveIngredientFields=[""];render();return;}
-    if(action==="reset-filters"){archiveSearch="";archiveCategory="Tutte";archiveIngredientFields=[""];render();return;}
+    if(action==="reset-filters"){archiveSearch="";archiveCategory="Tutte";archiveType="Qualsiasi";archiveIngredientFields=[""];render();return;}
     if(action==="add-source"){sourceDialog();return;}
     if(action==="move-source"){
       const other=idx+Number(b.dataset.dir);
