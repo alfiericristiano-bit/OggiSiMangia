@@ -22,7 +22,9 @@ object RecipeSearchQueries {
     }
 
     fun bing(domain: String, query: String, offset: Int = 0): String {
-        val text = "site:$domain ricetta $query"
+        // Site restriction is enough: adding the word "ricetta" excludes legitimate
+        // pages that use cooking-category titles rather than that exact word.
+        val text = "site:$domain $query"
         return "https://www.bing.com/search?q=" + URLEncoder.encode(text, "UTF-8") + "&format=rss" +
             (if (offset > 0) "&first=" + (offset + 1) else "")
     }
