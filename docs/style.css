@@ -1,7 +1,7 @@
 :root {
   color-scheme: light;
-  --bg: #f7f8f4; --paper: #fff; --paper-soft: #f8faf6; --ink: #203429; --muted: #69796c;
-  --green: #235a3b; --green-2: #31734e; --green-pale: #e8f3e9; --outline: #e1e9df;
+  --bg: #f9faf5; --paper: #fff; --paper-soft: #fcfdf8; --ink: #2b4030; --muted: #718070;
+  --green: #355f43; --green-2: #426e49; --green-pale: #eef5df; --outline: #e5e9db;
   --lunch: #da7a27; --dinner: #497ab8; --shadow: 0 6px 34px rgba(19,49,32,.045);
 }
 * { box-sizing: border-box; }
@@ -692,3 +692,41 @@ body.dark .calendar-hero::after{opacity:.58;}
 @media screen and (max-width:520px){
   .phone-preview .app-backbar { margin-bottom:8px; }
 }
+
+/* 1.6.0 — EasyPlan-inspired light, leafy mobile styling (original OggiSiMangia components). */
+.phone-preview .topbar {
+  background:linear-gradient(110deg,#b8d179,#e0edbc);
+  color:#2b4c35;border-bottom-color:transparent;
+  box-shadow:0 5px 17px rgba(73,108,40,.11);
+}
+.phone-preview .brand-theme {color:#355f43;background:#f5f9ed;border:1px solid #d9e8b7;}
+.phone-preview .calendar-hero {background:linear-gradient(128deg,#bdd687,#edf5da);color:#2d5038;box-shadow:none;}
+.phone-preview .calendar-hero h1,.phone-preview .calendar-hero p,.phone-preview .calendar-hero .kicker {color:#2b4c35;}
+.phone-preview .btn.primary,.phone-preview .search-cta {background:#638d4d;border-color:#638d4d;color:#fff;box-shadow:0 5px 13px rgba(66,102,50,.16);}
+.phone-preview .btn.primary:hover {background:#507b3c;border-color:#507b3c;}
+.phone-preview .btn.soft {background:#eef5df;color:#365c42;border-color:#e1ead1;}
+.phone-preview .card {border:1px solid #e9eddf;box-shadow:0 6px 20px rgba(47,89,53,.055);}
+.phone-preview .bottom-nav {background:#fff;border-top:1px solid #e6eadc;}
+.phone-preview .bottom-nav button.active {color:#3e7649;}
+.phone-preview .bottom-nav button.active span {background:#e7f0d2;border-radius:12px;padding:3px 11px;}
+.phone-preview .stat-link {font:inherit;color:var(--ink);cursor:pointer;text-align:left;transition:transform .12s,background .12s,box-shadow .12s;}
+.phone-preview .stat-link:hover,.phone-preview .stat-link:focus-visible {background:var(--green-pale);box-shadow:0 3px 10px rgba(57,91,48,.11);transform:translateY(-2px);}
+.phone-preview .stat-link span {display:block;line-height:1.25;}
+.phone-preview .quick-stat {gap:6px;}
+.phone-preview .quick-stat .stat {min-width:0;padding:10px 7px;border-radius:15px;}
+.phone-preview .quick-stat .stat strong {font-size:23px;}
+.phone-preview .quick-stat .stat span {font-size:10px;}
+.phone-preview .planned-day-row {width:100%;padding:14px 12px;margin:7px 0;text-align:left;color:var(--ink);background:var(--paper-soft);border:1px solid var(--outline);border-radius:16px;display:grid;grid-template-columns:1fr auto;gap:4px 10px;cursor:pointer;}
+.phone-preview .planned-day-row strong {font-size:14px;}
+.phone-preview .planned-day-row span:nth-child(2) {grid-column:1;color:var(--muted);font-size:12px;line-height:1.4;}
+.phone-preview .planned-day-row span:last-child {grid-column:2;grid-row:1/3;align-self:center;font-size:25px;color:var(--green);}
+.phone-preview .scan-section {background:var(--paper-soft);border-radius:18px;padding:12px;margin:12px 0;border:1px solid var(--outline);}
+.phone-preview .scan-section h2 {font-size:17px;margin:0 0 8px;}
+.phone-preview .scan-section h3 {font-size:14px;}
+.phone-preview .scan-gallery {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:10px 0;}
+.phone-preview .scan-gallery .photo-choice {min-width:0;display:flex;flex-direction:column;gap:4px;padding:7px;background:var(--paper);border:1px solid var(--outline);border-radius:13px;}
+.phone-preview .scan-gallery .photo-choice img,.phone-preview .scan-detail {width:100%;max-height:165px;object-fit:cover;border-radius:10px;}
+.phone-preview .scan-gallery .photo-choice label {font-size:12px;}
+.phone-preview .scan-gallery .photo-choice .btn {min-height:36px;}
+.phone-preview .scan-section .btn {display:inline-flex;align-items:center;justify-content:center;cursor:pointer;}
+.phone-preview .scan-section .empty {grid-column:1/-1;padding:10px 12px;}
