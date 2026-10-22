@@ -59,11 +59,11 @@ if any('Come ti chiami?' in n.attrib.get('text', '') for n in intro):
     intro_tap(intro_nodes('onboarding-typed'), 'Continua')
     welcome = intro_nodes('onboarding-welcome')
     assert any('Benvenuto, Tester' in n.attrib.get('text', '') for n in welcome), 'Welcome did not use saved name'
-    intro_tap(welcome, 'Inizia a cucinare')
+    intro_tap(welcome, 'Inizia')
     time.sleep(0.7)
     completed = intro_nodes('onboarding-complete')
     # The calendar immediately displays its first-use help dialog, which overlays the page title.
-    assert any(('Il calendario dei pasti' in n.attrib.get('text', '') or
+    assert any(('Calendario' in n.attrib.get('text', '') or
                 'Come funziona il calendario' in n.attrib.get('text', '')) for n in completed), 'Calendar or its first-use help did not open after onboarding'
     print('PASS: first-run personalized name, welcome and preserved Android profile.')
 
@@ -117,7 +117,7 @@ def restart_home(name):
     adb('shell', 'am', 'start', '-W', '-n', package + '/.MainActivity')
     for attempt in range(10):
         nodes = snapshot(name)
-        if any(n.attrib.get('text') == 'Il calendario dei pasti' for n in nodes):
+        if any(n.attrib.get('text') == 'Calendario' for n in nodes):
             return nodes
         time.sleep(0.4)
     raise AssertionError('Calendar did not become ready after app restart: ' + name)
@@ -159,8 +159,8 @@ def db_rows():
 cell = next(n for n in nodes if 'Pranzo e Cena' in n.attrib.get('content-desc',''))
 tap(cell)
 home = snapshot('tap-day')
-assert any(n.attrib.get('text') == 'Il calendario dei pasti' for n in home)
-assert not any(n.attrib.get('text') == 'Trova cosa cucinare' for n in home)
+assert any(n.attrib.get('text') == 'Calendario' for n in home)
+assert not any(n.attrib.get('text') == 'Cerca ricetta' for n in home)
 cell = next(n for n in home if 'Pranzo e Cena' in n.attrib.get('content-desc',''))
 assert cell.attrib.get('selected') == 'true'
 hold(cell, 120)
@@ -171,7 +171,7 @@ hold(cell, 900)
 confirm = snapshot('hold-confirm')
 tap(text_node(confirm, 'No'))
 unchanged = snapshot('hold-no')
-assert any(n.attrib.get('text') == 'Il calendario dei pasti' for n in unchanged)
+assert any(n.attrib.get('text') == 'Calendario' for n in unchanged)
 assert len(db_rows()) == 3
 cell = next(n for n in unchanged if 'Pranzo e Cena' in n.attrib.get('content-desc',''))
 hold(cell, 900)
@@ -181,7 +181,7 @@ kind = snapshot('kind')
 assert text_node(kind,'Alternativa').attrib.get('checked') == 'true', 'Existing main meal should propose an alternative'
 tap(text_node(kind,'Cerca ricetta'))
 search = snapshot('search')
-assert any(n.attrib.get('text') == 'Trova cosa cucinare' for n in search)
+assert any(n.attrib.get('text') == 'Cerca ricetta' for n in search)
 assert any(n.attrib.get('text') == 'Pranzo · Alternativa' for n in search)
 assert any('Massimo 10 ingredienti' in n.attrib.get('text','') for n in search)
 button = text_node(search,'Ho un link')
@@ -190,7 +190,7 @@ link = snapshot('recipe-link')
 assert any(n.attrib.get('text') == 'Aggiungi una ricetta dal link' for n in link)
 (out / 'recipe-link.png').write_bytes(adb('exec-out', 'screencap', '-p'))
 # Reuse a saved recipe to test scheduling without depending on external sites.
-nav = next(n for n in link if 'Ricettario' in n.attrib.get('text','') and n.attrib.get('clickable') == 'true')
+nav = next(n for n in link if n.attrib.get('content-desc') == 'Ricette' and n.attrib.get('clickable') == 'true')
 tap(nav)
 button=find_scrolling('📅 Pianifica «Ricetta alternativa»','archive')
 tap(button)
@@ -205,7 +205,7 @@ assert any(n.attrib.get('text') == 'Ricetta copiata' for n in cloned), 'Cloning 
 tap(text_node(cloned,'Torna al calendario'))
 rows=db_rows()
 assert rows[-1] == ('Ricetta alternativa',today,'Pranzo',1), rows
-button=find_scrolling('↪ Ricetta alternativa','home-alternative')
+button=find_scrolling('Ricetta alternativa','home-alternative')
 assert button is not None
 (out / 'home-alternative.png').write_bytes(adb('exec-out','screencap','-p'))
 print('PASS: tap selects day; 120ms short press does not prompt; 900ms native long press prompts; No preserves data; existing main proposes alternative.')
