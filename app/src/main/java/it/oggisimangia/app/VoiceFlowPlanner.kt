@@ -32,6 +32,9 @@ object VoiceFlowPlanner {
         if (duplicate != null) return VoicePlan(emptyList(), conflict =
             "Hai richiesto più volte lo stesso piatto per lo stesso pasto. Vuoi correggere la sequenza?")
         val searches = actions.filterIsInstance<VoiceCommand.Search>()
+        if (actions.dropLast(1).any { it is VoiceCommand.Search || it is VoiceCommand.GuidedMealSearch })
+            return VoicePlan(emptyList(), conflict =
+                "Una ricerca online deve essere l'ultimo passaggio: devo attendere che tu scelga una ricetta.")
         if (searches.size > 1 && searches.map { it.ingredients.first() }.distinct().size > 1)
             return VoicePlan(emptyList(), conflict =
                 "Hai indicato ingredienti principali diversi nella stessa ricerca. Dimmi quale vuoi usare.")
@@ -47,6 +50,7 @@ object VoiceFlowPlanner {
             VoiceCommand.Destination.SUMMARY -> "Mostra riepilogo"
             VoiceCommand.Destination.SOURCES -> "Apri fonti di ricerca"
         }
+        is VoiceCommand.GuidedMealSearch -> "Organizza ${command.meal.lowercase()} del ${command.day} cercando ricette con ingrediente principale ${command.ingredients.first()}"
         is VoiceCommand.Search -> "Cerca ricette con ingrediente principale ${command.ingredients.first()}" +
             (if (command.ingredients.size > 1) " e ${command.ingredients.drop(1).joinToString(", ")}" else "")
         is VoiceCommand.ShowDay -> "Mostra calendario del ${command.day}"
@@ -57,7 +61,8 @@ object VoiceFlowPlanner {
     }
 
     fun suggestion(command: VoiceCommand): String = when (command) {
-        is VoiceCommand.Search -> "Ora puoi scegliere una ricetta e aggiungerla al calendario."
+        is VoiceCommand.Search, is VoiceCommand.GuidedMealSearch ->
+            "Ora puoi scegliere una ricetta verificata e aggiungerla al calendario."
         is VoiceCommand.ShowDay, is VoiceCommand.ReadMeals ->
             "Vuoi cercare una ricetta per questo giorno o consultare il ricettario?"
         is VoiceCommand.Open -> when (command.destination) {
