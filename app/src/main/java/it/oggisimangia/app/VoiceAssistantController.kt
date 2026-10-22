@@ -21,7 +21,8 @@ import java.util.Locale
 /** Push-to-talk control: never records in the background and never sends commands to an LLM. */
 class VoiceAssistantController(
     private val activity: Activity,
-    private val executor: (VoiceCommand, (String) -> Unit) -> Unit
+    private val executor: (VoiceCommand, (String) -> Unit) -> Unit,
+    private val aiInterpret: (String, (String?) -> Unit) -> Unit = { _, callback -> callback(null) }
 ) {
     companion object {
         const val SPEECH_REQUEST = 519
@@ -124,15 +125,48 @@ class VoiceAssistantController(
         accept(heard)
     }
 
-    private fun accept(spoken: String) {
+    private fun askClarification(problem: String, spoken: String) {
+        speak(problem)
+        AlertDialog.Builder(activity).setTitle("Chiarimento necessario")
+            .setMessage(problem + "\n\nComando: «" + spoken.take(300) + "»")
+            .setPositiveButton("Riformula") { _, _ -> open() }
+            .setNegativeButton("Annulla", null).show()
+    }
+
+    private fun accept(spoken: String, refined: Boolean = false) {
         val plan = VoiceFlowPlanner.build(spoken)
         val problem = plan.clarification ?: plan.conflict
         if (problem != null) {
-            speak(problem)
-            AlertDialog.Builder(activity).setTitle("Chiarimento necessario")
-                .setMessage(problem + "\n\nComando: «" + spoken.take(300) + "»")
-                .setPositiveButton("Riformula") { _, _ -> open() }
-                .setNegativeButton("Annulla", null).show()
+            if (!refined && plan.clarification != null) {
+                val progress = AlertDialog.Builder(activity)
+                    .setTitle("Interpretazione AI locale")
+                    .setMessage("Verifico se l'AI già disponibile sul telefono può proporre una sequenza sicura...")
+                    .setNegativeButton("Annulla", null).create()
+                var active = true
+                progress.setOnDismissListener { active = false }
+                progress.show()
+                aiInterpret(spoken) { alternative ->
+                    activity.runOnUiThread {
+                        if (!active || activity.isFinishing || activity.isDestroyed) return@runOnUiThread
+                        progress.dismiss()
+                        val suggested = alternative?.let { VoiceFlowPlanner.build(it) }
+                        if (suggested != null && suggested.clarification == null &&
+                            suggested.conflict == null && suggested.commands.isNotEmpty() &&
+                            alternative != spoken) {
+                            AlertDialog.Builder(activity).setTitle("L'AI propone questa interpretazione")
+                                .setMessage("Hai detto: «" + spoken.take(300) + "»\n\n" +
+                                    suggested.commands.joinToString("\n") {
+                                        VoiceFlowPlanner.description(it)
+                                    } + "\n\nÈ ciò che intendevi?")
+                                .setPositiveButton("Sì, continua") { _, _ -> accept(alternative!!, true) }
+                                .setNegativeButton("No, riformulo") { _, _ -> open() }
+                                .show()
+                        } else askClarification(problem, spoken)
+                    }
+                }
+                return
+            }
+            askClarification(problem, spoken)
             return
         }
         val summary = plan.commands.mapIndexed { i, cmd ->
@@ -163,11 +197,27 @@ class VoiceAssistantController(
                 val closing = (results.lastOrNull() ?: "Operazioni completate.") +
                     "\n\n" + (last?.let { VoiceFlowPlanner.suggestion(it) } ?: "")
                 speak(closing)
-                AlertDialog.Builder(activity).setTitle("Assistente: operazioni completate")
+                val suggestedAction: VoiceCommand? = when (last) {
+                    is VoiceCommand.PlanSaved -> VoiceCommand.ReadMeals(last.day, last.meal)
+                    is VoiceCommand.ReadMeals, is VoiceCommand.ShowDay ->
+                        VoiceCommand.Open(VoiceCommand.Destination.SEARCH)
+                    else -> null
+                }
+                val response = AlertDialog.Builder(activity).setTitle("Assistente: operazioni completate")
                     .setMessage(results.joinToString("\n") + "\n\n" +
                         (last?.let { VoiceFlowPlanner.suggestion(it) } ?: ""))
                     .setPositiveButton("Altro comando") { _, _ -> open() }
-                    .setNegativeButton("Chiudi", null).show()
+                    .setNegativeButton("Chiudi", null)
+                if (suggestedAction != null) response.setNeutralButton("Passo suggerito") { _, _ ->
+                    executor(suggestedAction) { message ->
+                        speak(message)
+                        AlertDialog.Builder(activity).setTitle("Passo completato")
+                            .setMessage(message)
+                            .setPositiveButton("Altro comando") { _, _ -> open() }
+                            .setNegativeButton("Chiudi", null).show()
+                    }
+                }
+                response.show()
                 return
             }
             executor(plan.commands[index]) { response ->
