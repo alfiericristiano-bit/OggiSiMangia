@@ -21,6 +21,27 @@ object VoiceFlowPlanner {
         if (statements.isEmpty()) return VoicePlan(emptyList(), "Non ho sentito un comando. Puoi ripetere?")
         if (statements.size > 6) return VoicePlan(emptyList(),
             "La sequenza supera sei comandi: dividila in più richieste.")
+        // Ask for the missing part of an actionable goal rather than guessing.
+        for ((index, raw) in statements.withIndex()) {
+            val clause = raw.lowercase(Locale.ITALIAN).trim()
+            if (Regex("^(?:organizza|organizzami|prepara|preparami|pianifica|proponi|suggerisci)\\\\b").containsMatchIn(clause) &&
+                Regex("\\\\b(?:pranzo|cena)\\\\b").containsMatchIn(clause) &&
+                Regex("^(?:organizza|organizzami|prepara|preparami|proponi|suggerisci)").containsMatchIn(clause) &&
+                !Regex("\\\\b(?:con|a base di|usando)\\\\s+").containsMatchIn(clause)) {
+                return VoicePlan(emptyList(),
+                    "Nel passaggio ${index + 1}, quale ingrediente principale vuoi usare per questo pasto?")
+            }
+            if (Regex("^(?:pianifica|metti|aggiungi|programma)\\\\s+").containsMatchIn(clause) &&
+                !Regex("\\\\b(?:pranzo|cena)\\\\b").containsMatchIn(clause)) {
+                return VoicePlan(emptyList(),
+                    "Nel passaggio ${index + 1}, vuoi pianificare la ricetta per pranzo o per cena?")
+            }
+            if (Regex("\\\\b(?:oggi|domani|dopodomani)\\\\b").containsMatchIn(clause) &&
+                Regex("\\\\bieri\\\\b").containsMatchIn(clause)) {
+                return VoicePlan(emptyList(),
+                    "Nel passaggio ${index + 1}, hai indicato giorni in conflitto: quale giorno intendi?")
+            }
+        }
         val actions = statements.map { VoiceCommands.parse(it, today) }
         val unknown = actions.indexOfFirst { it == VoiceCommand.Unknown }
         if (unknown >= 0) return VoicePlan(emptyList(),
