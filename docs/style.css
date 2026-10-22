@@ -730,3 +730,28 @@ body.dark .calendar-hero::after{opacity:.58;}
 .phone-preview .scan-gallery .photo-choice .btn {min-height:36px;}
 .phone-preview .scan-section .btn {display:inline-flex;align-items:center;justify-content:center;cursor:pointer;}
 .phone-preview .scan-section .empty {grid-column:1/-1;padding:10px 12px;}
+
+/* 1.7.0 — private local profile onboarding and gentle plate/calendar animation. */
+.phone-preview .header-app-icon {display:inline-block;width:30px;height:30px;object-fit:contain;vertical-align:middle;margin-right:7px;border:0;box-shadow:none;}
+.phone-preview .mobile-brand {display:flex;align-items:center;}
+.phone-preview .intro-card {
+  min-height:635px;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  margin:6px auto;padding:22px 19px 35px;text-align:center;border-radius:26px;
+  background:linear-gradient(160deg,#ffffff 0%,#f9fcf1 68%,#e7f0cd 100%);
+  border:1px solid var(--outline);box-shadow:0 5px 24px rgba(65,101,54,.07);
+}
+.phone-preview .intro-card h1{font-size:27px;line-height:1.2;color:var(--green);margin:12px 0;}
+.phone-preview .intro-card p{font-size:14px;color:var(--muted);line-height:1.6;margin:7px 0 17px;}
+.phone-preview .intro-symbol{width:180px;height:180px;object-fit:contain;margin:5px 0 15px;animation:plate-enter 800ms ease-out both;}
+.phone-preview .intro-card .field{display:block;width:100%;text-align:left;margin-top:13px;}
+.phone-preview .intro-name{min-height:52px;font-size:18px;background:var(--paper);text-align:left;border-radius:14px;}
+.phone-preview .intro-go{width:100%;min-height:52px;margin-top:15px;font-size:16px;}
+.phone-preview .intro-error{min-height:19px;color:#b13f3c!important;margin:6px 0!important;font-size:12px!important;}
+.phone-preview .welcome-dish{min-height:220px;display:flex;flex-direction:column;align-items:center;justify-content:center;}
+.phone-preview .welcome-dish img{width:172px;height:172px;animation:plate-enter 850ms ease-out both;}
+.phone-preview .welcome-dish span{font-size:24px;letter-spacing:5px;animation:plate-enter 1100ms ease-out both;}
+body.onboarding .phone-preview .bottom-nav{display:none!important;}
+body.onboarding .phone-preview .footer{padding:9px 12px 22px;}
+body.onboarding .phone-preview .topbar-right{display:none;}
+@keyframes plate-enter {0%{opacity:.2;transform:translateY(18px) scale(.86) rotate(-4deg)}75%{opacity:1;transform:translateY(-2px) scale(1.03) rotate(1deg)}100%{opacity:1;transform:translateY(0) scale(1) rotate(0)}}
+@media(prefers-reduced-motion:reduce){.phone-preview .intro-symbol,.phone-preview .welcome-dish img,.phone-preview .welcome-dish span{animation:none;}}
