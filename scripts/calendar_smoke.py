@@ -61,7 +61,10 @@ if any('Come ti chiami?' in n.attrib.get('text', '') for n in intro):
     assert any('Benvenuto, Tester' in n.attrib.get('text', '') for n in welcome), 'Welcome did not use saved name'
     intro_tap(welcome, 'Inizia a cucinare')
     time.sleep(0.7)
-    assert any('Il calendario dei pasti' in n.attrib.get('text', '') for n in intro_nodes('onboarding-complete')), 'Calendar did not open after onboarding'
+    completed = intro_nodes('onboarding-complete')
+    # The calendar immediately displays its first-use help dialog, which overlays the page title.
+    assert any(('Il calendario dei pasti' in n.attrib.get('text', '') or
+                'Come funziona il calendario' in n.attrib.get('text', '')) for n in completed), 'Calendar or its first-use help did not open after onboarding'
     print('PASS: first-run personalized name, welcome and preserved Android profile.')
 
 # The new first-run help is part of the UI: verify and dismiss it, opting out persistently.
