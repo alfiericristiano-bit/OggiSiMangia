@@ -127,7 +127,7 @@ object MagazineRecipeText {
             if (clean.isBlank()) return@forEach
             if (numbered || (current.isNotBlank() && current.endsWith(".") &&
                         clean.firstOrNull()?.isUpperCase() == true)) flush()
-            current = (if (current.isBlank()) "" else " ") + clean
+            current += (if (current.isBlank()) "" else " ") + clean
         }
         flush()
         return out.take(40)
