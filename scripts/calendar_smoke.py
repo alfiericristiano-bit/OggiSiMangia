@@ -20,7 +20,7 @@ fixture.unlink(missing_ok=True)
 db = sqlite3.connect(fixture)
 db.execute('CREATE TABLE recipes (' + schema + ')')
 # Fixture already has the newest schema; never run ALTER TABLE twice.
-version = re.search(r'SQLiteOpenHelper\(context, "oggisimangia\\.db", null, (\\d+)\)', source)
+version = re.search(r'SQLiteOpenHelper\(context, "oggisimangia\.db", null, (\d+)\)', source)
 assert version, 'Database schema version not found'
 db.execute('PRAGMA user_version=' + version.group(1))
 today = adb('shell', 'date', '+%F').decode().strip()
