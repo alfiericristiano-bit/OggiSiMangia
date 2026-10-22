@@ -56,6 +56,11 @@ object IngredientMatcher {
             Regex("\\bpasta\\s+(?:frolla|sfoglia|brisee|brise|fillo|phyllo|madre|" +
                 "di\\s+(?:zucchero|mandorle|nocciole|pane)|per\\s+pizza)\\b")
                 .containsMatchIn(clean(line))) return false
+        if (clean(requested) == "pasta" &&
+            Regex("\\b(?:spaghetti|spaghettoni|penne|fusilli|rigatoni|linguine|" +
+                "tagliatelle|tagliolini|farfalle|orecchiette|maccheroni|bucatini|" +
+                "lasagne|lasagna|cannelloni|pappardelle|gnocchetti|tortellini|ravioli)\\b")
+                .containsMatchIn(clean(line))) return true
         val actual = tokens(line).map(::canonical).toSet()
         val wanted = tokens(requested).filterNot { it in ignored || it.all(Char::isDigit) }
         if (wanted.isEmpty()) return false
