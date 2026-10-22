@@ -64,4 +64,26 @@ object RecipeRanking {
             .thenByDescending { confidence(it.rating, it.feedbackCount) }
             .thenByDescending { it.feedbackCount ?: -1 }
             .thenBy { it.title.lowercase() })
+    /** Online search: the primary ingredient is mandatory; the other requested
+     * ingredients may be missing and must be called out explicitly in the UI.
+     * Results that could not be opened have no verified ingredient list.
+     */
+    fun orderFlexible(items: List<WebRecipe>, ingredients: String): List<WebRecipe> {
+        val main = RecipeValidation.mainIngredient(ingredients)
+        if (main.isBlank()) return emptyList()
+        return items.filter {
+            RecipeValidation.isLikelyRecipeLink(it.title, it.url) &&
+                (if (it.verified) IngredientMatcher.containsEvery(it.ingredients, main)
+                else RecipeValidation.mentionsMainInTitle(it.title, ingredients))
+        }.sortedWith(compareBy<WebRecipe> { RecipeSources.priority(it.url) }
+            .thenByDescending { it.verified }
+            .thenByDescending {
+                it.verified && RecipeValidation.containsEvery(it.ingredients, ingredients)
+            }
+            .thenByDescending { RecipeRanking.relevance(it.ingredients, ingredients) }
+            .thenByDescending { RecipeValidation.mentionsMainInTitle(it.title, ingredients) }
+            .thenByDescending { confidence(it.rating, it.feedbackCount) }
+            .thenBy { it.title.lowercase() })
+    }
+
 }
