@@ -55,6 +55,23 @@ class MainActivity : Activity() {
     private var searchType = "Qualsiasi"
     private var selectedPhoto = ""
     private val magazinePages = mutableListOf<String>()
+    private val scanPageRoles = linkedMapOf<String, String>()
+    private val scanPageTexts = linkedMapOf<String, String>()
+    private var pendingGalleryRole = MagazineRecipeText.WHOLE
+    private var editorPrep: EditText? = null
+    private var editorCook: EditText? = null
+    private var editorRest: EditText? = null
+    private var editorTotal: EditText? = null
+    private var editorPortions: EditText? = null
+    private var editorDifficulty: Spinner? = null
+    private var autoTitle = ""
+    private var autoIngredients = ""
+    private var autoSteps = ""
+    private var autoPrep = ""
+    private var autoCook = ""
+    private var autoRest = ""
+    private var autoTotal = ""
+    private var autoPortions = ""
     private val dishPhotoChoices = linkedMapOf<String, Boolean>()
     private var magazinePagesContainer: LinearLayout? = null
     private var dishPhotosContainer: LinearLayout? = null
@@ -695,6 +712,11 @@ class MainActivity : Activity() {
         selectedPhoto = existing?.imagePath ?: ""
         magazinePages.clear()
         magazinePages.addAll(photoPaths(existing?.scanPages))
+        scanPageRoles.clear()
+        scanPageRoles.putAll(photoRoles(existing?.scanPages))
+        scanPageTexts.clear()
+        autoTitle = ""; autoIngredients = ""; autoSteps = ""
+        autoPrep = ""; autoCook = ""; autoRest = ""; autoTotal = ""; autoPortions = ""
         dishPhotoChoices.clear()
         dishPhotoChoices.putAll(photoChoices(existing?.dishPhotos))
         photoPreview = null
@@ -715,17 +737,27 @@ class MainActivity : Activity() {
         val titleField = input("Nome del piatto *", existing?.title ?: suggestedTitle)
         editorTitle = titleField
         label("RICETTA DA RIVISTA · SCANSIONE E OCR", 19f, true)
-        label("Fotografa una o più pagine. Puoi archiviare le fotografie anche senza OCR, oppure trasformare il testo in campi modificabili. Nessuna foto viene caricata online.", 13f)
+        label("Segui le fasi nell'ordine: 1) pagina intera (anche più pagine); 2) primo piano degli ingredienti; 3) preparazione; 4) tempi, difficoltà e dosi. L'OCR locale parte dopo ogni foto. Manteniamo sia le fotografie originali sia tutti i testi correggibili.", 13f)
+        label("1 · PAGINA INTERA DELLA RICETTA", 15f, true)
+        actionRow("📷 Fotografa pagina", { launchCamera("scan:" + MagazineRecipeText.WHOLE) },
+            "🖼️ Importa pagine", { chooseMagazineFiles(MAGAZINE_PAGES_REQUEST, MagazineRecipeText.WHOLE) })
+        label("2 · INGREDIENTI (foto ravvicinata)", 15f, true)
+        actionRow("📷 Foto ingredienti", { launchCamera("scan:" + MagazineRecipeText.INGREDIENTS) },
+            "🖼️ Importa ingredienti", { chooseMagazineFiles(MAGAZINE_PAGES_REQUEST, MagazineRecipeText.INGREDIENTS) })
+        label("3 · PREPARAZIONE (foto ravvicinata)", 15f, true)
+        actionRow("📷 Foto preparazione", { launchCamera("scan:" + MagazineRecipeText.STEPS) },
+            "🖼️ Importa preparazione", { chooseMagazineFiles(MAGAZINE_PAGES_REQUEST, MagazineRecipeText.STEPS) })
+        label("4 · TEMPI, DOSI E DIFFICOLTÀ", 15f, true)
+        actionRow("📷 Foto dati", { launchCamera("scan:" + MagazineRecipeText.DETAILS) },
+            "🖼️ Importa dati", { chooseMagazineFiles(MAGAZINE_PAGES_REQUEST, MagazineRecipeText.DETAILS) })
         magazinePagesContainer = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         content.addView(magazinePagesContainer)
         refreshMagazinePages()
-        actionRow("📷 Fotografa pagina", { launchCamera("scan") },
-            "🖼️ Aggiungi pagine", { chooseMagazineFiles(MAGAZINE_PAGES_REQUEST) })
         label("TESTO RICONOSCIUTO (MODIFICABILE)", 15f, true)
         val ocrField = input("Testo OCR delle pagine, correggibile anche prima di salvare", existing?.scanOcrText.orEmpty(), true)
         editorOcr = ocrField
         ocrStatusLabel = label("OCR pronto: ogni pagina fotografata verrà letta automaticamente e aggiunta qui sotto.", 13f)
-        action("📝 Compila titolo, ingredienti e preparazione dal testo OCR") {
+        action("📝 Ricostruisci i campi dalla scansione (controlla prima di salvare)") {
             AlertDialog.Builder(this).setTitle("Usare il testo OCR?")
                 .setMessage("I campi della ricetta saranno compilati con suggerimenti automatici. Controlla sempre dosi e preparazione: il riconoscimento può sbagliare.")
                 .setPositiveButton("Compila") { _, _ -> applyMagazineSuggestions(false) }
@@ -741,8 +773,10 @@ class MainActivity : Activity() {
         val descriptionField = input("Descrizione breve / presentazione", existing?.description.orEmpty(), true)
         val categoryPicker = dropdown("Portata", categories, existing?.category ?: selectedCategory)
         val difficultyPicker = dropdown("Difficoltà", difficulties, existing?.difficulty ?: searchDifficulty)
+        editorDifficulty = difficultyPicker
         val cuisineField = input("Tipo di cucina / provenienza (es. italiana)", existing?.cuisine.orEmpty())
         val portionsField = input("Dosi / numero persone (es. 4 persone)", existing?.portions.orEmpty())
+        editorPortions = portionsField
         val authorField = input("Autore della ricetta (facoltativo)", existing?.author.orEmpty())
         val costField = input("Costo indicativo (facoltativo)", existing?.cost.orEmpty())
         val tagsField = input("Etichette (es. vegetariano, senza glutine)", existing?.tags.orEmpty())
@@ -765,6 +799,8 @@ class MainActivity : Activity() {
         val cookField = input("Tempo di cottura (es. 25 min)", existing?.cookTime.orEmpty())
         val restField = input("Riposo / lievitazione (es. 2 ore)", existing?.restTime.orEmpty())
         val totalField = input("Tempo totale (facoltativo)", existing?.totalTime.orEmpty())
+        editorPrep = prepField; editorCook = cookField
+        editorRest = restField; editorTotal = totalField
         val temperatureField = input("Temperatura forno / cottura (es. 180 °C)", existing?.temperature.orEmpty())
         val savedDuration = existing?.duration ?: searchDuration
         val durationPicker = dropdown("Fascia di tempo", (durations.toList() + savedDuration).distinct().toTypedArray(), savedDuration)
@@ -860,7 +896,12 @@ class MainActivity : Activity() {
                 url = url,
                 alternative = alternativePicker.selectedItem.toString() == "Alternativa",
                 imagePath = selectedPhoto,
-                scanPages = JSONArray(magazinePages).toString(),
+                scanPages = JSONArray().apply {
+                    magazinePages.forEach { path ->
+                        put(JSONObject().put("path", path)
+                            .put("role", scanPageRoles[path] ?: MagazineRecipeText.WHOLE))
+                    }
+                }.toString(),
                 dishPhotos = JSONObject(dishPhotoChoices as Map<*, *>).toString(),
                 scanOcrText = ocrField.text.toString().trim(),
                 originalInstructions = originalField?.text?.toString()?.trim() ?: existing?.originalInstructions.orEmpty(),
@@ -899,17 +940,33 @@ class MainActivity : Activity() {
     }
 
 
+    // Old archives contain ["path.jpg"]; new ones contain {path,role}.
     private fun photoPaths(json: String?): List<String> = try {
         val data = JSONArray(json ?: "[]")
-        (0 until data.length()).mapNotNull { data.optString(it).takeIf(String::isNotBlank) }
+        (0 until data.length()).mapNotNull { at ->
+            (data.optJSONObject(at)?.optString("path") ?: data.optString(at))
+                .takeIf(String::isNotBlank)
+        }
     } catch (_: Exception) { emptyList() }
+
+    private fun photoRoles(json: String?): Map<String, String> = try {
+        val data = JSONArray(json ?: "[]")
+        (0 until data.length()).mapNotNull { at ->
+            data.optJSONObject(at)?.let { obj ->
+                obj.optString("path").takeIf(String::isNotBlank)?.let { path ->
+                    path to obj.optString("role", MagazineRecipeText.WHOLE)
+                }
+            }
+        }.toMap()
+    } catch (_: Exception) { emptyMap() }
 
     private fun photoChoices(json: String?): Map<String, Boolean> = try {
         val data = JSONObject(json ?: "{}")
         data.keys().asSequence().associateWith { data.optBoolean(it, false) }
     } catch (_: Exception) { emptyMap() }
 
-    private fun chooseMagazineFiles(request: Int) {
+    private fun chooseMagazineFiles(request: Int, role: String = MagazineRecipeText.WHOLE) {
+        pendingGalleryRole = role
         startActivityForResult(Intent(Intent.ACTION_GET_CONTENT).apply {
             type = "image/*"
             addCategory(Intent.CATEGORY_OPENABLE)
@@ -933,7 +990,13 @@ class MainActivity : Activity() {
                 LinearLayout.LayoutParams(dp(70), dp(92)))
             val info = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
             info.addView(TextView(this).apply {
-                text = "Pagina " + (index + 1) + " · foto archiviata"
+                text = "Foto " + (index + 1) + " · " +
+                    when (scanPageRoles[path]) {
+                        MagazineRecipeText.INGREDIENTS -> "Ingredienti"
+                        MagazineRecipeText.STEPS -> "Preparazione"
+                        MagazineRecipeText.DETAILS -> "Tempi, dosi e difficoltà"
+                        else -> "Pagina intera"
+                    }
                 textSize = 14f
                 setTextColor(familyInk)
             })
@@ -941,6 +1004,8 @@ class MainActivity : Activity() {
                 text = "✕ Elimina pagina"; isAllCaps = false
                 setOnClickListener {
                     magazinePages.remove(path)
+                    scanPageRoles.remove(path)
+                    scanPageTexts.remove(path)
                     pendingOcrPages.remove(path)
                     scanOcrResults.remove(path)
                     processedOcrPages.remove(path)
@@ -1007,13 +1072,14 @@ class MainActivity : Activity() {
     private fun addMagazineImage(uri: Uri, kind: String) {
         try {
             val path = compressPhoto(uri, if (kind == "scan") 2000 else 960)
-            if (kind == "scan") {
+            if (kind.startsWith("scan")) {
                 if (magazinePages.size >= 20) {
                     File(path).delete()
                     Toast.makeText(this, "Massimo 20 pagine per ricetta", Toast.LENGTH_LONG).show()
                     return
                 }
                 magazinePages.add(path)
+                scanPageRoles[path] = kind.substringAfter(':', MagazineRecipeText.WHOLE)
                 pendingOcrPages.add(path)
                 refreshMagazinePages()
                 updateOcrStatus()
@@ -1065,8 +1131,10 @@ class MainActivity : Activity() {
             if (text.isNotBlank()) {
                 val current = editorOcr?.text?.toString().orEmpty()
                 val page = magazinePages.indexOf(nextPath) + 1
+                scanPageTexts[nextPath] = text
+                val role = scanPageRoles[nextPath] ?: MagazineRecipeText.WHOLE
                 editorOcr?.append((if (current.isBlank()) "" else "\n\n") +
-                    "Pagina $page\n" + text.trim())
+                    "Pagina $page ($role)\n" + text.trim())
                 applyMagazineSuggestions(true)
             }
         }
@@ -2008,7 +2076,8 @@ class MainActivity : Activity() {
             }
         }
         if ((requestCode == MAGAZINE_PAGES_REQUEST || requestCode == DISH_PHOTOS_REQUEST) && resultCode == RESULT_OK) {
-            val kind = if (requestCode == MAGAZINE_PAGES_REQUEST) "scan" else "dish"
+            val kind = if (requestCode == MAGAZINE_PAGES_REQUEST)
+                "scan:" + pendingGalleryRole else "dish"
             val uris = mutableListOf<Uri>()
             data?.clipData?.let { clip ->
                 for (index in 0 until clip.itemCount.coerceAtMost(20)) uris.add(clip.getItemAt(index).uri)
@@ -2023,7 +2092,7 @@ class MainActivity : Activity() {
             pendingCameraKind = "cover"
             try {
                 if (resultCode == RESULT_OK && temporary?.isFile == true && temporary.length() > 0L) {
-                    if (kind == "scan" || kind == "dish") addMagazineImage(Uri.fromFile(temporary), kind)
+                    if (kind.startsWith("scan") || kind == "dish") addMagazineImage(Uri.fromFile(temporary), kind)
                     else {
                         selectedPhoto = compressPhoto(Uri.fromFile(temporary))
                         refreshPhotoPreview()
