@@ -9,6 +9,7 @@ import android.speech.RecognizerIntent
 import android.speech.tts.TextToSpeech
 import android.view.Gravity
 import android.widget.Button
+import android.widget.CheckBox
 import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.ScrollView
@@ -68,6 +69,14 @@ class VoiceAssistantController(
             textSize = 13f
         }
         layout.addView(sample)
+        layout.addView(CheckBox(activity).apply {
+            text = "Leggi ad alta voce risposte e suggerimenti"
+            isChecked = prefs.getBoolean("speak", true)
+            setOnCheckedChangeListener { _, checked ->
+                prefs.edit().putBoolean("speak", checked).apply()
+                if (!checked) speaker?.stop()
+            }
+        })
         val dialog = AlertDialog.Builder(activity)
             .setTitle("🎙 Assistente OggiSiMangia...")
             .setView(layout)
