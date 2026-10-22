@@ -2378,6 +2378,18 @@ class MainActivity : Activity() {
                 showSearch(autoSearch = true)
                 done("Ricerca avviata con ingrediente principale ${ingredients.first()}.")
             }
+            is VoiceCommand.GuidedMealSearch -> {
+                selectedDate = command.day
+                selectedMeal = command.meal
+                selectedAlternative = db.onDay(command.day.toString()).any {
+                    !it.alternative && (it.meal == command.meal || it.meal == "Entrambi")
+                }
+                searchForDay = true
+                searchIngredients = command.ingredients.take(10).joinToString(", ")
+                showSearch(autoSearch = true)
+                done("Cerco proposte per ${command.meal.lowercase()} del ${command.day.format(dateFormatter)}. " +
+                    "Scegli una ricetta prima di aggiungerla al calendario.")
+            }
             is VoiceCommand.ShowDay -> {
                 selectedDate = command.day
                 expandedMeals.clear()
