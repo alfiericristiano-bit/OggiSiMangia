@@ -50,6 +50,17 @@ object IngredientMatcher {
     private val ignored = setOf("di", "del", "della", "delle", "dei", "degli", "con", "per", "da")
 
     private fun lineContainsIngredient(line: String, requested: String): Boolean {
+        // "Pasta frolla", "pasta sfoglia" and sugar paste are pastry, not the
+        // principal ingredient pasta intended for first-course searches.
+        if (clean(requested) == "pasta" &&
+            Regex("\\bpasta\\s+(?:frolla|sfoglia|brisee|brise|fillo|phyllo|madre|" +
+                "di\\s+(?:zucchero|mandorle|nocciole|pane)|per\\s+pizza)\\b")
+                .containsMatchIn(clean(line))) return false
+        if (clean(requested) == "pasta" &&
+            Regex("\\b(?:spaghetti|spaghettoni|penne|fusilli|rigatoni|linguine|" +
+                "tagliatelle|tagliolini|farfalle|orecchiette|maccheroni|bucatini|" +
+                "lasagne|lasagna|cannelloni|pappardelle|gnocchetti|tortellini|ravioli)\\b")
+                .containsMatchIn(clean(line))) return true
         val actual = tokens(line).map(::canonical).toSet()
         val wanted = tokens(requested).filterNot { it in ignored || it.all(Char::isDigit) }
         if (wanted.isEmpty()) return false

@@ -256,12 +256,12 @@ tap(next(n for n in home if 'Cerca' in n.attrib.get('text','') and n.attrib.get(
 # The first ingredient row grows to ten independent fields.
 for index in range(1,11):
     current=snapshot('ingredients-'+str(index))
-    field=next((n for n in current if n.attrib.get('content-desc')=='Ingrediente '+str(index)),None)
+    field=next((n for n in current if n.attrib.get('content-desc')==('Ingrediente principale' if index == 1 else 'Ingrediente '+str(index))),None)
     for attempt in range(8):
         if field is not None: break
         adb('shell','input','swipe','160','530','160','220','300')
         current=snapshot('ingredients-scroll')
-        field=next((n for n in current if n.attrib.get('content-desc')=='Ingrediente '+str(index)),None)
+        field=next((n for n in current if n.attrib.get('content-desc')==('Ingrediente principale' if index == 1 else 'Ingrediente '+str(index))),None)
     assert field is not None
     tap(field);adb('shell','input','text','ingrediente'+str(index));adb('shell','input','keyevent','KEYCODE_BACK')
     if index<10: tap(find_scrolling('＋ Ingrediente','ingredient-add'))

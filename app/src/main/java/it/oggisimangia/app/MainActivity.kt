@@ -1184,7 +1184,7 @@ class MainActivity : Activity() {
         if (searchForDay) label(selectedMeal + " · " + if (selectedAlternative) "Alternativa" else "Principale", 16f, true)
         actionRow("🔗 Ho un link", { showRecipeLink() }, "📅 Pasti del giorno", { showCalendar() })
         label("Quali ingredienti hai a disposizione?", 17f, true)
-        label("Una casella per ingrediente. Massimo 10 ingredienti.", 13f)
+        label("Primo campo: ingrediente principale obbligatorio (es. pasta, riso, pollo, patate). Massimo 10 ingredienti in totale: anche gli altri devono essere presenti nella ricetta.", 13f)
         val ingredients = IngredientInputs(this, searchIngredients) { searchIngredients = it }
         content.addView(ingredients)
         val category = dropdown("Cerchi un...", categories, searchCategory)
@@ -1407,9 +1407,10 @@ class MainActivity : Activity() {
         screen("Risultati per sito", "Ricette raggruppate per fonte, senza taglio globale a 10.",
             "recipe-sites") { showRecipeResults(lastSearchResults) }
         val confirmedCount = items.count { it.verified }
+        label("Ingrediente principale: " + RecipeValidation.mainIngredient(searchIngredients), 15f, true)
         label(confirmedCount.toString() + " ricette verificate · " +
             (items.size - confirmedCount) + " collegamenti da controllare", 17f, true)
-        label("Apri un sito per vedere le sue ricette, 10 alla volta. I collegamenti 'da controllare' provengono dalla ricerca web, ma non è stato possibile verificarne automaticamente tutti gli ingredienti.", 13f)
+        label("Ricette singole, ordinate per fonte e per ingrediente principale. La dicitura 'Da controllare' appare solo se non è stato possibile leggere la pagina: gli ingredienti secondari restano da verificare.", 13f)
         actionRow("🔎 Modifica ricerca", { showSearch() },
             "⚙ Fonti e priorità", { showSourceSettings() })
         if (items.isEmpty()) {
@@ -1483,9 +1484,20 @@ class MainActivity : Activity() {
                 textSize = 17f
                 setTypeface(null, Typeface.BOLD); setTextColor(familyDeep)
             })
-            if (!recipe.verified) row.addView(TextView(this).apply {
-                text = "Da controllare: gli ingredienti della ricetta non sono ancora stati verificati automaticamente."
-                textSize = 13f; setTextColor(Color.rgb(140, 84, 20))
+            row.addView(TextView(this).apply {
+                val found = RecipeValidation.foundIngredients(recipe.ingredients, searchIngredients)
+                val pending = RecipeValidation.missingIngredients(recipe.ingredients, searchIngredients)
+                text = if (recipe.verified) {
+                    "✓ Ingredienti verificati: " + found.joinToString(", ") +
+                        (if (pending.isEmpty()) "" else "\nNon trovati: " + pending.joinToString(", "))
+                } else {
+                    "Da controllare: pagina non leggibile durante la ricerca. " +
+                        "Ingrediente principale indicato dal titolo: " +
+                        RecipeValidation.mainIngredient(searchIngredients) +
+                        (if (pending.isNotEmpty()) "\nIngredienti da verificare: " + pending.joinToString(", ") else "")
+                }
+                textSize = 13f
+                setTextColor(if (recipe.verified) familyDeep else Color.rgb(140, 84, 20))
             })
             val differences = if (recipe.verified) RecipePreferences.notices(
                 recipe, searchCategory, searchDifficulty, searchDuration) else emptyList()
@@ -1593,8 +1605,16 @@ class MainActivity : Activity() {
                 screen(recipe.title, recipe.source, "online-" + recipe.url) {
                     showOnlineDetail(sourceRecipe, imported)
                 }
-                val fullMatch = result.ingredients.isNotBlank() &&
-                    RecipeValidation.containsEvery(result.ingredients, searchIngredients)
+                val publishedIngredients = result.ingredients.ifBlank { recipe.ingredients }
+                val fullMatch = publishedIngredients.isNotBlank() &&
+                    RecipeValidation.containsEvery(publishedIngredients, searchIngredients)
+                if (!imported && publishedIngredients.isNotBlank()) {
+                    label("Ingredienti trovati: " +
+                        RecipeValidation.foundIngredients(publishedIngredients, searchIngredients)
+                            .joinToString(", ").ifBlank { "nessuno di quelli richiesti" }, 13f)
+                    val missing = RecipeValidation.missingIngredients(publishedIngredients, searchIngredients)
+                    if (missing.isNotEmpty()) label("Ingredienti non trovati: " + missing.joinToString(", "), 13f)
+                }
                 if (!recipe.verified && !fullMatch) {
                     label("⚠ Ingredienti non verificati per tutti i termini cercati. Controlla la ricetta originale prima di salvarla o assegnarla al calendario.", 14f, true)
                 } else if (!recipe.verified && fullMatch) {
@@ -1617,8 +1637,8 @@ class MainActivity : Activity() {
                 }
                 val details = onlineDraft(recipe, result, "Entrambe")
                 showRecipeMetadata(details)
-                action(if (recipe.verified || fullMatch) "📅 Aggiungi al calendario" else "📅 Controlla e pianifica la ricetta") {
-                    if (!recipe.verified && !fullMatch) {
+                action(if (fullMatch || imported) "📅 Aggiungi al calendario" else "📅 Controlla e pianifica la ricetta") {
+                    if (!fullMatch && !imported) {
                         prepareOnlineDraft(recipe, result, "Entrambe") { draft ->
                             showEditor(draft, planByDefault = true)
                         }
@@ -1637,7 +1657,7 @@ class MainActivity : Activity() {
                     }
                 }
                 label("INGREDIENTI", 17f, true)
-                label(result.ingredients.ifBlank { "Non disponibili: consulta l'originale." })
+                label(publishedIngredients.ifBlank { "Non disponibili: consulta l'originale." })
                 label("PREPARAZIONE SEMPLIFICATA", 17f, true)
                 label(result.summary.ifBlank { recipe.summary.ifBlank { "Sintesi non disponibile." } })
                 label(result.notice, 13f)

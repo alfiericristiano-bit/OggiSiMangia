@@ -18,7 +18,8 @@ class IngredientInputs(context: Context, initial: String, private val changed: (
     private fun append(value: String = "") {
         val row = LinearLayout(context).apply { orientation = HORIZONTAL }
         val field = EditText(context).apply {
-            hint = "Ingrediente ${fields.size+1}"; contentDescription = hint
+            hint = if (fields.isEmpty()) "Ingrediente principale" else "Ingrediente ${fields.size+1}"
+            contentDescription = hint
             setSingleLine(true); textSize = 16f
             imeOptions = android.view.inputmethod.EditorInfo.IME_ACTION_DONE
             setOnEditorActionListener { view, actionId, event ->
@@ -78,7 +79,16 @@ class IngredientInputs(context: Context, initial: String, private val changed: (
                 field.error = "Un solo ingrediente per casella"; field.requestFocus(); return null
             }
         }
-        if (!allowEmpty && values().isEmpty()) { fields.first().error = "Indica almeno un ingrediente"; fields.first().requestFocus(); return null }
+        if (values().isNotEmpty() && fields.first().text.toString().isBlank()) {
+            fields.first().error = "Indica prima l'ingrediente principale"
+            fields.first().requestFocus()
+            return null
+        }
+        if (!allowEmpty && fields.first().text.toString().isBlank()) {
+            fields.first().error = "L'ingrediente principale è obbligatorio (es. pasta, riso, pollo, patate)"
+            fields.first().requestFocus()
+            return null
+        }
         return values().joinToString(", ")
     }
 }

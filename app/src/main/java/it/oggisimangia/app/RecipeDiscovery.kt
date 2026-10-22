@@ -72,7 +72,7 @@ object RecipeDiscovery {
             val normalized = url.trim().substringBefore('#')
             if (!acceptableLink(normalized, domain)) return
             val name = cleanCandidateTitle(title, normalized)
-            if (name.length < 5) return
+            if (!RecipeValidation.isLikelyRecipeLink(name, normalized)) return
             found.putIfAbsent(normalized.substringBefore('?'),
                 Candidate(normalized, name, site))
         }
@@ -96,8 +96,10 @@ object RecipeDiscovery {
         return (0 until largest).flatMap { index -> groups.mapNotNull { it.getOrNull(index) } }
     }
 
-    private fun pendingPreview(candidate: Candidate) = WebRecipe(
-        candidate.title, "", candidate.url, candidate.site, verified = false)
+    private fun pendingPreview(candidate: Candidate, ingredients: String): WebRecipe? =
+        if (RecipeValidation.mentionsMainInTitle(candidate.title, ingredients))
+            WebRecipe(candidate.title, "", candidate.url, candidate.site, verified = false)
+        else null
 
     internal fun schema(html: String): JSONObject? {
         val found = mutableListOf<JSONObject>()
@@ -124,7 +126,7 @@ object RecipeDiscovery {
         val recipe = schema(html) ?: return null // Reject articles and category pages.
         fun clean(s: String) = Jsoup.parse(s).text()
         val title = clean(recipe.optString("name"))
-        if (title.isBlank()) return null
+        if (!RecipeValidation.isLikelyRecipeLink(title, link)) return null
         val reader = RecipeReader.parse(recipe)
         val description = clean(recipe.optString("description")).take(240)
         if (!RecipeValidation.isDish(title, reader.ingredients, reader.original) ||
@@ -176,12 +178,18 @@ object RecipeDiscovery {
         val pool = Executors.newFixedThreadPool(6)
         return try {
             val jobs = hits.take(12).map { candidate -> Callable {
-                try { preview(download(candidate.url), candidate.url, candidate.site, ingredients) }
-                catch (_: Exception) { null }
+                try {
+                    preview(download(candidate.url), candidate.url, candidate.site, ingredients)
+                } catch (_: Exception) {
+                    // Network/robots/timeouts: only a plausible dish using the main
+                    // ingredient is shown as genuinely not yet verified.
+                    pendingPreview(candidate, ingredients)
+                }
             } }
-            val checked = pool.invokeAll(jobs, 29, TimeUnit.SECONDS).mapIndexed { index, future ->
-                try { if (future.isCancelled) null else future.get() } catch (_: Exception) { null }
-                    ?: pendingPreview(hits[index])
+            val checked = pool.invokeAll(jobs, 29, TimeUnit.SECONDS).mapIndexedNotNull { index, future ->
+                try {
+                    if (future.isCancelled) pendingPreview(hits[index], ingredients) else future.get()
+                } catch (_: Exception) { pendingPreview(hits[index], ingredients) }
             }
             RecipeRanking.order(checked, ingredients)
         } finally { pool.shutdownNow() }
@@ -219,14 +227,18 @@ object RecipeDiscovery {
             val candidates = roundRobin(groups)
                 .distinctBy { it.url.substringBefore('?').substringBefore('#').trimEnd('/') }
             val checks = candidates.map { candidate -> Callable {
-                try { preview(download(candidate.url), candidate.url, candidate.site, ingredients) }
-                catch (_: Exception) { null }
+                try {
+                    preview(download(candidate.url), candidate.url, candidate.site, ingredients)
+                } catch (_: Exception) {
+                    pendingPreview(candidate, ingredients)
+                }
             } }
             val futures = executor.invokeAll(checks, 43, TimeUnit.SECONDS)
-            val all = futures.mapIndexed { index, future ->
-                val verified = try { if (future.isCancelled) null else future.get() }
-                    catch (_: Exception) { null }
-                verified ?: pendingPreview(candidates[index])
+            val all = futures.mapIndexedNotNull { index, future ->
+                try {
+                    if (future.isCancelled) pendingPreview(candidates[index], ingredients)
+                    else future.get()
+                } catch (_: Exception) { pendingPreview(candidates[index], ingredients) }
             }
             return RecipeRanking.order(all, ingredients)
         } finally { executor.shutdownNow() }

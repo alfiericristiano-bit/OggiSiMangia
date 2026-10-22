@@ -85,13 +85,24 @@ object RecipeFinder {
                         .userAgent("Mozilla/5.0 (Android; OggiSiMangia/1.8.1)")
                         .timeout(7500).maxBodySize(2_000_000).get().outerHtml()
                     RecipeDiscovery.preview(html, candidate.url, candidate.source, ingredients)
-                } catch (_: Exception) { null }
+                } catch (_: Exception) {
+                    if (RecipeValidation.mentionsMainInTitle(candidate.title, ingredients))
+                        candidate.copy(verified = false) else null
+                }
             } }
             pool.invokeAll(calls, 39, java.util.concurrent.TimeUnit.SECONDS)
-                .mapIndexed { index, future ->
-                    val confirmed = try { if (future.isCancelled) null else future.get() }
-                        catch (_: Exception) { null }
-                    confirmed ?: balanced[index].copy(verified = false)
+                .mapIndexedNotNull { index, future ->
+                    try {
+                        if (future.isCancelled) {
+                            balanced[index].takeIf {
+                                RecipeValidation.mentionsMainInTitle(it.title, ingredients)
+                            }?.copy(verified = false)
+                        } else future.get()
+                    } catch (_: Exception) {
+                        balanced[index].takeIf {
+                            RecipeValidation.mentionsMainInTitle(it.title, ingredients)
+                        }?.copy(verified = false)
+                    }
                 }
         } finally { pool.shutdownNow() }
 
@@ -105,6 +116,7 @@ object RecipeFinder {
             val title = anchor.text().trim().replace(Regex("\\s+"), " ")
             val url = anchor.absUrl("href")
             if (title.length !in 6..130 || !isTrusted(url) ||
+                !RecipeValidation.isLikelyRecipeLink(title, url) ||
                 url.contains("/ricerca-ricette/") || url.contains("/category/") ||
                 url.contains("/categorie/")) continue
             val host = Uri.parse(url).host?.lowercase().orEmpty()
@@ -145,7 +157,7 @@ object RecipeFinder {
 
             found.putIfAbsent(url.substringBefore('?'), WebRecipe(
                 title, summary, url, source, imageUrl, recipeCategory, diff,
-                mins, rating, feedbacks
+                mins, rating, feedbacks, verified = false
             ))
             if (found.size >= 18) break
         }

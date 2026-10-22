@@ -45,4 +45,58 @@ class RecipeValidationTest {
         val matching = missing.copy(ingredients = "riso\ncarciofi")
         assertEquals(listOf(matching), RecipeRanking.order(listOf(missing, matching),"riso, carciofi"))
     }
+    @Test fun genericIndexPagesAreNotIndividualRecipes() {
+        assertFalse(RecipeValidation.isLikelyRecipeLink("Tutte le ricette",
+            "https://www.giallozafferano.it/ricette/"))
+        assertFalse(RecipeValidation.isLikelyRecipeLink(
+            "Pasta: ricette veloci - Le ricette di GialloZafferano",
+            "https://www.giallozafferano.it/ricette/pasta-ricette-veloci"))
+        assertFalse(RecipeValidation.isLikelyRecipeLink("Le ricette di pollo",
+            "https://www.misya.info/ricette/ricette-di-pollo"))
+        assertFalse(RecipeValidation.isLikelyRecipeLink("Primi piatti",
+            "https://www.giallozafferano.it/ricette-cat/Primi-piatti"))
+        assertTrue(RecipeValidation.isLikelyRecipeLink("Pasta e fagioli",
+            "https://ricette.giallozafferano.it/Pasta-e-fagioli.html"))
+    }
+
+    @Test fun primaryPastaNeverMeansShortcrustPastry() {
+        assertFalse(RecipeValidation.mentionsMainInTitle("Strudel di mele con pasta frolla", "pasta"))
+        assertFalse(RecipeValidation.containsEvery("250 g pasta sfoglia\n2 mele\nburro",
+            "pasta, mele"))
+        assertTrue(RecipeValidation.mentionsMainInTitle("Spaghetti alla norma", "pasta, melanzane"))
+        assertTrue(RecipeValidation.mentionsMainInTitle("Risotto ai funghi", "riso, funghi"))
+        assertTrue(RecipeValidation.containsEvery("250 g spaghetti\n2 melanzane",
+            "pasta, melanzane"))
+    }
+
+    @Test fun unverifiedMustMentionMainAndMustNotBeACollection() {
+        val url = "https://ricette.giallozafferano.it/"
+        val candidates = listOf(
+            WebRecipe("Tutte le ricette", "", url+"Tutte-le-ricette.html",
+                "GialloZafferano", verified=false),
+            WebRecipe("Strudel di mele con pasta frolla", "", url+"Strudel.html",
+                "GialloZafferano", verified=false),
+            WebRecipe("Pasta e fagioli", "", url+"Pasta-e-fagioli.html",
+                "GialloZafferano", verified=false),
+            WebRecipe("Pasta al pomodoro", "", url+"Pasta-al-pomodoro.html",
+                "GialloZafferano", ingredients="200 g pasta\n200 g pomodori", verified=true),
+            WebRecipe("Pasta senza pomodoro", "", url+"Pasta-senza-pomodoro.html",
+                "GialloZafferano", ingredients="200 g pasta\n100 g burro", verified=true)
+        )
+        val found = RecipeRanking.order(candidates,"pasta, pomodoro")
+        assertEquals(2,found.size)
+        assertEquals(listOf("Pasta al pomodoro","Pasta e fagioli"), found.map { it.title })
+        assertTrue(found[0].verified)
+        assertFalse(found[1].verified)
+    }
+
+    @Test fun mainAndSecondaryAreReportedIndividually() {
+        val published = "300 g riso\n150 g piselli\n1 cipolla"
+        assertEquals("riso",RecipeValidation.mainIngredient("riso, pollo, cipolla"))
+        assertEquals(listOf("riso", "cipolla"), RecipeValidation.foundIngredients(published,
+            "riso, pollo, cipolla"))
+        assertEquals(listOf("pollo"),RecipeValidation.missingIngredients(published,
+            "riso, pollo, cipolla"))
+    }
+
 }
