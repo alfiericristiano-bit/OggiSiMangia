@@ -21,9 +21,10 @@ object RecipeSearchQueries {
         ).distinct()
     }
 
-    fun bing(domain: String, query: String): String {
+    fun bing(domain: String, query: String, offset: Int = 0): String {
         val text = "site:$domain ricetta $query"
-        return "https://www.bing.com/search?q=" + URLEncoder.encode(text, "UTF-8") + "&format=rss"
+        return "https://www.bing.com/search?q=" + URLEncoder.encode(text, "UTF-8") + "&format=rss" +
+            (if (offset > 0) "&first=" + (offset + 1) else "")
     }
 
     fun editorial(name: String, query: String): String {

@@ -29,7 +29,7 @@ object RecipeDiscovery {
     }
 
     internal fun rssLinks(xml: String, domain: String): List<String> = Jsoup.parse(xml, "", Parser.xmlParser())
-        .select("item > link").map { it.text().trim() }.filter { RecipeSources.belongs(it, domain) }.distinct().take(4)
+        .select("item > link").map { it.text().trim() }.filter { RecipeSources.belongs(it, domain) }.distinct().take(12)
 
     /** RSS is preferred; some search responses come back as HTML instead. */
     internal fun searchLinks(body: String, domain: String): List<String> {
@@ -102,6 +102,32 @@ object RecipeDiscovery {
         return WebRecipe(title, description, link, site, image, category, difficulty, mins, rating, count, relevance, reader.ingredients)
     }
 
+    /** Request the next search-engine page for one source only; other sources are unaffected. */
+    fun searchNextPage(ingredients: String, site: String, domain: String, page: Int): List<WebRecipe> {
+        require(page >= 1)
+        require(RecipeSources.sites[site] == domain) { "Fonte non configurata" }
+        val queries = RecipeSearchQueries.variants(ingredients)
+        if (queries.isEmpty()) return emptyList()
+        val links = linkedSetOf<String>()
+        for (query in queries) {
+            try {
+                links += searchLinks(download(RecipeSearchQueries.bing(domain, query, page * 10)), domain)
+            } catch (_: Exception) { /* Other configured sites remain available. */ }
+            if (links.size >= 12) break
+        }
+        val pool = Executors.newFixedThreadPool(6)
+        return try {
+            val jobs = links.take(12).map { link -> Callable {
+                try { preview(download(link), link, site, ingredients) }
+                catch (_: Exception) { null }
+            } }
+            val items = pool.invokeAll(jobs, 33, TimeUnit.SECONDS).mapNotNull {
+                try { if (it.isCancelled) null else it.get() } catch (_: Exception) { null }
+            }
+            RecipeRanking.order(items.distinctBy { it.url.substringBefore('?').substringBefore('#').trimEnd('/') }, ingredients)
+        } finally { pool.shutdownNow() }
+    }
+
     fun search(ingredients: String, category: String, difficulty: String, duration: String): List<WebRecipe> {
         val queries = RecipeSearchQueries.variants(ingredients)
         if (queries.isEmpty()) return emptyList()
@@ -117,9 +143,9 @@ object RecipeDiscovery {
                     } catch (_: Exception) {
                         // Try a form without the trailing comma if this one fails.
                     }
-                    if (found.size >= 4) break
+                    if (found.size >= 12) break
                 }
-                found.take(4).map { site to it }
+                found.take(12).map { site to it }
             } }
             // Keep a bounded network budget so UI search does not hang.
             val links = executor.invokeAll(searches, 25, TimeUnit.SECONDS).flatMap {
