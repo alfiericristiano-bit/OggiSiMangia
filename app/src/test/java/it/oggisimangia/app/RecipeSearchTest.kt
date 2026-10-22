@@ -42,6 +42,44 @@ class RecipeSearchTest {
         assertTrue(RecipeValidation.containsEvery("200 g polenta\n250 ml acqua", "polenta"))
     }
 
+    @Test fun everySiteGetsVerificationTurnsEvenWhenFirstSiteHasManyCandidates() {
+        val giallo = listOf("g1","g2","g3","g4","g5")
+        val benedetta = listOf("b1","b2")
+        val misya = listOf("m1","m2","m3")
+        assertEquals(listOf("g1","b1","m1","g2","b2","m2","g3","m3","g4","g5"),
+            RecipeDiscovery.roundRobin(listOf(giallo, benedetta, misya)))
+    }
+
+    @Test fun searchIndexCandidatesAreShownButNeverClaimedAsIngredientVerified() {
+        RecipeSources.configure(linkedMapOf("Misya" to "misya.info", "Sale&Pepe" to "salepepe.it"))
+        val xml = """<rss><channel>
+            <item><title>Pasta con le melanzane - Ricetta di Misya</title>
+            <link>https://www.misya.info/ricetta/pasta-con-le-melanzane.htm</link></item>
+            <item><title>Guida impasto</title>
+            <link>https://www.example.org/guida</link></item>
+            </channel></rss>"""
+        val hits = RecipeDiscovery.candidates(xml,"Misya","misya.info")
+        assertEquals(1, hits.size)
+        assertEquals("Pasta con le melanzane", hits[0].title)
+        val provisional = WebRecipe(hits[0].title,"",hits[0].url,"Misya",verified=false)
+        val confirmed = WebRecipe("Barchette di melanzane", "",
+            "https://www.salepepe.it/ricette/barchette-melanzane-pomodoro/",
+            "Sale&Pepe", ingredients="300 g melanzane\n2 pomodori", verified=true)
+        val impossible = confirmed.copy(url="https://www.salepepe.it/ricette/senza-pomodoro/",
+            ingredients="300 g melanzane\n100 g zucchine")
+        val result = RecipeRanking.order(listOf(impossible,confirmed,provisional),
+            "melanzane, pomodoro")
+        assertEquals(listOf(provisional,confirmed),result)
+        assertFalse(result[0].verified)
+        assertTrue(result[1].verified)
+    }
+
+    @Test fun sourceSearchNoLongerRequiresTheLiteralWordRicetta() {
+        val url=RecipeSearchQueries.bing("misya.info","melanzane pomodoro")
+        assertTrue(url.contains("site%3Amisya.info"))
+        assertFalse(url.contains("ricetta+melanzane"))
+    }
+
     @Test fun searchCanReadRssOrHtmlResultsWithoutTrustingOtherDomains() {
         val rss = """<rss><channel><item><link>https://www.misya.info/ricetta/polenta.htm</link></item></channel></rss>"""
         assertEquals(listOf("https://www.misya.info/ricetta/polenta.htm"),
