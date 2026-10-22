@@ -59,10 +59,33 @@ print('PASS: calendar starts with SQLite recipes and exposes both meal markers o
 import time
 
 def snapshot(name):
-    adb('shell', 'uiautomator', 'dump', '/sdcard/check.xml')
-    data = adb('exec-out', 'cat', '/sdcard/check.xml')
-    (out / (name + '.xml')).write_bytes(data)
-    return list(ET.fromstring(data).iter('node'))
+    # A failed uiautomator dump can leave yesterday's check.xml in place.
+    # Remove it first, then retry until a fresh, parseable hierarchy exists.
+    last_error = None
+    for attempt in range(5):
+        adb('shell', 'rm', '-f', '/sdcard/check.xml')
+        try:
+            adb('shell', 'uiautomator', 'dump', '/sdcard/check.xml')
+            data = adb('exec-out', 'cat', '/sdcard/check.xml')
+            nodes = list(ET.fromstring(data).iter('node'))
+            if not nodes:
+                raise AssertionError('Empty UI hierarchy')
+            (out / (name + '.xml')).write_bytes(data)
+            return nodes
+        except (subprocess.CalledProcessError, ET.ParseError, AssertionError) as error:
+            last_error = error
+            time.sleep(0.5)
+    raise AssertionError(f'Could not obtain a fresh UI hierarchy ({name}): {last_error}')
+
+def restart_home(name):
+    adb('shell', 'am', 'force-stop', package)
+    adb('shell', 'am', 'start', '-W', '-n', package + '/.MainActivity')
+    for attempt in range(10):
+        nodes = snapshot(name)
+        if any(n.attrib.get('text') == 'Il calendario dei pasti' for n in nodes):
+            return nodes
+        time.sleep(0.4)
+    raise AssertionError('Calendar did not become ready after app restart: ' + name)
 
 def center(node):
     x1, y1, x2, y2 = map(int, re.findall(r'\d+', node.attrib['bounds']))
@@ -169,9 +192,7 @@ adb('shell','input','keyevent','KEYCODE_BACK')
 print('PASS: native multipage PDF generated and Android print service opened without submitting a print job.')
 
 # Configure source priorities and a custom domain, then verify persistence after process restart.
-adb('shell','am','force-stop',package)
-adb('shell','am','start','-W','-n',package+'/.MainActivity')
-home=snapshot('preferences-home')
+home=restart_home('preferences-home')
 assert not any(n.attrib.get('text')=='Come funziona il calendario' for n in home), 'Help opt-out was not saved'
 tap(next(n for n in home if 'Cerca' in n.attrib.get('text','') and n.attrib.get('clickable')=='true'))
 tap(find_scrolling('Priorità dei siti e nuove fonti','source-action'))
@@ -195,9 +216,7 @@ tap(find_scrolling('Elimina sito GialloZafferano','source-delete'))
 confirm_delete=snapshot('source-delete-confirm')
 assert any(n.attrib.get('text') == 'Eliminare il sito?' for n in confirm_delete)
 tap(text_node(confirm_delete,'Elimina sito'))
-adb('shell','am','force-stop',package)
-adb('shell','am','start','-W','-n',package+'/.MainActivity')
-home=snapshot('persist-home')
+home=restart_home('persist-home')
 tap(next(n for n in home if 'Cerca' in n.attrib.get('text','') and n.attrib.get('clickable')=='true'))
 # The first ingredient row grows to ten independent fields.
 for index in range(1,11):
