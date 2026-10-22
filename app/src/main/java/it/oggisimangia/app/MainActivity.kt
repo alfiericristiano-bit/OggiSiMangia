@@ -2353,6 +2353,117 @@ class MainActivity : Activity() {
         return file.absolutePath
     }
 
+
+    /** Execute only actions registered in the allowlist; always call done after user choices. */
+    private fun executeVoiceCommand(command: VoiceCommand, done: (String) -> Unit) {
+        when (command) {
+            is VoiceCommand.Open -> {
+                when (command.destination) {
+                    VoiceCommand.Destination.CALENDAR -> showCalendar()
+                    VoiceCommand.Destination.ARCHIVE -> showArchive()
+                    VoiceCommand.Destination.SEARCH -> showSearch()
+                    VoiceCommand.Destination.EDITOR -> showEditor()
+                    VoiceCommand.Destination.SUMMARY -> showSummary()
+                    VoiceCommand.Destination.SOURCES -> showSourceSettings()
+                }
+                done("Sezione aperta.")
+            }
+            is VoiceCommand.Search -> {
+                val ingredients = command.ingredients.map(String::trim).filter(String::isNotBlank).take(10)
+                if (ingredients.isEmpty()) {
+                    done("Impossibile cercare: indica almeno l'ingrediente principale.")
+                    return
+                }
+                searchIngredients = ingredients.joinToString(", ")
+                showSearch(autoSearch = true)
+                done("Ricerca avviata con ingrediente principale ${ingredients.first()}.")
+            }
+            is VoiceCommand.ShowDay -> {
+                selectedDate = command.day
+                expandedMeals.clear()
+                showCalendar()
+                done("Calendario aperto per ${command.day.format(dateFormatter)}.")
+            }
+            is VoiceCommand.ReadMeals -> {
+                selectedDate = command.day
+                expandedMeals.clear()
+                showCalendar()
+                val meals = db.onDay(command.day.toString()).filter {
+                    command.meal == null || it.meal == command.meal || it.meal == "Entrambi"
+                }
+                val message = if (meals.isEmpty()) {
+                    "Non risultano ricette pianificate per ${command.meal?.lowercase() ?: "i pasti"} del ${command.day.format(dateFormatter)}."
+                } else {
+                    "Pasti del ${command.day.format(dateFormatter)}:\n" +
+                        meals.joinToString("\n") { "${it.meal}: ${it.title}" +
+                            (if (it.alternative) " (alternativa)" else "") }
+                }
+                done(message)
+            }
+            is VoiceCommand.PlanSaved -> voicePlanSaved(command, done)
+            VoiceCommand.Help -> {
+                AlertDialog.Builder(this).setTitle("Comandi disponibili")
+                    .setMessage("Prova: «cerca ricette con riso e zucchine»; " +
+                        "«apri il ricettario»; «cosa mangio domani?»; " +
+                        "«pianifica risotto ai funghi per cena domani». " +
+                        "Puoi dire «e poi» per concatenare fino a sei comandi. " +
+                        "L'assistente chiede conferma prima di modificare il calendario.")
+                    .setPositiveButton("Ho capito", null).show()
+                done("Ecco i comandi disponibili.")
+            }
+            VoiceCommand.Unknown -> done("Impossibile interpretare il comando.")
+        }
+    }
+
+    private fun voicePlanSaved(command: VoiceCommand.PlanSaved, done: (String) -> Unit) {
+        val all = db.archive("", "Tutte", "Tutte", "Nome A–Z")
+        val sought = command.title.lowercase(java.util.Locale.ITALIAN).trim()
+        val matches = all.filter { it.title.lowercase(java.util.Locale.ITALIAN).trim() == sought }
+            .ifEmpty { all.filter { it.title.lowercase(java.util.Locale.ITALIAN).contains(sought) } }
+        if (matches.isEmpty()) {
+            done("Impossibile pianificare «${command.title}»: non è nel ricettario. " +
+                "Prima cerca o salva la ricetta, poi ripeti il comando.")
+            return
+        }
+        fun apply(recipe: Recipe) {
+            val current = db.onDay(command.day.toString()).filter {
+                it.meal == command.meal || it.meal == "Entrambi"
+            }
+            if (current.any { it.title == recipe.title }) {
+                done("Impossibile duplicare «${recipe.title}»: è già presente per ${command.meal.lowercase()} in quel giorno.")
+                return
+            }
+            fun persist(alternative: Boolean) {
+                try {
+                    db.save(recipe.copy(id = 0L, day = command.day.toString(),
+                        meal = command.meal, alternative = alternative))
+                    done("Pianificata «${recipe.title}» per ${command.meal.lowercase()} del ${command.day.format(dateFormatter)}" +
+                        (if (alternative) " come alternativa." else "."))
+                } catch (_: Exception) {
+                    done("Impossibile salvare il pasto. Il calendario non è stato modificato.")
+                }
+            }
+            if (current.any { !it.alternative }) {
+                AlertDialog.Builder(this)
+                    .setTitle("Pasto già presente")
+                    .setMessage("Per ${command.meal.lowercase()} del ${command.day.format(dateFormatter)}" +
+                        " c'è già un piatto principale. Vuoi aggiungere «${recipe.title}» come alternativa?")
+                    .setPositiveButton("Aggiungi alternativa") { _, _ -> persist(true) }
+                    .setNegativeButton("Annulla") { _, _ -> done("Annullato: il pasto non è stato modificato.") }
+                    .setOnCancelListener { done("Annullato: il pasto non è stato modificato.") }
+                    .show()
+            } else persist(false)
+        }
+        if (matches.size == 1) apply(matches.first())
+        else AlertDialog.Builder(this).setTitle("Quale ricetta intendi?")
+            .setItems(matches.take(20).map { it.title }.toTypedArray()) { _, which ->
+                apply(matches[which])
+            }
+            .setNegativeButton("Annulla") { _, _ -> done("Annullato: ricetta non selezionata.") }
+            .setOnCancelListener { done("Annullato: ricetta non selezionata.") }
+            .show()
+    }
+
     override fun onDestroy() {
         voice.close()
         nano.close()
