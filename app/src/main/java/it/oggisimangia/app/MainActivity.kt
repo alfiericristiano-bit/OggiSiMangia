@@ -40,6 +40,8 @@ import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 class MainActivity : Activity() {
     private lateinit var db: RecipeDb
     private lateinit var sourcePreferences: SourcePreferences
+    private lateinit var nano: LocalNanoAssistant
+    private var nanoRequestedText = ""
     private var pendingReport: File? = null
     private lateinit var content: LinearLayout
     private lateinit var screenRoot: LinearLayout
@@ -119,6 +121,8 @@ class MainActivity : Activity() {
         db = RecipeDb(this)
         sourcePreferences = SourcePreferences(this)
         RecipeSources.configure(sourcePreferences.load())
+        nano = LocalNanoAssistant(this)
+        nano.refresh()
         window.statusBarColor = Color.rgb(45, 91, 61)
         window.navigationBarColor = Color.rgb(45, 91, 61)
         showSplash()
@@ -716,6 +720,7 @@ class MainActivity : Activity() {
         scanPageRoles.clear()
         scanPageRoles.putAll(photoRoles(existing?.scanPages))
         scanPageTexts.clear()
+        nanoRequestedText = ""
         autoTitle = ""; autoIngredients = ""; autoSteps = ""
         autoPrep = ""; autoCook = ""; autoRest = ""; autoTotal = ""; autoPortions = ""; autoDifficulty = ""
         dishPhotoChoices.clear()
@@ -738,6 +743,18 @@ class MainActivity : Activity() {
         val titleField = input("Nome del piatto *", existing?.title ?: suggestedTitle)
         editorTitle = titleField
         label("RICETTA DA RIVISTA · SCANSIONE E OCR", 19f, true)
+        label("🤖 " + nano.statusText(), 13f)
+        action("ⓘ Come viene usata l'AI locale?") {
+            AlertDialog.Builder(this)
+                .setTitle("Privacy e AI sul dispositivo")
+                .setMessage("Se Gemini Nano è già disponibile, OggiSiMangia usa " +
+                    "automaticamente l'AI locale per organizzare il testo OCR. " +
+                    "Nessuna fotografia o ricetta viene inviata a servizi AI online. " +
+                    "Se Nano non è compatibile, resta attivo l'OCR ML Kit tradizionale. " +
+                    "Il download di Nano è consentito solo dopo conferma esplicita " +
+                    "su rete Wi-Fi non a consumo. Controlla sempre il risultato.")
+                .setPositiveButton("Ho capito", null).show()
+        }
         label("Segui le fasi nell'ordine: 1) pagina intera (anche più pagine); 2) primo piano degli ingredienti; 3) preparazione; 4) tempi, difficoltà e dosi. L'OCR locale parte dopo ogni foto. Manteniamo sia le fotografie originali sia tutti i testi correggibili.", 13f)
         label("1 · PAGINA INTERA DELLA RICETTA", 15f, true)
         actionRow("📷 Fotografa pagina", { launchCamera("scan:" + MagazineRecipeText.WHOLE) },
@@ -1163,6 +1180,121 @@ class MainActivity : Activity() {
         }
     }
 
+    /** Gemini Nano suggestions are never written to the saved raw OCR.
+     * A field that the user changed after OCR was generated stays untouched.
+     */
+    private fun applyNanoGuess(guess: MagazineRecipeText.Guess) {
+        fun offer(field: EditText?, value: String, previous: String, remember: (String)->Unit) {
+            if (field == null || value.isBlank()) return
+            val current = field.text.toString()
+            if (current.isBlank() || (previous.isNotBlank() && current == previous)) {
+                field.setText(value)
+                remember(value)
+            }
+        }
+        offer(editorTitle, guess.title, autoTitle) { autoTitle = it }
+        if (guess.ingredients.isNotBlank() && editorIngredients != null &&
+            (editorIngredients!!.entries().isEmpty() ||
+             (autoIngredients.isNotBlank() && editorIngredients!!.value() == autoIngredients))) {
+            editorIngredients?.replaceValues(guess.ingredients)
+            autoIngredients = guess.ingredients
+        }
+        if (guess.steps.isNotBlank() && editorSteps != null &&
+            (editorSteps!!.entries().isEmpty() ||
+             (autoSteps.isNotBlank() && editorSteps!!.value() == autoSteps))) {
+            editorSteps?.replaceValues(guess.steps)
+            autoSteps = guess.steps
+        }
+        offer(editorPrep, guess.prepTime, autoPrep) { autoPrep = it }
+        offer(editorCook, guess.cookTime, autoCook) { autoCook = it }
+        offer(editorRest, guess.restTime, autoRest) { autoRest = it }
+        offer(editorTotal, guess.totalTime, autoTotal) { autoTotal = it }
+        offer(editorPortions, guess.portions, autoPortions) { autoPortions = it }
+        if (guess.difficulty.isNotBlank()) editorDifficulty?.let { picker ->
+            if (autoDifficulty == picker.selectedItem?.toString() ||
+                (autoDifficulty.isBlank() && picker.selectedItem?.toString() == searchDifficulty)) {
+                difficulties.indexOf(guess.difficulty).takeIf { it >= 0 }?.let {
+                    picker.setSelection(it)
+                    autoDifficulty = guess.difficulty
+                }
+            }
+        }
+    }
+
+    private fun tryNanoEnhance(session: Int) {
+        if (!nano.enabled || nano.state != LocalNanoAssistant.State.READY) return
+        val raw = editorOcr?.text?.toString().orEmpty()
+        if (raw.isBlank() || raw == nanoRequestedText) return
+        nanoRequestedText = raw
+        val editor = editorOcr
+        nano.improveOcr(raw) { guess ->
+            if (session == scanSession && currentPageKey.startsWith("editor-") &&
+                editor === editorOcr && guess != null) {
+                applyNanoGuess(guess)
+                ocrStatusLabel?.text = "✓ OCR migliorato con AI locale Gemini Nano. " +
+                    "Verifica i campi: puoi correggere ogni informazione."
+            }
+        }
+    }
+
+    private fun showAiSettings() {
+        screen("AI locale e privacy", "Funziona sul telefono, senza servizi AI cloud.",
+            "ai-settings") { showAiSettings() }
+        label("🤖 Intelligenza artificiale sul dispositivo", 19f, true)
+        label(nano.statusText(), 15f, true)
+        val enabled = CheckBox(this).apply {
+            text = "Usa automaticamente Gemini Nano, quando presente"
+            isChecked = nano.enabled
+            setOnCheckedChangeListener { _, checked ->
+                nano.enabled = checked
+                showAiSettings()
+            }
+        }
+        content.addView(enabled)
+        label("Le foto vengono elaborate dall'OCR ML Kit sul telefono. " +
+            "Gemini Nano, se supportato, riorganizza soltanto il testo OCR, " +
+            "senza caricare immagini o ricette sui server AI. " +
+            "Non è attiva alcuna AI online, né è necessaria una chiave API.", 14f)
+        label("Il modello può essere grande: NON viene mai avviato un download " +
+            "da OggiSiMangia senza il tuo consenso esplicito e una connessione Wi-Fi " +
+            "non a consumo. Non è possibile utilizzare automaticamente ogni AI " +
+            "proprietaria del telefono se il produttore non offre API compatibili.", 13f)
+        action("↻ Ricontrolla compatibilità del telefono") {
+            nano.refresh()
+            android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+                if (currentPageKey == "ai-settings") showAiSettings()
+            }, 1800L)
+        }
+        if (nano.enabled && nano.state == LocalNanoAssistant.State.DOWNLOADABLE) {
+            action("⬇ Installa il modello Gemini Nano (conferma richiesta)") {
+                if (!nano.isUnmeteredWifi()) {
+                    AlertDialog.Builder(this)
+                        .setTitle("Serve una rete Wi-Fi non a consumo")
+                        .setMessage("Collega il telefono a una rete Wi-Fi con Internet " +
+                            "non a consumo, poi riprova. Nessun download è stato avviato.")
+                        .setPositiveButton("OK", null).show()
+                } else {
+                    AlertDialog.Builder(this)
+                        .setTitle("Scaricare Gemini Nano?")
+                        .setMessage("Il modello è gratuito ma può occupare molto spazio. " +
+                            "Sarà scaricato usando la connessione Wi-Fi attuale. " +
+                            "Nessuna foto verrà caricata online. Confermi il download?")
+                        .setNegativeButton("Annulla", null)
+                        .setPositiveButton("Sì, scarica") { _, _ ->
+                            nano.downloadAfterConsent { success ->
+                                if (currentPageKey == "ai-settings") showAiSettings()
+                                Toast.makeText(this,
+                                    if (success) "Modello Nano pronto all'uso"
+                                    else "Download non completato. OCR ML Kit resta disponibile.",
+                                    Toast.LENGTH_LONG).show()
+                            }
+                        }.show()
+                }
+            }
+        }
+        action("← Torna alle fonti di ricerca") { showSourceSettings() }
+    }
+
     private fun updateOcrStatus() {
         val total = magazinePages.size
         val remaining = pendingOcrPages.size
@@ -1192,6 +1324,7 @@ class MainActivity : Activity() {
             }
         }
         updateOcrStatus()
+        if (pendingOcrPages.isEmpty()) tryNanoEnhance(scanSession)
     }
 
     private fun recognizeMagazinePage(path: String, page: Int, session: Int) {
@@ -1469,6 +1602,7 @@ class MainActivity : Activity() {
                 bottomMargin = dp(5)
             })
         }
+        action("🤖 Impostazioni AI locale e privacy") { showAiSettings() }
         action("Ripristina siti e ordine iniziali") {
             val restored = LinkedHashMap(RecipeSources.defaults)
             RecipeSources.sites.forEach { (name,domain) -> if (domain !in restored.values) restored[name] = domain }
@@ -2204,6 +2338,7 @@ class MainActivity : Activity() {
     }
 
     override fun onDestroy() {
+        nano.close()
         db.close()
         super.onDestroy()
     }
