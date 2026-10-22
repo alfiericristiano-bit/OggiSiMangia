@@ -61,6 +61,11 @@ class MainActivity : Activity() {
     private var editorSteps: RecipeListFields? = null
     private var editorOcr: EditText? = null
     private var pendingCameraKind = "cover"
+    private val scanOcrResults = mutableMapOf<String, String>()
+    private val processedOcrPages = mutableSetOf<String>()
+    private val pendingOcrPages = mutableSetOf<String>()
+    private var ocrStatusLabel: TextView? = null
+    private var scanSession = 0
     private var photoPreview: ImageView? = null
     private var pendingCameraPath: String? = null
     private var lastSearchResults: List<WebRecipe> = emptyList()
@@ -91,15 +96,123 @@ class MainActivity : Activity() {
         db = RecipeDb(this)
         sourcePreferences = SourcePreferences(this)
         RecipeSources.configure(sourcePreferences.load())
-        window.statusBarColor = Color.rgb(15, 98, 86)
-        window.navigationBarColor = Color.rgb(15, 98, 86)
-        showCalendar()
+        window.statusBarColor = Color.rgb(45, 91, 61)
+        window.navigationBarColor = Color.rgb(45, 91, 61)
+        if (displayName().isBlank()) showNameIntroduction() else showCalendar()
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
         outState.putString("pending_camera_path", pendingCameraPath)
         outState.putString("pending_camera_kind", pendingCameraKind)
         super.onSaveInstanceState(outState)
+    }
+
+
+    private fun displayName(): String = getSharedPreferences("user_profile", MODE_PRIVATE)
+        .getString("display_name", "").orEmpty().trim()
+
+    private fun onboardingRoot(title: String, subtitle: String): LinearLayout {
+        val wrapper = ScrollView(this).apply { isFillViewport = true }
+        val layout = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER_HORIZONTAL
+            setPadding(dp(24), dp(32), dp(24), dp(28))
+            setBackgroundColor(Color.rgb(250, 252, 244))
+        }
+        wrapper.addView(layout)
+        setContentView(wrapper)
+        layout.addView(TextView(this).apply {
+            text = "OggiSiMangia..."
+            textSize = 27f
+            setTypeface(null, Typeface.BOLD)
+            setTextColor(Color.rgb(45, 91, 61))
+            gravity = Gravity.CENTER
+        })
+        layout.addView(TextView(this).apply {
+            text = title
+            textSize = 24f
+            setTypeface(null, Typeface.BOLD)
+            setTextColor(Color.rgb(35, 70, 49))
+            gravity = Gravity.CENTER
+            setPadding(0, dp(22), 0, dp(4))
+        })
+        layout.addView(TextView(this).apply {
+            text = subtitle
+            textSize = 15f
+            setTextColor(Color.rgb(82, 103, 76))
+            gravity = Gravity.CENTER
+        })
+        val image = ImageView(this).apply {
+            setImageResource(R.drawable.app_icon_clean)
+            contentDescription = "Calendario, pasta e basilico di OggiSiMangia"
+        }
+        layout.addView(image, LinearLayout.LayoutParams(dp(202), dp(202)).apply {
+            topMargin = dp(18); bottomMargin = dp(16)
+        })
+        image.alpha = 0.3f
+        image.scaleX = 0.78f
+        image.scaleY = 0.78f
+        image.animate().alpha(1f).scaleX(1f).scaleY(1f).setDuration(650L).start()
+        return layout
+    }
+
+    private fun showNameIntroduction() {
+        currentPageKey = "onboarding-name"
+        pageHistory.clear()
+        val layout = onboardingRoot("Ciao! Come ti chiami?",
+            "Mettiamo il tuo nome sul menu, così ogni giornata in cucina inizia con un sorriso.")
+        val nameInput = EditText(this).apply {
+            hint = "Il tuo nome"
+            setSingleLine(true)
+            textSize = 18f
+            setText(displayName())
+            inputType = android.text.InputType.TYPE_CLASS_TEXT or
+                android.text.InputType.TYPE_TEXT_FLAG_CAP_WORDS
+            background = outlined(Color.WHITE, 16f)
+            setPadding(dp(16), dp(11), dp(16), dp(11))
+            contentDescription = "Il tuo nome"
+        }
+        layout.addView(nameInput, LinearLayout.LayoutParams(-1, dp(54)))
+        layout.addView(Button(this).apply {
+            text = "Continua  →"
+            isAllCaps = false
+            textSize = 17f
+            setTextColor(Color.WHITE)
+            setTypeface(null, Typeface.BOLD)
+            background = shape(Color.rgb(64, 121, 65), 18f)
+            setOnClickListener {
+                val value = nameInput.text.toString().trim().replace(Regex("\\s+"), " ")
+                if (value.isBlank() || value.length > 40) {
+                    nameInput.error = "Inserisci un nome (massimo 40 caratteri)"
+                    nameInput.requestFocus()
+                } else {
+                    getSharedPreferences("user_profile", MODE_PRIVATE).edit()
+                        .putString("display_name", value).apply()
+                    hideKeyboard(nameInput)
+                    showPersonalWelcome(value)
+                }
+            }
+        }, LinearLayout.LayoutParams(-1, dp(55)).apply { topMargin = dp(20) })
+    }
+
+    private fun showPersonalWelcome(name: String = displayName()) {
+        currentPageKey = "onboarding-welcome"
+        val layout = onboardingRoot("Benvenuto, $name! 🍃",
+            "Il tuo ricettario, il calendario dei pasti e le ricette fotografate sono pronti.")
+        layout.addView(TextView(this).apply {
+            text = "📅  Pianifica i pasti    🍝  Scopri ricette    📷  Digitalizza le riviste"
+            textSize = 14f
+            gravity = Gravity.CENTER
+            setTextColor(Color.rgb(55, 92, 63))
+        })
+        layout.addView(Button(this).apply {
+            text = "Inizia a cucinare  →"
+            isAllCaps = false
+            textSize = 17f
+            setTextColor(Color.WHITE)
+            background = shape(Color.rgb(64, 121, 65), 18f)
+            setOnClickListener { pageHistory.clear(); showCalendar() }
+        }, LinearLayout.LayoutParams(-1, dp(55)).apply { topMargin = dp(23) })
     }
 
     private fun dp(n: Int) = (n * resources.displayMetrics.density).toInt()
@@ -164,9 +277,10 @@ class MainActivity : Activity() {
             }
             elevation = dp(3).toFloat()
         }
-        hero.addView(TextView(this).apply {
-            text = "🍽️"; textSize = 27f; gravity = Gravity.CENTER
-            // Emblem without decorative white frame.
+        hero.addView(ImageView(this).apply {
+            setImageResource(R.drawable.app_icon_clean)
+            scaleType = ImageView.ScaleType.FIT_CENTER
+            contentDescription = "OggiSiMangia: calendario e piatto"
         }, LinearLayout.LayoutParams(dp(44), dp(44)).apply { marginEnd = dp(8) })
         val headerText = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         headerText.addView(TextView(this).apply {
@@ -418,6 +532,9 @@ class MainActivity : Activity() {
         }
         actionRow("🔎 Cerca ricetta", { showSearch() },
             "＋ Nuova ricetta", { showEditor() })
+        action("👤 " + displayName().ifBlank { "Il mio profilo" } + " · Cambia nome") {
+            showNameIntroduction()
+        }
         action("PDF e stampa del giorno") {
             report("Menu del giorno", selectedDate.format(dateFormatter), db.onDay(selectedDate.toString()))
         }
@@ -535,6 +652,12 @@ class MainActivity : Activity() {
         dishPhotoChoices.clear()
         dishPhotoChoices.putAll(photoChoices(existing?.dishPhotos))
         photoPreview = null
+        scanSession++
+        scanOcrResults.clear()
+        pendingOcrPages.clear()
+        processedOcrPages.clear()
+        processedOcrPages.addAll(magazinePages)
+        ocrStatusLabel = null
         magazinePagesContainer = null
         dishPhotosContainer = null
         screen(if (existing == null || existing.id == 0L) "Scrivi la tua ricetta" else "Modifica ricetta",
@@ -555,6 +678,7 @@ class MainActivity : Activity() {
         label("TESTO RICONOSCIUTO (MODIFICABILE)", 15f, true)
         val ocrField = input("Testo OCR delle pagine, correggibile anche prima di salvare", existing?.scanOcrText.orEmpty(), true)
         editorOcr = ocrField
+        ocrStatusLabel = label("OCR pronto: ogni pagina fotografata verrà letta automaticamente e aggiunta qui sotto.", 13f)
         action("📝 Compila titolo, ingredienti e preparazione dal testo OCR") {
             AlertDialog.Builder(this).setTitle("Usare il testo OCR?")
                 .setMessage("I campi della ricetta saranno compilati con suggerimenti automatici. Controlla sempre dosi e preparazione: il riconoscimento può sbagliare.")
@@ -771,6 +895,10 @@ class MainActivity : Activity() {
                 text = "✕ Elimina pagina"; isAllCaps = false
                 setOnClickListener {
                     magazinePages.remove(path)
+                    pendingOcrPages.remove(path)
+                    scanOcrResults.remove(path)
+                    processedOcrPages.remove(path)
+                    appendCompletedOcrPages()
                     refreshMagazinePages()
                 }
             })
@@ -840,8 +968,10 @@ class MainActivity : Activity() {
                     return
                 }
                 magazinePages.add(path)
+                pendingOcrPages.add(path)
                 refreshMagazinePages()
-                recognizeMagazinePage(path, magazinePages.size)
+                updateOcrStatus()
+                recognizeMagazinePage(path, magazinePages.size, scanSession)
             } else {
                 dishPhotoChoices[path] = true
                 if (selectedPhoto.isBlank()) { selectedPhoto = path; refreshPhotoPreview() }
@@ -867,31 +997,66 @@ class MainActivity : Activity() {
             editorSteps?.replaceValues(guess.steps)
     }
 
-    private fun recognizeMagazinePage(path: String, page: Int) {
+
+    private fun updateOcrStatus() {
+        val total = magazinePages.size
+        val remaining = pendingOcrPages.size
+        ocrStatusLabel?.text = if (remaining > 0) {
+            "⏳ OCR in corso su $remaining pagina/e di $total. Il testo compare qui appena pronto."
+        } else if (total > 0) {
+            "✓ OCR completato. Controlla il testo: puoi correggerlo liberamente."
+        } else {
+            "Fotografa una pagina e il riconoscimento partirà immediatamente."
+        }
+    }
+
+    /** Append in capture order; text already corrected manually is not overwritten. */
+    private fun appendCompletedOcrPages() {
+        while (true) {
+            val nextPath = magazinePages.firstOrNull { it !in processedOcrPages } ?: break
+            val text = scanOcrResults.remove(nextPath) ?: break
+            processedOcrPages.add(nextPath)
+            if (text.isNotBlank()) {
+                val current = editorOcr?.text?.toString().orEmpty()
+                val page = magazinePages.indexOf(nextPath) + 1
+                editorOcr?.append((if (current.isBlank()) "" else "\n\n") +
+                    "Pagina $page\n" + text.trim())
+                applyMagazineSuggestions(true)
+            }
+        }
+        updateOcrStatus()
+    }
+
+    private fun recognizeMagazinePage(path: String, page: Int, session: Int) {
         val client = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
         try {
-            val inputImage = InputImage.fromFilePath(this, Uri.fromFile(File(path)))
-            client.process(inputImage)
+            val input = InputImage.fromFilePath(this, Uri.fromFile(File(path)))
+            client.process(input)
                 .addOnSuccessListener { result ->
-                    if (path in magazinePages && currentPageKey.startsWith("editor-")) {
-                        if (result.text.isNotBlank()) {
-                            val current = editorOcr?.text?.toString().orEmpty()
-                            editorOcr?.setText(current + (if (current.isBlank()) "" else "\n\n") +
-                                "Pagina $page\n" + result.text.trim())
-                            applyMagazineSuggestions(true)
-                            Toast.makeText(this, "Testo pagina $page riconosciuto: controlla i campi.", Toast.LENGTH_SHORT).show()
-                        } else {
-                            Toast.makeText(this, "Nessun testo leggibile; pagina fotografata conservata.", Toast.LENGTH_LONG).show()
-                        }
+                    if (session == scanSession && path in magazinePages) {
+                        pendingOcrPages.remove(path)
+                        scanOcrResults[path] = result.text
+                        appendCompletedOcrPages()
+                        if (result.text.isBlank())
+                            Toast.makeText(this, "Pagina $page fotografata, testo non rilevato.", Toast.LENGTH_LONG).show()
                     }
                 }
                 .addOnFailureListener {
-                    Toast.makeText(this, "OCR non riuscito: fotografia conservata e modificabile.", Toast.LENGTH_LONG).show()
+                    if (session == scanSession && path in magazinePages) {
+                        pendingOcrPages.remove(path)
+                        scanOcrResults[path] = ""
+                        appendCompletedOcrPages()
+                        Toast.makeText(this, "OCR pagina $page non disponibile; foto conservata.", Toast.LENGTH_LONG).show()
+                    }
                 }
                 .addOnCompleteListener { client.close() }
         } catch (_: Exception) {
             client.close()
-            Toast.makeText(this, "OCR non disponibile, pagina conservata.", Toast.LENGTH_LONG).show()
+            if (session == scanSession && path in magazinePages) {
+                pendingOcrPages.remove(path)
+                scanOcrResults[path] = ""
+                appendCompletedOcrPages()
+            }
         }
     }
 

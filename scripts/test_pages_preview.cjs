@@ -56,6 +56,15 @@ let context=vm.createContext({
   console
 });
 vm.runInContext(source,context,{filename:"docs/app.js",timeout:2000});
+assert(element("app").innerHTML.includes("Come ti chiami?"),"Personal onboarding must appear on first use");
+element("onboard-name").value="Test";
+function onboardingClick(action){
+  listeners.click({target:{closest(sel){return sel==="[data-action]"?{dataset:{action}}:null;}}});
+}
+onboardingClick("onboarding-continue");
+assert(element("app").innerHTML.includes("Benvenuto, Test!"),"Personalized welcome missing");
+onboardingClick("onboarding-start");
+assert(JSON.parse(storage.get("oggisimangia_web_preview_v1")).profileName==="Test","Profile name not persisted");
 assert(element("app").innerHTML.includes("Il tuo calendario"),"Calendar failed to render");
 assert(element("app").innerHTML.includes("Pranzo"),"Lunch missing");
 assert(element("app").innerHTML.includes("Cena"),"Dinner missing");

@@ -1,5 +1,12 @@
 # 🍽️ OggiSiMangia...
 
+## Novità 1.7.0 — benvenuto personalizzato e OCR progressivo
+- Prima apertura: due schermate dedicate, **come ti chiami?** con illustrazione calendario/piatto animata e **benvenuto, Nome!**; nome in SharedPreferences locale, modificabile dalla dashboard senza cancellare ricette. Alle successive aperture si entra direttamente nel calendario.
+- Dashboard calendario: **Cerca ricetta** in evidenza. L'icona nelle intestazioni utilizza lo stesso simbolo calendario, pasta e basilico dell'app: sfondo verde brillante e rosso, senza bordino esterno bianco.
+- OCR Android ML Kit offline già incluso in 1.6.0: adesso viene mostrato uno stato "OCR in corso" per le foto importate/scattate, con risultati accodati al riquadro modificabile in **ordine di acquisizione** anche se il motore riconosce le pagine in ordine diverso. Non sovrascrive il testo che l'utente ha già corretto.
+- Vercel: onboarding e nome salvati nel browser; anteprima confinata a dimensioni smartphone. OCR automatico solo nell'APK, non nella simulazione web.
+- Stesso applicationId e firma, **versionCode 19, versionName 1.7.0**: aggiornamento installabile sopra la 1.6.0 senza disinstallazione.
+
 ## Novità 1.6.0 — riviste, OCR e riepilogo navigabile
 
 - Le statistiche dell'anteprima web **Ricette**, **Giorni pianificati** e **Fonti configurate** sono tre pulsanti reali: aprono il ricettario, la nuova lista dei giorni pianificati del mese o le fonti. Dalla lista si torna direttamente al giorno scelto.
