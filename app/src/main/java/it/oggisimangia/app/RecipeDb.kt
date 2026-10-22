@@ -40,10 +40,13 @@ data class Recipe(
     val temperature: String = "",
     val author: String = "",
     val cost: String = "",
-    val isPersonal: Boolean = false
+    val isPersonal: Boolean = false,
+    val scanPages: String = "[]",
+    val dishPhotos: String = "[]",
+    val scanOcrText: String = ""
 )
 
-class RecipeDb(context: Context) : SQLiteOpenHelper(context, "oggisimangia.db", null, 4) {
+class RecipeDb(context: Context) : SQLiteOpenHelper(context, "oggisimangia.db", null, 5) {
     override fun onCreate(db: SQLiteDatabase) {
         db.execSQL("""
             CREATE TABLE recipes (
@@ -80,7 +83,10 @@ class RecipeDb(context: Context) : SQLiteOpenHelper(context, "oggisimangia.db", 
                 temperature TEXT NOT NULL DEFAULT '',
                 author TEXT NOT NULL DEFAULT '',
                 cost TEXT NOT NULL DEFAULT '',
-                isPersonal INTEGER NOT NULL DEFAULT 0
+                isPersonal INTEGER NOT NULL DEFAULT 0,
+                scanPages TEXT NOT NULL DEFAULT '[]',
+                dishPhotos TEXT NOT NULL DEFAULT '[]',
+                scanOcrText TEXT NOT NULL DEFAULT ''
             )
         """.trimIndent())
         db.execSQL("CREATE INDEX by_day ON recipes(day)")
@@ -115,6 +121,11 @@ class RecipeDb(context: Context) : SQLiteOpenHelper(context, "oggisimangia.db", 
             db.execSQL("ALTER TABLE recipes ADD COLUMN author TEXT NOT NULL DEFAULT ''")
             db.execSQL("ALTER TABLE recipes ADD COLUMN cost TEXT NOT NULL DEFAULT ''")
             db.execSQL("ALTER TABLE recipes ADD COLUMN isPersonal INTEGER NOT NULL DEFAULT 0")
+        }
+        if (oldVersion < 5) {
+            db.execSQL("ALTER TABLE recipes ADD COLUMN scanPages TEXT NOT NULL DEFAULT '[]'")
+            db.execSQL("ALTER TABLE recipes ADD COLUMN dishPhotos TEXT NOT NULL DEFAULT '[]'")
+            db.execSQL("ALTER TABLE recipes ADD COLUMN scanOcrText TEXT NOT NULL DEFAULT ''")
         }
     }
 
@@ -152,7 +163,10 @@ class RecipeDb(context: Context) : SQLiteOpenHelper(context, "oggisimangia.db", 
         temperature = c.getString(c.getColumnIndexOrThrow("temperature")),
         author = c.getString(c.getColumnIndexOrThrow("author")),
         cost = c.getString(c.getColumnIndexOrThrow("cost")),
-        isPersonal = c.getInt(c.getColumnIndexOrThrow("isPersonal")) == 1
+        isPersonal = c.getInt(c.getColumnIndexOrThrow("isPersonal")) == 1,
+        scanPages = c.getString(c.getColumnIndexOrThrow("scanPages")),
+        dishPhotos = c.getString(c.getColumnIndexOrThrow("dishPhotos")),
+        scanOcrText = c.getString(c.getColumnIndexOrThrow("scanOcrText"))
     )
 
     fun save(r: Recipe): Long {
@@ -190,6 +204,9 @@ class RecipeDb(context: Context) : SQLiteOpenHelper(context, "oggisimangia.db", 
             put("author", r.author)
             put("cost", r.cost)
             put("isPersonal", if (r.isPersonal) 1 else 0)
+            put("scanPages", r.scanPages)
+            put("dishPhotos", r.dishPhotos)
+            put("scanOcrText", r.scanOcrText)
         }
         return if (r.id == 0L) writableDatabase.insertOrThrow("recipes", null, v)
         else {
