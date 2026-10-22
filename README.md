@@ -1,5 +1,15 @@
 # 🍽️ OggiSiMangia...
 
+## Novità 1.8.0 — ricerca con elenchi separati per sito
+
+- La ricerca Android ora consulta tutte le fonti configurate (in ordine di priorità) senza limitare la visualizzazione ai primi 10 risultati di un unico sito.
+- La schermata **Risultati per sito** mostra ogni fonte separatamente, con relativo numero di ricette verificate e un pulsante per aprire il suo elenco.
+- Ogni elenco contiene fino a **10 schede per pagina**; le pagine successive/precedenti sono indipendenti per ogni sito.
+- Quando i risultati raccolti per una fonte finiscono, il pulsante **Cerca altre** interroga un'ulteriore pagina di quella sola fonte, conservando i risultati già raccolti dagli altri siti. Nessuna promessa di risultati dove il sito non ne pubblica o blocca la consultazione.
+- Dopo aver scelto una ricetta restano le opzioni esistenti: scheda, procedimento, collegamento originale, salva versione semplificata/originale/entrambe, aggiungi al calendario scegliendo giorno/pranzo/cena/principale/alternativa.
+- Il filtro sugli ingredienti obbligatori non viene allentato e recensioni, foto e tempi non vengono inventati.
+- Identità Android invariata, versione **1.8.0 (versionCode 20)**; firma persistente, aggiornamento senza disinstallazione.
+
 ## Novità 1.7.0 — benvenuto personalizzato e OCR progressivo
 - Prima apertura: due schermate dedicate, **come ti chiami?** con illustrazione calendario/piatto animata e **benvenuto, Nome!**; nome in SharedPreferences locale, modificabile dalla dashboard senza cancellare ricette. Alle successive aperture si entra direttamente nel calendario.
 - Dashboard calendario: **Cerca ricetta** in evidenza. L'icona nelle intestazioni utilizza lo stesso simbolo calendario, pasta e basilico dell'app: sfondo verde brillante e rosso, senza bordino esterno bianco.
