@@ -1,5 +1,15 @@
 # 🍽️ OggiSiMangia...
 
+## Novità 1.6.0 — riviste, OCR e riepilogo navigabile
+
+- Le statistiche dell'anteprima web **Ricette**, **Giorni pianificati** e **Fonti configurate** sono tre pulsanti reali: aprono il ricettario, la nuova lista dei giorni pianificati del mese o le fonti. Dalla lista si torna direttamente al giorno scelto.
+- Stile EasyPlan come **riferimento** (non replica): verde naturale, sfondo chiaro, card arrotondate, comandi compatti sul solo smartphone; icona Android senza bordo bianco.
+- Nell'editor Android «Ricetta da rivista» si possono fotografare o importare fino a 20 pagine, memorizzate nel telefono come JPEG compressi (fino a 2000 px per la leggibilità dei testi); foto-only consentito con titolo anche senza ingredienti/procedimento.
+- OCR **in locale** con modello ML Kit bundled (alfabeto latino/italiano), senza server: propone titolo, ingredienti e passaggi quando riconoscibili; il testo OCR rimane modificabile e i campi possono essere riscritti manualmente. È necessario **controllare** dosi e cotture: non garantisce trascrizione perfetta né riconoscimento affidabile dell'impaginazione.
+- Puoi aggiungere più foto del piatto da fotocamera/galleria, scegliere singolarmente quali conservare, assegnare una copertina oppure conservare una pagina fotografata anche come immagine. Non è prevista in questa versione l'estrazione automatica dei soli riquadri fotografici dalle pagine: per immagini separate usare il ritaglio del telefono o la galleria.
+- Le pagine fotografate e la trascrizione vengono mostrate nella scheda ricetta e conservate offline. Database SQLite v5: migrazione non distruttiva da v1-v4, stesso applicationId/firma, versionCode 18.
+- L'anteprima web supporta più pagine e foto selezionate con testo trascritto manualmente; **non esegue OCR automatico** nel browser, e i dati web non sono sincronizzati con l'APK Android. Le quote di spazio del browser possono limitare la quantità di foto.
+
 ## Regola globale – APK e anteprima Vercel smartphone
 
 Per ogni modifica **sostanziale** proporre sempre **entrambi i percorsi**: link diretto dell'anteprima Vercel in produzione e opzione per l'APK Android. URL di produzione della demo: **https://oggisimangia.vercel.app/**. Specificare la versione effettiva e distinguere la demo browser dall'APK.
@@ -10,7 +20,7 @@ L'anteprima web è **sempre solo in formato smartphone** (PC: cornice e area cir
 
 **Risparmio quote:** effettuare un'unica pubblicazione Vercel per blocco sostanziale su `main`, raggruppare i piccoli aggiustamenti e usare GitHub Actions senza verifiche online ripetute e superflue. Il monitoraggio approfondito online è lanciato solo manualmente con il workflow `Verifica sito Vercel online`.
 
-Android 1.5.4 (versionCode 17).
+Android 1.6.0 (versionCode 18). La sezione che segue mantiene anche la storia funzionale della v1.5.4.
 
 - Navigazione «Indietro» sempre visibile nelle pagine interne e supporto al tasto/gesto Indietro Android.
 - Home: Pranzo e Cena compatti, con titoli dei piatti visibili; un tocco sulla sezione mostra opzioni per modificare, clonare o rimuovere i piatti dal giorno. «Rimuovi dal giorno» e «Svuota giorno» preservano le ricette nel ricettario con conferma.
