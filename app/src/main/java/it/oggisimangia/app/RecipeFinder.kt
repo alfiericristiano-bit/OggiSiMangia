@@ -23,7 +23,8 @@ data class WebRecipe(
     val rating: Double? = null,
     val feedbackCount: Int? = null,
     val relevance: Int = 0,
-    val ingredients: String = ""
+    val ingredients: String = "",
+    val verified: Boolean = true
 )
 
 object RecipeFinder {
