@@ -341,7 +341,7 @@ class MainActivity : Activity() {
             textSize = 21f
             isAllCaps = false
             contentDescription = "Apri assistente vocale OggiSiMangia"
-            background = shape(familyPale, 14f)
+            this.background = shape(familyPale, 14f)
             setOnClickListener { voice.open() }
         }, LinearLayout.LayoutParams(dp(48), dp(48)))
         content.addView(hero, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(9) })
