@@ -48,10 +48,18 @@ object RecipeRanking {
     fun order(items: List<WebRecipe>, ingredients: String): List<WebRecipe> = items
         // Only verified Recipe ingredient lists are treated as confirmed matches.
         // Search-index links without readable ingredients remain visible, clearly unverified.
-        .filter { !it.verified || (it.ingredients.isNotBlank() &&
-            RecipeValidation.containsEvery(it.ingredients, ingredients)) }
+        .filter {
+            RecipeValidation.isLikelyRecipeLink(it.title, it.url) &&
+                (if (it.verified) it.ingredients.isNotBlank() &&
+                    RecipeValidation.containsEvery(it.ingredients, ingredients)
+                 else RecipeValidation.mentionsMainInTitle(it.title, ingredients))
+        }
         .sortedWith(compareBy<WebRecipe> { RecipeSources.priority(it.url) }
             .thenByDescending { it.verified }
+            // Within a source, show dishes named after the principal ingredient first.
+            .thenByDescending {
+                RecipeValidation.mentionsMainInTitle(it.title, ingredients)
+            }
             .thenByDescending { relevance(it.ingredients, ingredients) }
             .thenByDescending { confidence(it.rating, it.feedbackCount) }
             .thenByDescending { it.feedbackCount ?: -1 }
