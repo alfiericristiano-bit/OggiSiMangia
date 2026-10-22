@@ -52,6 +52,7 @@ class MainActivity : Activity() {
     private var searchDifficulty = "Facile"
     private var searchDuration = "Veloce"
     private var searchCategory = "Primo"
+    private var searchType = "Qualsiasi"
     private var selectedPhoto = ""
     private val magazinePages = mutableListOf<String>()
     private val dishPhotoChoices = linkedMapOf<String, Boolean>()
@@ -1184,21 +1185,22 @@ class MainActivity : Activity() {
         if (searchForDay) label(selectedMeal + " · " + if (selectedAlternative) "Alternativa" else "Principale", 16f, true)
         actionRow("🔗 Ho un link", { showRecipeLink() }, "📅 Pasti del giorno", { showCalendar() })
         label("Quali ingredienti hai a disposizione?", 17f, true)
-        label("Primo campo: ingrediente principale obbligatorio (es. pasta, riso, pollo, patate). Massimo 10 ingredienti in totale: anche gli altri devono essere presenti nella ricetta.", 13f)
+        label("Primo campo: ingrediente principale obbligatorio (es. pasta, riso, pollo, patate). Massimo 10 ingredienti: gli altri sono preferenze; le ricette con corrispondenza parziale vengono segnalate.", 13f)
         val ingredients = IngredientInputs(this, searchIngredients) { searchIngredients = it }
         content.addView(ingredients)
-        val category = dropdown("Cerchi un...", categories, searchCategory)
+        val category = dropdown("Portata", categories, searchCategory)
+        val type = dropdown("Tipologia alimentare", RecipeTypeFilter.options, searchType)
         val difficulty = dropdown("Difficoltà desiderata", difficulties, searchDifficulty)
         val duration = dropdown("Tempo a disposizione", durations, searchDuration)
         action("Priorità dei siti e nuove fonti") {
             searchIngredients = ingredients.values().joinToString(", ")
             searchCategory = category.selectedItem.toString()
+            searchType = type.selectedItem.toString()
             searchDifficulty = difficulty.selectedItem.toString()
             searchDuration = duration.selectedItem.toString()
             showSourceSettings()
         }
-        label("Ingredienti obbligatori, anche singolare/plurale e preparazioni equivalenti. " +
-            "Categoria, difficoltà e tempi sono preferenze: gli scostamenti vengono segnalati.", 13f)
+        label("Ingrediente principale obbligatorio. Le ricette con tutti gli ingredienti sono preferite; quelle parziali mostrano le differenze. Il filtro vegetariano/vegano e i filtri allergeni sono indicativi, non certificazioni.", 13f)
 
         primaryAction("⌕  Cerca ricette") search@{
             searchIngredients = ingredients.query() ?: return@search
@@ -1236,7 +1238,7 @@ class MainActivity : Activity() {
                             .values.map { duplicates -> duplicates.maxBy { r ->
                                 (if (r.rating != null) 2 else 0) + (if (r.feedbackCount != null) 2 else 0) + r.relevance
                             } }
-                        RecipeRanking.order(unique, selectedIngredients)
+                        RecipeRanking.orderFlexible(unique, selectedIngredients)
                     } finally { executor.shutdownNow() }
                 } catch (_: Exception) { emptyList() }
                 runOnUiThread {
@@ -1400,30 +1402,47 @@ class MainActivity : Activity() {
     }
 
 
+    private fun filterByType(items: List<WebRecipe>): List<WebRecipe> {
+        if (searchType == "Qualsiasi") return items
+        return items.filter {
+            RecipeTypeFilter.match(it.ingredients, searchType) != false
+        }
+    }
+
     /** First show the configured sites separately in their saved priority order. */
     private fun showRecipeResults(items: List<WebRecipe>, offset: Int = 0) {
         lastSearchResults = items
         lastSearchOffset = 0
         screen("Risultati per sito", "Ricette raggruppate per fonte, senza taglio globale a 10.",
             "recipe-sites") { showRecipeResults(lastSearchResults) }
-        val confirmedCount = items.count { it.verified }
+        val visible = filterByType(items)
+        val confirmedCount = visible.count { it.verified }
+        val completeCount = visible.count { it.verified &&
+            RecipeValidation.containsEvery(it.ingredients, searchIngredients) }
         label("Ingrediente principale: " + RecipeValidation.mainIngredient(searchIngredients), 15f, true)
-        label(confirmedCount.toString() + " ricette verificate · " +
-            (items.size - confirmedCount) + " collegamenti da controllare", 17f, true)
+        label("Tipologia richiesta: " + searchType, 14f, true)
+        RecipeTypeFilter.warning(searchType).takeIf { it.isNotBlank() }?.let { label("⚠ " + it, 13f) }
+        label(completeCount.toString() + " ricette con tutti gli ingredienti · " +
+            (confirmedCount - completeCount) + " con ingredienti parziali", 14f)
+        label(confirmedCount.toString() + " schede con ingredienti leggibili · " +
+            (visible.size - confirmedCount) + " collegamenti da controllare", 16f, true)
         label("Ricette singole, ordinate per fonte e per ingrediente principale. La dicitura 'Da controllare' appare solo se non è stato possibile leggere la pagina: gli ingredienti secondari restano da verificare.", 13f)
         actionRow("🔎 Modifica ricerca", { showSearch() },
             "⚙ Fonti e priorità", { showSourceSettings() })
-        if (items.isEmpty()) {
+        if (visible.isEmpty()) {
             label("Nessuna ricetta verificata per gli ingredienti indicati. Alcuni siti potrebbero bloccare la lettura automatica: puoi richiedere altre pagine per un sito oppure aprirlo manualmente.", 14f)
         }
         if (RecipeSources.sites.isEmpty()) {
             action("＋ Aggiungi un sito di ricette") { showSourceSettings() }
         }
         RecipeSources.sites.entries.forEachIndexed { index, (name, domain) ->
-            val siteRecipes = RecipeSourcePages.forSource(items, domain)
+            val siteRecipes = RecipeSourcePages.forSource(visible, domain)
             label((index + 1).toString() + "ª fonte · " + name, 18f, true)
-            label(domain + " · " + siteRecipes.count { it.verified } +
-                " verificate · " + siteRecipes.count { !it.verified } + " da controllare", 13f)
+            label(domain + " · " + siteRecipes.count { it.verified &&
+                RecipeValidation.containsEvery(it.ingredients, searchIngredients) } +
+                " complete · " + siteRecipes.count { it.verified &&
+                !RecipeValidation.containsEvery(it.ingredients, searchIngredients) } +
+                " parziali · " + siteRecipes.count { !it.verified } + " da controllare", 13f)
             if (siteRecipes.isNotEmpty()) {
                 siteRecipes.take(3).forEach { item ->
                     label((if (item.verified) "✅ " else "🔎 ") + item.title, 14f)
@@ -1447,7 +1466,7 @@ class MainActivity : Activity() {
 
     /** Pagination belongs to one website, not the complete search. */
     private fun showSiteRecipeResults(site: String, domain: String, offset: Int = 0) {
-        val items = RecipeSourcePages.forSource(lastSearchResults, domain)
+        val items = RecipeSourcePages.forSource(filterByType(lastSearchResults), domain)
         if (items.isEmpty()) {
             showRecipeResults(lastSearchResults)
             return
@@ -1488,7 +1507,8 @@ class MainActivity : Activity() {
                 val found = RecipeValidation.foundIngredients(recipe.ingredients, searchIngredients)
                 val pending = RecipeValidation.missingIngredients(recipe.ingredients, searchIngredients)
                 text = if (recipe.verified) {
-                    "✓ Ingredienti verificati: " + found.joinToString(", ") +
+                    (if (pending.isEmpty()) "✓ Corrispondenza completa. " else "⚠ Corrispondenza parziale. ") +
+                        "Ingredienti trovati: " + found.joinToString(", ") +
                         (if (pending.isEmpty()) "" else "\nNon trovati: " + pending.joinToString(", "))
                 } else {
                     "Da controllare: pagina non leggibile durante la ricerca. " +
@@ -1501,6 +1521,10 @@ class MainActivity : Activity() {
             })
             val differences = if (recipe.verified) RecipePreferences.notices(
                 recipe, searchCategory, searchDifficulty, searchDuration) else emptyList()
+            if (recipe.verified && searchType != "Qualsiasi") row.addView(TextView(this).apply {
+                text = "Tipologia: " + searchType + " (verifica sull'elenco pubblicato)"
+                textSize = 12f; setTextColor(familyDeep)
+            })
             if (differences.isNotEmpty()) row.addView(TextView(this).apply {
                 text = differences.joinToString("\n") { "⚠ " + it }
                 textSize = 13f; setTextColor(Color.rgb(139, 79, 15))
@@ -1579,7 +1603,7 @@ class MainActivity : Activity() {
                         ". Prova la ricerca manuale.", Toast.LENGTH_LONG).show()
                 } else {
                     val oldCount = lastSearchResults.count { RecipeSources.belongs(it.url, domain) }
-                    lastSearchResults = RecipeRanking.order(lastSearchResults + fresh, ingredients)
+                    lastSearchResults = RecipeRanking.orderFlexible(lastSearchResults + fresh, ingredients)
                     showSiteRecipeResults(site, domain, (oldCount / 10) * 10)
                 }
                 if (fresh.isEmpty()) showRecipeResults(lastSearchResults)
@@ -1623,6 +1647,15 @@ class MainActivity : Activity() {
                 if (!imported && (recipe.verified || fullMatch)) {
                     RecipePreferences.notices(recipe, searchCategory, searchDifficulty, searchDuration)
                         .forEach { label("⚠ " + it, 13f) }
+                }
+                if (!imported) {
+                    label("Link diretto alla ricetta:", 14f, true)
+                    action("🌐 Apri la ricetta originale su " + recipe.source) {
+                        openWeb(recipe.url)
+                    }
+                    label(recipe.url, 12f)
+                    if (searchType != "Qualsiasi") label("Tipologia richiesta: " + searchType +
+                        ". " + RecipeTypeFilter.warning(searchType), 13f)
                 }
                 label("Giorno scelto: " + selectedDate.format(dateFormatter), 14f)
                 val imageUrl = result.imageUrl.ifBlank { recipe.imageUrl }
