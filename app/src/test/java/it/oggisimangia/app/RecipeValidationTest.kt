@@ -66,7 +66,7 @@ class RecipeValidationTest {
         assertTrue(RecipeValidation.mentionsMainInTitle("Spaghetti alla norma", "pasta, melanzane"))
         assertTrue(RecipeValidation.mentionsMainInTitle("Risotto ai funghi", "riso, funghi"))
         assertTrue(RecipeValidation.containsEvery("250 g spaghetti\n2 melanzane",
-            "spaghetti, melanzane"))
+            "pasta, melanzane"))
     }
 
     @Test fun unverifiedMustMentionMainAndMustNotBeACollection() {
