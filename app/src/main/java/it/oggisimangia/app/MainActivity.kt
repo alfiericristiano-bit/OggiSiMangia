@@ -355,7 +355,7 @@ class MainActivity : Activity() {
             textSize = 12f
             setTextColor(familyDeep)
             contentDescription = "Apri guida della schermata " + title
-            background = outlined(familyPale, 13f)
+            this.background = outlined(familyPale, 13f)
             setOnClickListener { GuideDialog.show(this@MainActivity, key) }
         }, LinearLayout.LayoutParams(dp(70), dp(46)).apply { marginStart = dp(5) })
         hero.addView(Button(this).apply {
