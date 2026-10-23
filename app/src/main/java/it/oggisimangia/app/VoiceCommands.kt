@@ -14,6 +14,7 @@ sealed interface VoiceCommand {
     data class PlanSaved(val title: String, val meal: String, val day: LocalDate) : VoiceCommand
     data class AutoPlan(val meal: String, val start: LocalDate, val days: Int) : VoiceCommand
     data class PressButton(val target: String) : VoiceCommand
+    data class SourcePriority(val site: String, val position: Int) : VoiceCommand
     enum class Filter { CATEGORY, TYPE, DIFFICULTY, DURATION }
     data class SetFilter(val kind: Filter, val value: String) : VoiceCommand
     data object Help : VoiceCommand
