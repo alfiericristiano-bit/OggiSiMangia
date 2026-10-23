@@ -769,3 +769,15 @@ body.onboarding .phone-preview .topbar-right{display:none;}
 #modal .guide-navigation{display:flex;gap:8px;flex-wrap:wrap;position:sticky;bottom:-22px;
  padding:12px 0;background:var(--paper)}
 #modal .guide-navigation .btn{flex:1}
+
+/* Android beta5 AI affordance reproduced as a nonfunctional web preview. */
+.ai-hint-preview {display:flex;align-items:center;gap:9px;min-width:0;
+    background:#f4eafa;border:1px solid #dbc5ee;border-radius:13px;
+    padding:8px 9px;margin:7px 0 11px;color:#462b66;
+    font-size:12px;line-height:1.4}
+.ai-hint-preview span{min-width:0;flex:1}
+.ai-preview-button{background:#60348c!important;color:#fff!important;
+    border:1px solid #482370!important;border-radius:12px!important;
+    min-width:65px;min-height:43px;font-size:14px!important;
+    font-weight:800;white-space:nowrap;padding:7px 8px!important}
+.ai-preview-button:focus-visible{outline:3px solid #fac95c;outline-offset:2px}
