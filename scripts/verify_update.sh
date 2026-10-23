@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 package=it.oggisimangia.app
-baseline=build/update-check/previous-beta5-debug.apk
+baseline=build/update-check/previous-beta51-debug.apk
 new=app/build/outputs/apk/debug/app-debug.apk
 test -s "$baseline"
 test -s "$new"
@@ -30,7 +30,7 @@ adb shell am start -W -n "$package/.MainActivity"
 adb shell am force-stop "$package"
 adb exec-out run-as "$package" cat databases/oggisimangia.db > build/update-check/upgraded-recipes.db
 python3 scripts/verify_real_upgrade.py check
-echo "PASS: versionCode $previous -> $current; signed APK upgraded over v1.13 beta5 without uninstall; recipe, OCR, file and profile storage retained."
+echo "PASS: versionCode $previous -> $current; signed APK upgraded over v1.13 beta5.1 without uninstall; recipe, OCR, file and profile storage retained."
 
 # Run full UI smoke after the realistic upgrade regression.
 python3 scripts/calendar_smoke.py
