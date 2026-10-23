@@ -131,11 +131,19 @@ class MainActivity : Activity() {
             executor = { command, done -> executeVoiceCommand(command, done) },
             onConversationState = { isOn ->
                 runOnUiThread {
-                    voiceButton?.text = if (isOn) "⏹" else "🎙"
+                    voiceButton?.text = if (isOn) "● AI" else "🤖 AI"
                     voiceButton?.contentDescription = if (isOn)
                         "Interrompi l'ascolto dell'assistente" else
                         "Avvia la conversazione: ascolto automatico dei comandi successivi"
                 }
+            },
+            nextStep = { last ->
+                VoiceNextStepAdvisor.suggest(last, VoiceUiContext(
+                    screen = currentPageKey,
+                    day = selectedDate,
+                    meal = selectedMeal,
+                    savedRecipeCount = db.archive("", "Tutte", "Tutte", "Nome A–Z").size
+                ))
             },
             aiInterpret = { phrase, done ->
                 // Prefer the self-contained FunctionGemma model when installed;
@@ -377,22 +385,47 @@ class MainActivity : Activity() {
             setOnClickListener { GuideDialog.show(this@MainActivity, key) }
         }, LinearLayout.LayoutParams(dp(70), dp(46)).apply { marginStart = dp(5) })
         hero.addView(Button(this).apply {
-            text = "🎙"
-            textSize = 21f
+            text = "🤖 AI"
+            textSize = 15f
             isAllCaps = false
-            contentDescription = "Avvia conversazione continua, tocca ancora per interrompere"
-            this.background = shape(familyPale, 14f)
+            setTextColor(Color.WHITE)
+            setTypeface(null, Typeface.BOLD)
+            contentDescription = "Assistente AI: avvia conversazione continua, tocca ancora per interrompere"
+            this.background = GradientDrawable().apply {
+                setColor(Color.rgb(92, 49, 137))
+                cornerRadius = dp(14).toFloat()
+                setStroke(dp(1), Color.rgb(73, 31, 120))
+            }
             // One tap starts/ends a foreground conversation. Subsequent turns
             // are captured by SpeechRecognizer automatically after each reply.
             setOnClickListener { voice.listen() }
             setOnLongClickListener { voice.open(); true }
         }.also { voiceButton = it
             if (voice.isConversing) {
-                it.text = "⏹"
+                it.text = "● AI"
                 it.contentDescription = "Interrompi l'ascolto dell'assistente"
             }
-        }, LinearLayout.LayoutParams(dp(48), dp(48)))
+        }, LinearLayout.LayoutParams(dp(64), dp(48)))
         content.addView(hero, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(9) })
+        // Small, non-blocking contextual suggestion based on actual screen options.
+        // Never executes writes, never touches unsaved editor fields.
+        val uiHint = VoiceNextStepAdvisor.suggest(null, VoiceUiContext(
+            key, selectedDate, selectedMeal, 0
+        )).message
+        if (key != "ai-settings" && key != "splash") {
+            val hint = TextView(this).apply {
+                text = "🤖 AI suggerisce: " + uiHint
+                textSize = 12f
+                setTextColor(Color.rgb(62, 45, 91))
+                this.background = outlined(Color.rgb(246, 239, 255), 12f)
+                setPadding(dp(10), dp(7), dp(10), dp(7))
+                contentDescription = "Suggerimento contestuale dell'assistente AI: " + uiHint
+                setOnClickListener { voice.listen() }
+            }
+            content.addView(hint, LinearLayout.LayoutParams(-1, -2).apply {
+                bottomMargin = dp(7)
+            })
+        }
         if (key != "calendar") {
             val back = Button(this).apply {
                 text = "‹  Indietro"
