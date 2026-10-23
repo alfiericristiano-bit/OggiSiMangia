@@ -51,6 +51,7 @@ class MainActivity : Activity() {
     private var searchForDay = false
     private var selectedCategory = "Primo"
     private var searchIngredients = ""
+    private var searchNaturalPrompt = ""
     private var searchDifficulty = "Facile"
     private var searchDuration = "Veloce"
     private var searchCategory = "Primo"
@@ -1265,7 +1266,7 @@ class MainActivity : Activity() {
         label(nano.statusText(), 15f, true)
         label(DeviceAiSupport.report(nano), 14f)
         val enabled = CheckBox(this).apply {
-            text = "Usa automaticamente Gemini Nano, quando presente"
+            text = "Usa Gemini Nano per ricerca testuale e OCR, quando disponibile"
             isChecked = nano.enabled
             setOnCheckedChangeListener { _, checked ->
                 nano.enabled = checked
@@ -1460,6 +1461,49 @@ class MainActivity : Activity() {
         label("Giorno scelto: " + selectedDate.format(dateFormatter), 16f, true)
         if (searchForDay) label(selectedMeal + " · " + if (selectedAlternative) "Alternativa" else "Principale", 16f, true)
         actionRow("🔗 Ho un link", { showRecipeLink() }, "📅 Pasti del giorno", { showCalendar() })
+        label("✨ AI per cercare ricette (testo, senza microfono)", 17f, true)
+        label("Scrivi liberamente cosa vuoi cucinare. L'AI locale, se supportata " +
+            "dal telefono, ti aiuta a riconoscere gli ingredienti. Altrimenti l'app " +
+            "li ricava direttamente dal testo. Potrai controllarli prima della ricerca.", 13f)
+        val naturalRequest = EditText(this).apply {
+            hint = "Es. Vorrei pasta con melanzane e pomodoro"
+            contentDescription = "Descrivi in testo la ricetta che cerchi"
+            setSingleLine(false)
+            maxLines = 3
+            textSize = 15f
+            setText(searchNaturalPrompt)
+            setPadding(dp(12), dp(9), dp(12), dp(9))
+            background = outlined(Color.WHITE, 13f)
+        }
+        content.addView(naturalRequest, LinearLayout.LayoutParams(-1, -2).apply {
+            bottomMargin = dp(5)
+        })
+        action("✨ AI · Interpreta richiesta scritta") {
+            val request = naturalRequest.text.toString().trim()
+            if (request.isBlank()) {
+                naturalRequest.error = "Scrivi cosa vorresti cucinare"
+            } else {
+                searchNaturalPrompt = request
+                val fallback = RecipeSearchIntent.ingredients(request)
+                fun populate(values: List<String>) {
+                    if (currentPageKey != "search" || isFinishing || isDestroyed) return
+                    if (values.isEmpty()) {
+                        Toast.makeText(this,
+                            "Indica almeno un ingrediente, per esempio pasta e melanzane.",
+                            Toast.LENGTH_LONG).show()
+                        return
+                    }
+                    searchIngredients = values.joinToString(", ")
+                    showSearch()
+                    Toast.makeText(this,
+                        "Ingredienti individuati: ${values.joinToString(", ")}. Controlla e premi Cerca ricette.",
+                        Toast.LENGTH_LONG).show()
+                }
+                nano.suggestSearchIngredients(request) { proposed ->
+                    runOnUiThread { populate(proposed ?: fallback) }
+                }
+            }
+        }
         label("Quali ingredienti hai a disposizione?", 17f, true)
         label("Primo campo: ingrediente principale obbligatorio (es. pasta, riso, pollo, patate). Massimo 10 ingredienti: gli altri sono preferenze; le ricette con corrispondenza parziale vengono segnalate.", 13f)
         val ingredients = IngredientInputs(this, searchIngredients) { searchIngredients = it }
