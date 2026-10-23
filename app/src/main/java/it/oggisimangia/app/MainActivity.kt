@@ -43,6 +43,7 @@ class MainActivity : Activity() {
     private lateinit var nano: LocalNanoAssistant
     private lateinit var functionGemma: LocalFunctionGemma
     private lateinit var voice: VoiceAssistantController
+    private var voiceButton: Button? = null
     private var nanoRequestedText = ""
     private var pendingReport: File? = null
     private lateinit var content: LinearLayout
@@ -128,6 +129,14 @@ class MainActivity : Activity() {
         functionGemma = LocalFunctionGemma(this)
         voice = VoiceAssistantController(this,
             executor = { command, done -> executeVoiceCommand(command, done) },
+            onConversationState = { isOn ->
+                runOnUiThread {
+                    voiceButton?.text = if (isOn) "⏹" else "🎙"
+                    voiceButton?.contentDescription = if (isOn)
+                        "Interrompi l'ascolto dell'assistente" else
+                        "Avvia la conversazione: ascolto automatico dei comandi successivi"
+                }
+            },
             aiInterpret = { phrase, done ->
                 // Prefer the self-contained FunctionGemma model when installed;
                 // retain Gemini Nano and deterministic parsing on unsupported phones.
@@ -371,11 +380,17 @@ class MainActivity : Activity() {
             text = "🎙"
             textSize = 21f
             isAllCaps = false
-            contentDescription = "Tocca per dettare un comando, tieni premuto per altre opzioni"
+            contentDescription = "Avvia conversazione continua, tocca ancora per interrompere"
             this.background = shape(familyPale, 14f)
-            // One tap starts speech immediately; long press opens the text/flow panel.
+            // One tap starts/ends a foreground conversation. Subsequent turns
+            // are captured by SpeechRecognizer automatically after each reply.
             setOnClickListener { voice.listen() }
             setOnLongClickListener { voice.open(); true }
+        }.also { voiceButton = it
+            if (voice.isConversing) {
+                it.text = "⏹"
+                it.contentDescription = "Interrompi l'ascolto dell'assistente"
+            }
         }, LinearLayout.LayoutParams(dp(48), dp(48)))
         content.addView(hero, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(9) })
         if (key != "calendar") {
@@ -2651,6 +2666,21 @@ class MainActivity : Activity() {
             .setNegativeButton("Annulla") { _, _ -> done("Annullato: ricetta non selezionata.") }
             .setOnCancelListener { done("Annullato: ricetta non selezionata.") }
             .show()
+    }
+
+    override fun onRequestPermissionsResult(
+        requestCode: Int, permissions: Array<out String>, grantResults: IntArray
+    ) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == ForegroundVoiceSession.PERMISSION_REQUEST) {
+            voice.onMicrophonePermissionResult(grantResults.firstOrNull() ==
+                android.content.pm.PackageManager.PERMISSION_GRANTED)
+        }
+    }
+
+    override fun onStop() {
+        voice.stopOnBackground()
+        super.onStop()
     }
 
     override fun onDestroy() {
