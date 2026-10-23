@@ -2666,6 +2666,15 @@ class MainActivity : Activity() {
                 done(message)
             }
             is VoiceCommand.PressButton -> voicePressButton(command.target, done)
+            is VoiceCommand.SetIngredients -> {
+                val items = command.ingredients.map(String::trim).filter(String::isNotBlank).take(10)
+                if (items.isEmpty()) done("Impossibile impostare gli ingredienti: dimmi il principale.")
+                else {
+                    searchIngredients = items.joinToString(", ")
+                    showSearch()
+                    done("Ingredienti impostati: ${items.joinToString(", ")}. Puoi scegliere i filtri oppure cercare.")
+                }
+            }
             is VoiceCommand.SetFilter -> voiceSetFilter(command, done)
             is VoiceCommand.SourcePriority -> voiceSourcePriority(command, done)
             is VoiceCommand.PlanSaved -> voicePlanSaved(command, done)
