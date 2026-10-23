@@ -2558,6 +2558,30 @@ class MainActivity : Activity() {
             "Impossibile attivare «${labels[matched]}». Riprova dalla schermata.")
     }
 
+    private fun voiceSourcePriority(command: VoiceCommand.SourcePriority, done: (String) -> Unit) {
+        val entries = RecipeSources.sites.entries.toMutableList()
+        val wanted = NaturalVoiceIntents.normalize(command.site).replace(" ", "")
+        val matches = entries.withIndex().filter { (_, e) ->
+            val name = NaturalVoiceIntents.normalize(e.key).replace(" ", "")
+            name == wanted || (wanted.length >= 4 && name.contains(wanted))
+        }
+        if (matches.size != 1) {
+            done(if (matches.isEmpty()) "Impossibile riconoscere il sito «${command.site}». " +
+                "Fonti disponibili: ${entries.joinToString(", ") { it.key }}."
+                else "Impossibile decidere a quale fonte ti riferisci. Pronuncia il nome completo.")
+            return
+        }
+        if (command.position !in 1..entries.size) {
+            done("Impossibile impostare la posizione ${command.position}: ci sono solo ${entries.size} fonti.")
+            return
+        }
+        val entry = entries.removeAt(matches.single().index)
+        entries.add(command.position - 1, entry)
+        sourcePreferences.save(entries.associateTo(linkedMapOf()) { it.key to it.value })
+        showSourceSettings()
+        done("${entry.key} ora è alla posizione ${command.position} per le prossime ricerche.")
+    }
+
     private fun voiceSetFilter(command: VoiceCommand.SetFilter, done: (String) -> Unit) {
         val source = when (command.kind) {
             VoiceCommand.Filter.CATEGORY -> categories.toList()
@@ -2643,6 +2667,7 @@ class MainActivity : Activity() {
             }
             is VoiceCommand.PressButton -> voicePressButton(command.target, done)
             is VoiceCommand.SetFilter -> voiceSetFilter(command, done)
+            is VoiceCommand.SourcePriority -> voiceSourcePriority(command, done)
             is VoiceCommand.PlanSaved -> voicePlanSaved(command, done)
             is VoiceCommand.AutoPlan -> voiceAutoPlan(command, done)
             VoiceCommand.Help -> {
