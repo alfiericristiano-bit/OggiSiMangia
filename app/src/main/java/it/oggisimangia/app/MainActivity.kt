@@ -1301,6 +1301,10 @@ class MainActivity : Activity() {
             }
         }
         content.addView(gemmaEnabled)
+        action("🌐 Modello FunctionGemma ufficiale e licenza") {
+            startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(
+                "https://huggingface.co/litert-community/functiongemma-270m-ft-mobile-actions/tree/main")))
+        }
         action("📂 Importa un modello FunctionGemma .litertlm") {
             AlertDialog.Builder(this)
                 .setTitle("Importazione AI locale")
