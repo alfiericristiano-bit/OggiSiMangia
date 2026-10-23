@@ -13,7 +13,7 @@ object VoiceConversationPolicy {
     private fun normalized(value: String): String =
         Normalizer.normalize(value.trim().lowercase(Locale.ITALIAN), Normalizer.Form.NFD)
             .replace(Regex("\\p{M}+"), "")
-            .replace(Regex("[.!?,;]+$"), "")
+            .replace(Regex("[.!?,;]+"), " ").trim()
             .replace(Regex("\\s+"), " ")
 
     fun classify(spoken: String, awaitingConfirmation: Boolean): Decision {
