@@ -108,10 +108,22 @@ class ForegroundVoiceSession(
                         isCapturing = false
                         if (!active) return
                         retries = 0
-                        val heard = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
-                            ?.firstOrNull { it.isNotBlank() }?.trim()
-                        if (heard == null) resume()
-                        else onCommand(heard)
+                        val alternatives = results?.getStringArrayList(
+                            SpeechRecognizer.RESULTS_RECOGNITION).orEmpty()
+                            .map(String::trim).filter(String::isNotBlank).take(3)
+                        // Try recognizer alternatives only when the first transcript
+                        // cannot be safely mapped to an existing app command.
+                        val best = alternatives.firstOrNull { phrase ->
+                            val plan = VoiceFlowPlanner.build(phrase)
+                            plan.commands.isNotEmpty() && plan.clarification == null &&
+                                plan.conflict == null
+                        } ?: alternatives.firstOrNull()
+                        if (best == null) resume()
+                        else {
+                            Toast.makeText(activity, "Ho sentito: " + best.take(110),
+                                Toast.LENGTH_SHORT).show()
+                            onCommand(best)
+                        }
                     }
 
                     override fun onError(error: Int) {
