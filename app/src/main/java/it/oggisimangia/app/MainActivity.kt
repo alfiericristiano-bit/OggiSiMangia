@@ -1274,10 +1274,12 @@ class MainActivity : Activity() {
             }
         }
         content.addView(enabled)
-        label("Le foto vengono elaborate dall'OCR ML Kit sul telefono. " +
-            "Gemini Nano, se supportato, riorganizza soltanto il testo OCR, " +
-            "senza caricare immagini o ricette sui server AI. " +
-            "Non è attiva alcuna AI online, né è necessaria una chiave API.", 14f)
+        label("La ricerca multisito mantiene filtri, priorità e ordinamento intelligente. " +
+            "Nella schermata Cerca ricetta puoi descrivere per iscritto cosa cucinare: " +
+            "Gemini Nano, se compatibile, aiuta a individuare gli ingredienti; " +
+            "altrimenti si usa l'analisi locale del testo. " +
+            "ML Kit OCR rimane attivo e Nano può migliorarne i risultati. " +
+            "Nessun dato viene inviato a servizi AI cloud.", 14f)
         label("Il modello può essere grande: NON viene mai avviato un download " +
             "da OggiSiMangia senza il tuo consenso esplicito e una connessione Wi-Fi " +
             "non a consumo. Non è possibile utilizzare automaticamente ogni AI " +
