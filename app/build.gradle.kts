@@ -10,10 +10,10 @@ android {
         applicationId = "it.oggisimangia.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = providers.gradleProperty("verificationVersionCode").orNull?.toInt() ?: 33
-        versionName = "1.13.0-beta6-arm64"
+        versionCode = providers.gradleProperty("verificationVersionCode").orNull?.toInt() ?: 34
+        versionName = "1.13.0-beta7-arm64"
     }
-    // Ship native ML Kit OCR + LiteRT-LM libraries for the ARM64 hardware used by
+    // Ship native ML Kit OCR libraries for the ARM64 hardware used by
     // Redmi 15 5G / Galaxy A17 5G. Debug remains universal for x86_64 emulator CI.
     // The existing universal beta5 APK remains available for other architectures.
     buildTypes.getByName("release") {
@@ -53,7 +53,6 @@ dependencies {
     implementation("androidx.core:core:1.15.0")
     implementation("androidx.exifinterface:exifinterface:1.3.7")
     implementation("com.google.mlkit:genai-prompt:1.0.0-beta4")
-    implementation("com.google.ai.edge.litertlm:litertlm-android:0.18.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
 }
 
