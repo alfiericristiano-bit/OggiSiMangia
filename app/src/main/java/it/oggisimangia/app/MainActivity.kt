@@ -41,9 +41,6 @@ class MainActivity : Activity() {
     private lateinit var db: RecipeDb
     private lateinit var sourcePreferences: SourcePreferences
     private lateinit var nano: LocalNanoAssistant
-    private lateinit var functionGemma: LocalFunctionGemma
-    private lateinit var voice: VoiceAssistantController
-    private var voiceButton: Button? = null
     private var nanoRequestedText = ""
     private var pendingReport: File? = null
     private lateinit var content: LinearLayout
@@ -126,26 +123,6 @@ class MainActivity : Activity() {
         RecipeSources.configure(sourcePreferences.load())
         nano = LocalNanoAssistant(this)
         nano.refresh()
-        functionGemma = LocalFunctionGemma(this)
-        voice = VoiceAssistantController(this,
-            executor = { command, done -> executeVoiceCommand(command, done) },
-            currentScreen = { currentPageKey },
-            onConversationState = { isOn ->
-                runOnUiThread {
-                    voiceButton?.text = if (isOn) "⏹" else "🎙"
-                    voiceButton?.contentDescription = if (isOn)
-                        "Interrompi l'ascolto dell'assistente" else
-                        "Avvia la conversazione: ascolto automatico dei comandi successivi"
-                }
-            },
-            aiInterpret = { phrase, done ->
-                // Prefer the self-contained FunctionGemma model when installed;
-                // retain Gemini Nano and deterministic parsing on unsupported phones.
-                functionGemma.interpret(phrase) { proposed ->
-                    if (proposed != null) done(proposed)
-                    else nano.interpretVoiceGoal(phrase, done)
-                }
-            })
         window.statusBarColor = Color.rgb(45, 91, 61)
         window.navigationBarColor = Color.rgb(45, 91, 61)
         showSplash()
@@ -377,33 +354,6 @@ class MainActivity : Activity() {
             this.background = outlined(familyPale, 13f)
             setOnClickListener { GuideDialog.show(this@MainActivity, key) }
         }, LinearLayout.LayoutParams(dp(70), dp(46)).apply { marginStart = dp(5) })
-        // Explicit AI text makes the assistant unmistakable on both Xiaomi and Samsung.
-        hero.addView(Button(this).apply {
-            text = "AI"
-            isAllCaps = false
-            textSize = 16f
-            setTypeface(null, Typeface.BOLD)
-            setTextColor(Color.WHITE)
-            contentDescription = "Assistente AI: suggerimenti e prossima azione"
-            this.background = shape(Color.rgb(35, 95, 175), 14f)
-            setOnClickListener { voice.showContextualSuggestions() }
-        }, LinearLayout.LayoutParams(dp(46), dp(46)).apply { marginStart = dp(4) })
-        hero.addView(Button(this).apply {
-            text = "🎙"
-            textSize = 21f
-            isAllCaps = false
-            contentDescription = "Avvia conversazione continua, tocca ancora per interrompere"
-            this.background = shape(familyPale, 14f)
-            // One tap starts/ends a foreground conversation. Subsequent turns
-            // are captured by SpeechRecognizer automatically after each reply.
-            setOnClickListener { voice.listen() }
-            setOnLongClickListener { voice.open(); true }
-        }.also { voiceButton = it
-            if (voice.isConversing) {
-                it.text = "⏹"
-                it.contentDescription = "Interrompi l'ascolto dell'assistente"
-            }
-        }, LinearLayout.LayoutParams(dp(48), dp(48)))
         content.addView(hero, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(9) })
         if (key != "calendar") {
             val back = Button(this).apply {
@@ -1309,93 +1259,11 @@ class MainActivity : Activity() {
     }
 
     private fun showAiSettings() {
-        screen("AI locale e privacy", "Funziona sul telefono, senza servizi AI cloud.",
+        screen("AI ricerca e OCR", "Nessun assistente vocale; ricerca e OCR disponibili.",
             "ai-settings") { showAiSettings() }
-        label("🤖 Intelligenza artificiale sul dispositivo", 19f, true)
+        label("✨ AI per ricerca e riconoscimento ricette", 19f, true)
         label(nano.statusText(), 15f, true)
         label(DeviceAiSupport.report(nano), 14f)
-        label("AI · Suggerimenti automatici", 18f, true)
-        label("Il nuovo pulsante blu AI, separato dal microfono, propone azioni coerenti " +
-            "con i pulsanti e le opzioni della schermata attuale. Dopo ogni comando " +
-            "l'assistente propone anche il passaggio successivo. " +
-            "Puoi scegliere di eseguirlo oppure dare un altro comando; " +
-            "nessuna cancellazione avviene per semplice suggerimento.", 13f)
-        label("🎙 Conversazione a mani libere", 18f, true)
-        label("Tocca una sola volta il microfono nelle schermate dell'app: " +
-            "l'assistente ascolta il primo comando e, dopo averti risposto, " +
-            "riprende automaticamente l'ascolto. Per interromperlo dì «fermati» " +
-            "oppure tocca di nuovo il microfono. L'ascolto si interrompe quando " +
-            "lasci l'app. Al primo avvio Android chiede il permesso microfono. " +
-            "Usiamo prioritariamente il riconoscimento sul dispositivo: " +
-            "se non disponibile, il servizio vocale Android potrebbe utilizzare Internet.", 13f)
-        label("🧠 FunctionGemma / LiteRT-LM (sperimentale)", 18f, true)
-        label(functionGemma.diagnostics().message, 13f)
-        if (functionGemma.failureMessage().isNotBlank()) {
-            label("Ultimo errore AI locale: " + functionGemma.failureMessage(), 12f)
-        }
-        val gemmaEnabled = CheckBox(this).apply {
-            text = "Interpreta automaticamente richieste vocali con FunctionGemma, se installato"
-            isChecked = functionGemma.enabled
-            setOnCheckedChangeListener { _, checked ->
-                functionGemma.enabled = checked
-                showAiSettings()
-            }
-        }
-        content.addView(gemmaEnabled)
-        action("🌐 Modello FunctionGemma ufficiale e licenza") {
-            startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(
-                "https://huggingface.co/litert-community/functiongemma-270m-ft-mobile-actions/tree/main")))
-        }
-        action("📂 Importa un modello FunctionGemma .litertlm") {
-            AlertDialog.Builder(this)
-                .setTitle("Importazione AI locale")
-                .setMessage("Occorre selezionare una sola volta un file FunctionGemma .litertlm " +
-                    "compatibile, ottenuto da una fonte affidabile. Il modello viene copiato " +
-                    "nella memoria privata dell'app: non inviamo ricette o richieste a un server AI. " +
-                    "L'importazione potrebbe richiedere spazio e alcuni minuti. Continuare?")
-                .setNegativeButton("Annulla", null)
-                .setPositiveButton("Seleziona file") { _, _ ->
-                    startActivityForResult(Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
-                        addCategory(Intent.CATEGORY_OPENABLE)
-                        type = "*/*"
-                    }, LocalFunctionGemma.PICK_MODEL_REQUEST)
-                }.show()
-        }
-        action("🧪 Prova l'AI locale con un comando innocuo") {
-            Toast.makeText(this, "Verifica modello in corso...", Toast.LENGTH_SHORT).show()
-            functionGemma.interpret("Apri il calendario") { proposed ->
-                if (currentPageKey == "ai-settings") {
-                    AlertDialog.Builder(this).setTitle("Risultato AI locale")
-                        .setMessage(if (proposed != null) "Comando proposto: $proposed"
-                            else "Nessuna interpretazione valida. " +
-                                "Controlla il modello e la compatibilità del telefono. " +
-                                functionGemma.failureMessage())
-                        .setPositiveButton("OK") { _, _ -> showAiSettings() }.show()
-                }
-            }
-        }
-        val autonomous = CheckBox(this).apply {
-            text = "Autorizzo l'assistente a pianificare ricette salvate senza conferma a ogni comando"
-            isChecked = voice.autonomousCalendarEnabled
-            setOnCheckedChangeListener { _, checked ->
-                if (checked) {
-                    AlertDialog.Builder(this@MainActivity)
-                        .setTitle("Attivare la pianificazione autonoma?")
-                        .setMessage("L'assistente potrà aggiungere ricette esistenti al calendario " +
-                            "senza una seconda conferma. Non cancellerà ricette e interromperà " +
-                            "le sequenze ambigue o in conflitto. Potrai disattivarlo qui.")
-                        .setPositiveButton("Attiva") { _, _ ->
-                            voice.autonomousCalendarEnabled = true
-                            showAiSettings()
-                        }
-                        .setNegativeButton("Annulla") { _, _ -> showAiSettings() }.show()
-                } else { voice.autonomousCalendarEnabled = false; showAiSettings() }
-            }
-        }
-        content.addView(autonomous)
-        label("Dopo il comando vocale l'assistente esegue già automaticamente le azioni " +
-            "di sola lettura. Per programmare pasti senza altri tocchi abilita l'opzione precedente. " +
-            "Al primo utilizzo può essere necessario selezionare e importare il modello AI.", 13f)
         val enabled = CheckBox(this).apply {
             text = "Usa automaticamente Gemini Nano, quando presente"
             isChecked = nano.enabled
@@ -1610,7 +1478,7 @@ class MainActivity : Activity() {
         }
         label("Ingrediente principale obbligatorio. Le ricette con tutti gli ingredienti sono preferite; quelle parziali mostrano le differenze. Il filtro vegetariano/vegano e i filtri allergeni sono indicativi, non certificazioni.", 13f)
 
-        val voiceSearchButton = primaryAction("⌕  Cerca ricette") search@{
+        val searchButton = primaryAction("⌕  Cerca ricette") search@{
             searchIngredients = ingredients.query() ?: return@search
             searchResultGeneration++
             val generation = searchResultGeneration
@@ -1656,7 +1524,7 @@ class MainActivity : Activity() {
                 }
             }.start()
         }
-        if (autoSearch) voiceSearchButton.post { if (voiceSearchButton.isAttachedToWindow) voiceSearchButton.performClick() }
+        if (autoSearch) searchButton.post { if (searchButton.isAttachedToWindow) searchButton.performClick() }
         actionRow("↻ Azzera ingredienti", {
             searchIngredients = ""
             showSearch()
@@ -1760,7 +1628,7 @@ class MainActivity : Activity() {
         action("❔ Guida completa: spiegazioni di schede e pulsanti") {
             GuideDialog.show(this)
         }
-        action("🤖 Impostazioni AI locale e privacy") { showAiSettings() }
+        action("✨ Impostazioni AI ricerca e OCR") { showAiSettings() }
         action("Ripristina siti e ordine iniziali") {
             val restored = LinkedHashMap(RecipeSources.defaults)
             RecipeSources.sites.forEach { (name,domain) -> if (domain !in restored.values) restored[name] = domain }
@@ -2400,20 +2268,6 @@ class MainActivity : Activity() {
     @Deprecated("Activity result used for system photo picker compatibility")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
-        if (requestCode == LocalFunctionGemma.PICK_MODEL_REQUEST) {
-            if (resultCode == RESULT_OK && data?.data != null) {
-                Toast.makeText(this, "Importazione in corso...", Toast.LENGTH_SHORT).show()
-                functionGemma.importModel(data.data!!) { ok, message ->
-                    Toast.makeText(this, message, Toast.LENGTH_LONG).show()
-                    if (currentPageKey == "ai-settings") showAiSettings()
-                }
-            }
-            return
-        }
-        if (requestCode == VoiceAssistantController.SPEECH_REQUEST) {
-            voice.onSpeechResult(resultCode, data)
-            return
-        }
         if (requestCode == PDF_REQUEST && resultCode == RESULT_OK) {
             val file = pendingReport ?: return
             val uri = data?.data ?: return
@@ -2510,322 +2364,7 @@ class MainActivity : Activity() {
     }
 
 
-    /**
-     * Voice controls only the same currently rendered, clickable buttons as a
-     * person's tap. No shell/accessibility privileges, hidden routes or inferred
-     * mutations. Unsafe/destructive buttons are not voice-activated.
-     */
-    private fun voicePressButton(target: String, done: (String) -> Unit) {
-        val buttons = mutableListOf<Button>()
-        fun collect(root: View) {
-            if (root is Button && root.isEnabled && root.isShown && root.hasOnClickListeners()) {
-                buttons.add(root)
-            }
-            if (root is android.view.ViewGroup) {
-                for (i in 0 until root.childCount) collect(root.getChildAt(i))
-            }
-        }
-        if (!::screenRoot.isInitialized) {
-            done("Impossibile individuare la schermata attiva.")
-            return
-        }
-        collect(screenRoot)
-        val labels = buttons.map { button ->
-            button.contentDescription?.toString()?.takeIf { it.isNotBlank() }
-                ?: button.text.toString()
-        }
-        val indices = VoiceUiMatcher.matchingIndices(target, labels)
-        if (indices.isEmpty()) {
-            done("Impossibile trovare un pulsante corrispondente a «$target» in questa schermata. " +
-                "Puoi aprire la sezione necessaria oppure specificare il nome del pulsante.")
-            return
-        }
-        if (indices.size != 1) {
-            val options = indices.take(4).joinToString(", ") { labels[it] }
-            done("Impossibile scegliere fra pulsanti simili: $options. " +
-                "Indica il nome più preciso.")
-            return
-        }
-        val matched=indices.single()
-        if (VoiceUiMatcher.isUnsafe(labels[matched]) || VoiceUiMatcher.isUnsafe(target)) {
-            done("Impossibile eseguire un comando distruttivo soltanto con la voce. " +
-                "Usa il pulsante e conferma sullo schermo per proteggere i dati.")
-            return
-        }
-        // The button's own listener performs exactly the operation offered in UI.
-        val clicked = buttons[matched].performClick()
-        done(if (clicked) "Ho selezionato «${labels[matched]}»." else
-            "Impossibile attivare «${labels[matched]}». Riprova dalla schermata.")
-    }
-
-    private fun voiceSourcePriority(command: VoiceCommand.SourcePriority, done: (String) -> Unit) {
-        val entries = RecipeSources.sites.entries.toMutableList()
-        val wanted = NaturalVoiceIntents.normalize(command.site).replace(" ", "")
-        val matches = entries.withIndex().filter { (_, e) ->
-            val name = NaturalVoiceIntents.normalize(e.key).replace(" ", "")
-            name == wanted || (wanted.length >= 4 && name.contains(wanted))
-        }
-        if (matches.size != 1) {
-            done(if (matches.isEmpty()) "Impossibile riconoscere il sito «${command.site}». " +
-                "Fonti disponibili: ${entries.joinToString(", ") { it.key }}."
-                else "Impossibile decidere a quale fonte ti riferisci. Pronuncia il nome completo.")
-            return
-        }
-        if (command.position !in 1..entries.size) {
-            done("Impossibile impostare la posizione ${command.position}: ci sono solo ${entries.size} fonti.")
-            return
-        }
-        val entry = entries.removeAt(matches.single().index)
-        entries.add(command.position - 1, entry)
-        sourcePreferences.save(entries.associateTo(linkedMapOf()) { it.key to it.value })
-        showSourceSettings()
-        done("${entry.key} ora è alla posizione ${command.position} per le prossime ricerche.")
-    }
-
-    private fun voiceSetFilter(command: VoiceCommand.SetFilter, done: (String) -> Unit) {
-        val source = when (command.kind) {
-            VoiceCommand.Filter.CATEGORY -> categories.toList()
-            VoiceCommand.Filter.TYPE -> RecipeTypeFilter.options.toList()
-            VoiceCommand.Filter.DIFFICULTY -> difficulties.toList()
-            VoiceCommand.Filter.DURATION -> durations.toList()
-        }
-        val choice = source.firstOrNull {
-            NaturalVoiceIntents.normalize(it) == NaturalVoiceIntents.normalize(command.value)
-        }
-        if (choice == null) {
-            done("Impossibile impostare «${command.value}»: scelta non disponibile. " +
-                "Valori possibili: ${source.joinToString(", ")}.")
-            return
-        }
-        when(command.kind) {
-            VoiceCommand.Filter.CATEGORY -> searchCategory = choice
-            VoiceCommand.Filter.TYPE -> searchType = choice
-            VoiceCommand.Filter.DIFFICULTY -> searchDifficulty = choice
-            VoiceCommand.Filter.DURATION -> searchDuration = choice
-        }
-        showSearch()
-        done("Filtro aggiornato: ${choice}. Puoi aggiungere altri filtri oppure cercare.")
-    }
-
-    /** Execute only actions registered in the allowlist; always call done after user choices. */
-    private fun executeVoiceCommand(command: VoiceCommand, done: (String) -> Unit) {
-        when (command) {
-            is VoiceCommand.Open -> {
-                when (command.destination) {
-                    VoiceCommand.Destination.CALENDAR -> showCalendar()
-                    VoiceCommand.Destination.ARCHIVE -> showArchive()
-                    VoiceCommand.Destination.SEARCH -> showSearch()
-                    VoiceCommand.Destination.EDITOR -> showEditor()
-                    VoiceCommand.Destination.SUMMARY -> showSummary()
-                    VoiceCommand.Destination.SOURCES -> showSourceSettings()
-                }
-                done("Sezione aperta.")
-            }
-            is VoiceCommand.Search -> {
-                val ingredients = command.ingredients.map(String::trim).filter(String::isNotBlank).take(10)
-                if (ingredients.isEmpty()) {
-                    done("Impossibile cercare: indica almeno l'ingrediente principale.")
-                    return
-                }
-                searchIngredients = ingredients.joinToString(", ")
-                showSearch(autoSearch = true)
-                done("Ricerca avviata con ingrediente principale ${ingredients.first()}.")
-            }
-            is VoiceCommand.GuidedMealSearch -> {
-                selectedDate = command.day
-                selectedMeal = command.meal
-                selectedAlternative = db.onDay(command.day.toString()).any {
-                    !it.alternative && (it.meal == command.meal || it.meal == "Entrambi")
-                }
-                searchForDay = true
-                searchIngredients = command.ingredients.take(10).joinToString(", ")
-                showSearch(autoSearch = true)
-                done("Cerco proposte per ${command.meal.lowercase()} del ${command.day.format(dateFormatter)}. " +
-                    "Scegli una ricetta prima di aggiungerla al calendario.")
-            }
-            is VoiceCommand.ShowDay -> {
-                selectedDate = command.day
-                expandedMeals.clear()
-                showCalendar()
-                done("Calendario aperto per ${command.day.format(dateFormatter)}.")
-            }
-            is VoiceCommand.ReadMeals -> {
-                selectedDate = command.day
-                expandedMeals.clear()
-                showCalendar()
-                val meals = db.onDay(command.day.toString()).filter {
-                    command.meal == null || it.meal == command.meal || it.meal == "Entrambi"
-                }
-                val message = if (meals.isEmpty()) {
-                    "Non risultano ricette pianificate per ${command.meal?.lowercase() ?: "i pasti"} del ${command.day.format(dateFormatter)}."
-                } else {
-                    "Pasti del ${command.day.format(dateFormatter)}:\n" +
-                        meals.joinToString("\n") { "${it.meal}: ${it.title}" +
-                            (if (it.alternative) " (alternativa)" else "") }
-                }
-                done(message)
-            }
-            is VoiceCommand.PressButton -> voicePressButton(command.target, done)
-            is VoiceCommand.SetIngredients -> {
-                val items = command.ingredients.map(String::trim).filter(String::isNotBlank).take(10)
-                if (items.isEmpty()) done("Impossibile impostare gli ingredienti: dimmi il principale.")
-                else {
-                    searchIngredients = items.joinToString(", ")
-                    showSearch()
-                    done("Ingredienti impostati: ${items.joinToString(", ")}. Puoi scegliere i filtri oppure cercare.")
-                }
-            }
-            is VoiceCommand.SetFilter -> voiceSetFilter(command, done)
-            is VoiceCommand.SourcePriority -> voiceSourcePriority(command, done)
-            is VoiceCommand.PlanSaved -> voicePlanSaved(command, done)
-            is VoiceCommand.AutoPlan -> voiceAutoPlan(command, done)
-            VoiceCommand.Help -> {
-                AlertDialog.Builder(this).setTitle("Comandi disponibili")
-                    .setMessage("Prova: «cerca ricette con riso e zucchine»; " +
-                        "«apri il ricettario»; «cosa mangio domani?»; " +
-                        "«pianifica risotto ai funghi per cena domani». " +
-                        "Puoi esprimerti anche con frasi diverse: «vorrei una ricetta con pollo», " +
-                        "«metti difficoltà facile», «sposta Misya al primo posto», " +
-                        "«premi il pulsante salva ricetta», «fotografa ingredienti», " +
-                        "«imposta ingrediente principale riso e funghi». " +
-                        "I pulsanti devono esistere nella schermata aperta; se il nome è ambiguo " +
-                        "ti chiedo di precisarlo. Le cancellazioni non vengono eseguite " +
-                        "automaticamente. Puoi dire «e poi» per concatenare fino a sei comandi.")
-                    .setPositiveButton("Ho capito", null).show()
-                done("Ecco i comandi disponibili.")
-            }
-            VoiceCommand.Unknown -> done("Impossibile interpretare il comando.")
-        }
-    }
-
-    /**
-     * Locally schedules existing recipes for 2-7 days. Never invents recipes,
-     * overwrites existing main meals, deletes records or calls an online AI.
-     * VoiceAssistantController requires one-time permission for autonomous writes.
-     */
-    private fun voiceAutoPlan(command: VoiceCommand.AutoPlan, done: (String) -> Unit) {
-        val recipes = db.archive("", "Tutte", "Tutte", "Nome A–Z")
-            .filter { it.title.isNotBlank() }
-            .distinctBy { it.title.lowercase(java.util.Locale.ITALIAN).trim() }
-        if (recipes.isEmpty()) {
-            done("Impossibile organizzare i pasti: non ci sono ricette salvate nel ricettario.")
-            return
-        }
-        val usedTitles = mutableSetOf<String>()
-        val recentCategories = ArrayDeque<String>()
-        var created = 0
-        var occupied = 0
-        var unavailable = 0
-        val details = mutableListOf<String>()
-        for (offset in 0 until command.days.coerceIn(2, 7)) {
-            val day = command.start.plusDays(offset.toLong())
-            val existing = db.onDay(day.toString()).filter {
-                it.meal == command.meal || it.meal == "Entrambi"
-            }
-            // Never replace a meal that the user already planned.
-            if (existing.any { !it.alternative }) { occupied++; continue }
-            val available = recipes.filter {
-                !usedTitles.contains(it.title.lowercase(java.util.Locale.ITALIAN).trim())
-            }
-            val recipe = available.firstOrNull {
-                !recentCategories.contains(it.category)
-            } ?: available.firstOrNull()
-            if (recipe == null) { unavailable++; continue }
-            try {
-                db.save(recipe.copy(
-                    id = 0L, day = day.toString(), meal = command.meal, alternative = false
-                ))
-                created++
-                usedTitles.add(recipe.title.lowercase(java.util.Locale.ITALIAN).trim())
-                recentCategories.addLast(recipe.category)
-                if (recentCategories.size > 2) recentCategories.removeFirst()
-                details.add("${day}: ${recipe.title}")
-            } catch (_: Exception) {
-                done("Impossibile completare la pianificazione. Pasti già aggiunti: $created. " +
-                    "Nessun pasto precedente è stato cancellato.")
-                return
-            }
-        }
-        if (created == 0) {
-            done("Impossibile aggiungere altri pasti: i giorni sono già occupati " +
-                "oppure mancano ricette diverse nell'archivio.")
-            return
-        }
-        selectedDate = command.start
-        showCalendar()
-        done("Pianificazione locale completata: $created ${command.meal.lowercase()} aggiunte. " +
-            "${if (occupied > 0) "$occupied giorni già occupati, non modificati. " else ""}" +
-            "${if (unavailable > 0) "$unavailable giorni senza ricette diverse disponibili. " else ""}" +
-            details.joinToString("; "))
-    }
-
-    private fun voicePlanSaved(command: VoiceCommand.PlanSaved, done: (String) -> Unit) {
-        val all = db.archive("", "Tutte", "Tutte", "Nome A–Z")
-        val sought = command.title.lowercase(java.util.Locale.ITALIAN).trim()
-        val matches = all.filter { it.title.lowercase(java.util.Locale.ITALIAN).trim() == sought }
-            .ifEmpty { all.filter { it.title.lowercase(java.util.Locale.ITALIAN).contains(sought) } }
-        if (matches.isEmpty()) {
-            done("Impossibile pianificare «${command.title}»: non è nel ricettario. " +
-                "Prima cerca o salva la ricetta, poi ripeti il comando.")
-            return
-        }
-        fun apply(recipe: Recipe) {
-            val current = db.onDay(command.day.toString()).filter {
-                it.meal == command.meal || it.meal == "Entrambi"
-            }
-            if (current.any { it.title == recipe.title }) {
-                done("Impossibile duplicare «${recipe.title}»: è già presente per ${command.meal.lowercase()} in quel giorno.")
-                return
-            }
-            fun persist(alternative: Boolean) {
-                try {
-                    db.save(recipe.copy(id = 0L, day = command.day.toString(),
-                        meal = command.meal, alternative = alternative))
-                    done("Pianificata «${recipe.title}» per ${command.meal.lowercase()} del ${command.day.format(dateFormatter)}" +
-                        (if (alternative) " come alternativa." else "."))
-                } catch (_: Exception) {
-                    done("Impossibile salvare il pasto. Il calendario non è stato modificato.")
-                }
-            }
-            if (current.any { !it.alternative }) {
-                AlertDialog.Builder(this)
-                    .setTitle("Pasto già presente")
-                    .setMessage("Per ${command.meal.lowercase()} del ${command.day.format(dateFormatter)}" +
-                        " c'è già un piatto principale. Vuoi aggiungere «${recipe.title}» come alternativa?")
-                    .setPositiveButton("Aggiungi alternativa") { _, _ -> persist(true) }
-                    .setNegativeButton("Annulla") { _, _ -> done("Annullato: il pasto non è stato modificato.") }
-                    .setOnCancelListener { done("Annullato: il pasto non è stato modificato.") }
-                    .show()
-            } else persist(false)
-        }
-        if (matches.size == 1) apply(matches.first())
-        else AlertDialog.Builder(this).setTitle("Quale ricetta intendi?")
-            .setItems(matches.take(20).map { it.title }.toTypedArray()) { _, which ->
-                apply(matches[which])
-            }
-            .setNegativeButton("Annulla") { _, _ -> done("Annullato: ricetta non selezionata.") }
-            .setOnCancelListener { done("Annullato: ricetta non selezionata.") }
-            .show()
-    }
-
-    override fun onRequestPermissionsResult(
-        requestCode: Int, permissions: Array<out String>, grantResults: IntArray
-    ) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        if (requestCode == ForegroundVoiceSession.PERMISSION_REQUEST) {
-            voice.onMicrophonePermissionResult(grantResults.firstOrNull() ==
-                android.content.pm.PackageManager.PERMISSION_GRANTED)
-        }
-    }
-
-    override fun onStop() {
-        voice.stopOnBackground()
-        super.onStop()
-    }
-
     override fun onDestroy() {
-        voice.close()
-        functionGemma.close()
         nano.close()
         db.close()
         super.onDestroy()
