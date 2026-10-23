@@ -1,6 +1,9 @@
 package it.oggisimangia.app
 
 import android.app.Activity
+import android.os.Handler
+import android.os.Looper
+import android.speech.tts.UtteranceProgressListener
 import android.app.AlertDialog
 import android.content.ActivityNotFoundException
 import android.content.Intent
@@ -19,11 +22,12 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.util.Locale
 
-/** Push-to-talk control: never records in the background and never sends commands to an LLM. */
+/** Foreground conversational assistant. Microphone restarts only during an active user-started session. */
 class VoiceAssistantController(
     private val activity: Activity,
     private val executor: (VoiceCommand, (String) -> Unit) -> Unit,
-    private val aiInterpret: (String, (String?) -> Unit) -> Unit = { _, callback -> callback(null) }
+    private val aiInterpret: (String, (String?) -> Unit) -> Unit = { _, callback -> callback(null) },
+    private val onConversationState: (Boolean) -> Unit = {}
 ) {
     companion object {
         const val SPEECH_REQUEST = 519
@@ -34,6 +38,71 @@ class VoiceAssistantController(
     private var speaker: TextToSpeech? = null
     private var speakerReady = false
     private val prefs = activity.getSharedPreferences(PREFS, Activity.MODE_PRIVATE)
+    private val main = Handler(Looper.getMainLooper())
+    private var replySequence = 0L
+    private var pendingSpokenConfirmation: VoicePlan? = null
+    private val session = ForegroundVoiceSession(activity,
+        onCommand = { spoken -> onConversationCommand(spoken) },
+        onState = { listening -> onConversationState(listening) })
+    val isConversing: Boolean get() = session.active
+
+    fun onMicrophonePermissionResult(granted: Boolean) = session.onPermissionResult(granted)
+
+    fun stopOnBackground() {
+        if (session.active) stopConversation()
+    }
+
+    private fun stopConversation() {
+        replySequence++
+        pendingSpokenConfirmation = null
+        session.stop()
+        speaker?.stop()
+    }
+
+    private fun onConversationCommand(spoken: String) {
+        when (VoiceConversationPolicy.classify(spoken, pendingSpokenConfirmation != null)) {
+            VoiceConversationPolicy.Decision.STOP -> {
+                stopConversation()
+                Toast.makeText(activity, "Assistente in pausa. Tocca il microfono per riprendere.",
+                    Toast.LENGTH_SHORT).show()
+            }
+            VoiceConversationPolicy.Decision.CONFIRM -> {
+                val plan = pendingSpokenConfirmation ?: return
+                pendingSpokenConfirmation = null
+                runPlan(plan)
+            }
+            VoiceConversationPolicy.Decision.REJECT -> {
+                pendingSpokenConfirmation = null
+                replyThenResume("Va bene, nessun pasto modificato. Dimmi pure il prossimo comando.")
+            }
+            VoiceConversationPolicy.Decision.COMMAND -> {
+                if (pendingSpokenConfirmation != null) {
+                    replyThenResume("Dimmi conferma oppure annulla prima di un altro comando.")
+                } else accept(spoken)
+            }
+        }
+    }
+
+    private fun replyThenResume(message: String) {
+        if (!session.active) { speak(message); return }
+        val token = ++replySequence
+        val utteranceId = "oggisimangia-session-$token"
+        Toast.makeText(activity, message.take(180), Toast.LENGTH_LONG).show()
+        if (speakerReady && prefs.getBoolean("speak", true) && speaker != null) {
+            val status = speaker?.speak(message.take(430), TextToSpeech.QUEUE_FLUSH, null, utteranceId)
+            if (status == TextToSpeech.SUCCESS) {
+                // Defensive timeout if the system voice engine never calls onDone.
+                main.postDelayed({
+                    if (session.active && replySequence == token) {
+                        replySequence++
+                        session.resume()
+                    }
+                }, 12000L)
+                return
+            }
+        }
+        session.resume(750L)
+    }
 
     /**
      * Consent stored only after an explicit toggle in AI Settings. Non-destructive
@@ -49,6 +118,23 @@ class VoiceAssistantController(
             speakerReady = result == TextToSpeech.SUCCESS
             if (speakerReady) speaker?.language = Locale.ITALIAN
         }
+        speaker?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
+            override fun onStart(utteranceId: String?) {}
+            override fun onDone(utteranceId: String?) { finishReply(utteranceId) }
+            @Deprecated("Legacy TTS callback")
+            override fun onError(utteranceId: String?) { finishReply(utteranceId) }
+        })
+    }
+
+    private fun finishReply(id: String?) {
+        val token = id?.removePrefix("oggisimangia-session-")?.toLongOrNull() ?: return
+        if (!id.startsWith("oggisimangia-session-")) return
+        main.post {
+            if (session.active && replySequence == token) {
+                replySequence++
+                session.resume(450L)
+            }
+        }
     }
 
     fun speak(message: String) {
@@ -57,12 +143,13 @@ class VoiceAssistantController(
     }
 
     fun open() {
+        if (session.active) stopConversation()
         val layout = LinearLayout(activity).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(18), dp(8), dp(18), dp(8))
         }
         val instructions = TextView(activity).apply {
-            text = "Parlami in italiano. Posso cercare ricette, consultare i pasti, aprire sezioni e pianificare ricette già salvate. Per più azioni usa «e poi». Ti chiederò conferma prima di cambiare il calendario."
+            text = "Con un solo tocco sul microfono avvii una conversazione. Dopo ogni comando ti ascolto ancora automaticamente: non serve premere «Parla». Di’ «fermati» per terminare. Per più azioni usa «e poi»."
             textSize = 15f
         }
         layout.addView(instructions)
@@ -116,6 +203,16 @@ class VoiceAssistantController(
     private fun dp(value: Int) = (value * activity.resources.displayMetrics.density).toInt()
 
     fun listen() {
+        if (session.active) {
+            stopConversation()
+            return
+        }
+        speaker?.stop()
+        session.start()
+    }
+
+    /** Legacy system speech activity fallback, kept for compatibility. */
+    private fun listenLegacy() {
         val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
             putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
             putExtra(RecognizerIntent.EXTRA_LANGUAGE, "it-IT")
@@ -144,6 +241,10 @@ class VoiceAssistantController(
     }
 
     private fun askClarification(problem: String, spoken: String) {
+        if (session.active) {
+            replyThenResume(problem + " Riformula la richiesta.")
+            return
+        }
         speak(problem)
         AlertDialog.Builder(activity).setTitle("Chiarimento necessario")
             .setMessage(problem + "\n\nComando: «" + spoken.take(300) + "»")
@@ -155,6 +256,22 @@ class VoiceAssistantController(
         val plan = VoiceFlowPlanner.build(spoken)
         val problem = plan.clarification ?: plan.conflict
         if (problem != null) {
+            if (session.active) {
+                if (!refined && plan.clarification != null) {
+                    aiInterpret(spoken) { alternative ->
+                        activity.runOnUiThread {
+                            if (!session.active || activity.isFinishing || activity.isDestroyed)
+                                return@runOnUiThread
+                            val suggestion = alternative?.let { VoiceFlowPlanner.build(it) }
+                            if (suggestion != null && suggestion.clarification == null &&
+                                suggestion.conflict == null && suggestion.commands.isNotEmpty() &&
+                                alternative != spoken) accept(alternative!!, true)
+                            else askClarification(problem, spoken)
+                        }
+                    }
+                } else askClarification(problem, spoken)
+                return
+            }
             if (!refined && plan.clarification != null) {
                 val progress = AlertDialog.Builder(activity)
                     .setTitle("Interpretazione AI locale")
@@ -187,6 +304,13 @@ class VoiceAssistantController(
             runPlan(plan)
             return
         }
+        if (session.active) {
+            pendingSpokenConfirmation = plan
+            replyThenResume("Ho capito: " + plan.commands.joinToString("; ") {
+                VoiceFlowPlanner.description(it)
+            }.take(280) + ". Per aggiungere i pasti dì conferma, oppure annulla.")
+            return
+        }
         val summary = plan.commands.mapIndexed { i, cmd ->
             "${i + 1}. ${VoiceFlowPlanner.description(cmd)}"
         }.joinToString("\n")
@@ -214,6 +338,11 @@ class VoiceAssistantController(
                 val last = plan.commands.lastOrNull()
                 val closing = (results.lastOrNull() ?: "Operazioni completate.") +
                     "\n\n" + (last?.let { VoiceFlowPlanner.suggestion(it) } ?: "")
+                if (session.active) {
+                    replyThenResume((results.lastOrNull() ?: "Completato.") +
+                        " Dimmi pure il prossimo comando, oppure fermati.")
+                    return
+                }
                 speak(closing)
                 val suggestedAction: VoiceCommand? = when (last) {
                     is VoiceCommand.PlanSaved -> VoiceCommand.ReadMeals(last.day, last.meal)
@@ -243,6 +372,10 @@ class VoiceAssistantController(
                 results.add("${index + 1}. " + response)
                 // "Annullato" blocks a whole plan to avoid continuing after a declined write.
                 if (response.startsWith("Annullato") || response.startsWith("Impossibile")) {
+                    if (session.active) {
+                        replyThenResume(response + " Puoi darmi un altro comando.")
+                        return@executor
+                    }
                     speak(response)
                     AlertDialog.Builder(activity).setTitle("Sequenza interrotta")
                         .setMessage(results.joinToString("\n"))
@@ -315,6 +448,7 @@ class VoiceAssistantController(
     }
 
     fun close() {
+        stopConversation()
         speaker?.stop()
         speaker?.shutdown()
         speaker = null
