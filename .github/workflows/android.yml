@@ -1,7 +1,7 @@
 name: Android APK
 on:
   push:
-    branches: [main, artifact/voice-assistant-v1.13.0-beta1, artifact/voice-guides-v1.13.0-beta2]
+    branches: [main, artifact/voice-assistant-v1.13.0-beta1, artifact/voice-guides-v1.13.0-beta2, artifact/on-device-functiongemma-v1.13.0-beta3]
   pull_request:
     branches: [main]
   workflow_dispatch:
@@ -22,7 +22,7 @@ jobs:
       - run: python3 scripts/check_migration.py
       - run: gradle --no-daemon :app:testDebugUnitTest :app:lintDebug
   signed-apk:
-    if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.user.login == 'alfiericristiano-bit' && github.event.pull_request.head.ref == 'artifact/voice-guides-v1.13.0-beta2')
+    if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.user.login == 'alfiericristiano-bit' && github.event.pull_request.head.ref == 'artifact/on-device-functiongemma-v1.13.0-beta3' || github.event.pull_request.head.ref == 'artifact/voice-guides-v1.13.0-beta2')
     needs: checks
     runs-on: ubuntu-latest
     env:
