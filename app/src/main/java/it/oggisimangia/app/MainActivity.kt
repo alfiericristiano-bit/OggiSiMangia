@@ -2524,6 +2524,7 @@ class MainActivity : Activity() {
                 done(message)
             }
             is VoiceCommand.PlanSaved -> voicePlanSaved(command, done)
+            is VoiceCommand.AutoPlan -> voiceAutoPlan(command, done)
             VoiceCommand.Help -> {
                 AlertDialog.Builder(this).setTitle("Comandi disponibili")
                     .setMessage("Prova: «cerca ricette con riso e zucchine»; " +
@@ -2536,6 +2537,67 @@ class MainActivity : Activity() {
             }
             VoiceCommand.Unknown -> done("Impossibile interpretare il comando.")
         }
+    }
+
+    /**
+     * Locally schedules existing recipes for 2-7 days. Never invents recipes,
+     * overwrites existing main meals, deletes records or calls an online AI.
+     * VoiceAssistantController requires one-time permission for autonomous writes.
+     */
+    private fun voiceAutoPlan(command: VoiceCommand.AutoPlan, done: (String) -> Unit) {
+        val recipes = db.archive("", "Tutte", "Tutte", "Nome A–Z")
+            .filter { it.title.isNotBlank() }
+            .distinctBy { it.title.lowercase(java.util.Locale.ITALIAN).trim() }
+        if (recipes.isEmpty()) {
+            done("Impossibile organizzare i pasti: non ci sono ricette salvate nel ricettario.")
+            return
+        }
+        val usedTitles = mutableSetOf<String>()
+        val recentCategories = ArrayDeque<String>()
+        var created = 0
+        var occupied = 0
+        var unavailable = 0
+        val details = mutableListOf<String>()
+        for (offset in 0 until command.days.coerceIn(2, 7)) {
+            val day = command.start.plusDays(offset.toLong())
+            val existing = db.onDay(day.toString()).filter {
+                it.meal == command.meal || it.meal == "Entrambi"
+            }
+            // Never replace a meal that the user already planned.
+            if (existing.any { !it.alternative }) { occupied++; continue }
+            val available = recipes.filter {
+                !usedTitles.contains(it.title.lowercase(java.util.Locale.ITALIAN).trim())
+            }
+            val recipe = available.firstOrNull {
+                !recentCategories.contains(it.category)
+            } ?: available.firstOrNull()
+            if (recipe == null) { unavailable++; continue }
+            try {
+                db.save(recipe.copy(
+                    id = 0L, day = day.toString(), meal = command.meal, alternative = false
+                ))
+                created++
+                usedTitles.add(recipe.title.lowercase(java.util.Locale.ITALIAN).trim())
+                recentCategories.addLast(recipe.category)
+                if (recentCategories.size > 2) recentCategories.removeFirst()
+                details.add("${day}: ${recipe.title}")
+            } catch (_: Exception) {
+                done("Impossibile completare la pianificazione. Pasti già aggiunti: $created. " +
+                    "Nessun pasto precedente è stato cancellato.")
+                return
+            }
+        }
+        if (created == 0) {
+            done("Impossibile aggiungere altri pasti: i giorni sono già occupati " +
+                "oppure mancano ricette diverse nell'archivio.")
+            return
+        }
+        selectedDate = command.start
+        showCalendar()
+        done("Pianificazione locale completata: $created ${command.meal.lowercase()} aggiunte. " +
+            "${if (occupied > 0) "$occupied giorni già occupati, non modificati. " else ""}" +
+            "${if (unavailable > 0) "$unavailable giorni senza ricette diverse disponibili. " else ""}" +
+            details.joinToString("; "))
     }
 
     private fun voicePlanSaved(command: VoiceCommand.PlanSaved, done: (String) -> Unit) {
