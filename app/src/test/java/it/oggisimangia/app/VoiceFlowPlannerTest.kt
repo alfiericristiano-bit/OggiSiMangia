@@ -25,6 +25,27 @@ class VoiceFlowPlannerTest {
         assertTrue(plan.clarification!!.contains("passaggio 2"))
     }
 
+    @Test fun multidayArchivedMealPlanIsBoundedAndMustBeAuthorized() {
+        val plan = VoiceFlowPlanner.build("Organizzami le cene dei prossimi tre giorni", today)
+        assertNull(plan.clarification)
+        assertEquals(
+            listOf(VoiceCommand.AutoPlan("Cena", today.plusDays(1), 3)),
+            plan.commands
+        )
+        assertTrue(plan.needsConfirmation)
+        assertEquals(
+            VoiceCommand.Unknown,
+            VoiceCommands.parse("Organizzami le cene dei prossimi dodici giorni", today)
+        )
+    }
+
+    @Test fun automaticPlannerNeverAcceptsDestructiveInstructions() {
+        val plan = VoiceFlowPlanner.build(
+            "Organizzami le cene dei prossimi tre giorni e poi elimina tutto", today)
+        assertTrue(plan.commands.isEmpty())
+        assertNotNull(plan.clarification)
+    }
+
     @Test fun multipleWritesAlwaysRequireConfirmation() {
         val plan = VoiceFlowPlanner.build(
             "Pianifica risotto ai funghi per pranzo domani e poi apri il calendario", today)
