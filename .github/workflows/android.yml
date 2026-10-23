@@ -1,7 +1,7 @@
 name: Android APK
 on:
   push:
-    branches: [main]
+    branches: [main, artifact/voice-assistant-v1.13.0-beta1, artifact/voice-guides-v1.13.0-beta2, artifact/on-device-functiongemma-v1.13.0-beta3, artifact/conversational-voice-v1.13.0-beta4, artifact/context-ai-v1.13.0-beta5, artifact/arm64-slim-v1.13.0-beta5.1, artifact/natural-voice-v1.13.0-beta6]
   pull_request:
     branches: [main]
   workflow_dispatch:
@@ -22,7 +22,7 @@ jobs:
       - run: python3 scripts/check_migration.py
       - run: gradle --no-daemon :app:testDebugUnitTest :app:lintDebug
   signed-apk:
-    if: github.event_name != 'pull_request'
+    if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.user.login == 'alfiericristiano-bit' && github.event.pull_request.head.ref == 'artifact/natural-voice-v1.13.0-beta6')
     needs: checks
     runs-on: ubuntu-latest
     env:
@@ -44,6 +44,31 @@ jobs:
       - name: Require the persistent signing certificate
         run: bash scripts/check_signing.sh
       - run: gradle --no-daemon :app:assembleRelease :app:assembleDebug
+      - name: Verify ARM64-only release without lost ML Kit / LiteRT native runtime
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import zipfile
+          from pathlib import Path
+          p=Path("app/build/outputs/apk/release/app-release.apk")
+          with zipfile.ZipFile(p) as apk:
+              native=[n for n in apk.namelist() if n.startswith("lib/") and n.endswith(".so")]
+              assert native and all(n.startswith("lib/arm64-v8a/") for n in native), native
+              assert any("litertlm" in n for n in native), native
+              assert any("ocr_pipeline" in n for n in native), native
+          size=p.stat().st_size
+          print(f"PASS: arm64 release retains AI+OCR, {size/1000000:.2f} MB")
+          assert size < 50_000_000, "ARM64 release unexpectedly larger than 50 MB"
+          PY
+      - name: Build signed previous beta5.1 APK for upgrade regression
+        shell: bash
+        run: |
+          git fetch --no-tags --depth=1 origin refs/heads/artifact/arm64-slim-v1.13.0-beta5.1
+          git worktree add --detach ../oggisimangia-previous FETCH_HEAD
+          (cd ../oggisimangia-previous && gradle --no-daemon :app:assembleDebug)
+          mkdir -p build/update-check
+          cp ../oggisimangia-previous/app/build/outputs/apk/debug/app-debug.apk build/update-check/previous-beta51-debug.apk
+          git worktree remove --force ../oggisimangia-previous
       - name: Enable emulator acceleration
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
