@@ -37,6 +37,10 @@ object VoiceCommands {
     fun parse(spoken: String, today: LocalDate = LocalDate.now()): VoiceCommand {
         val text = normalized(spoken).trim(' ', '.', '!', '?')
         if (text.isBlank()) return VoiceCommand.Unknown
+        // Never interpret a destructive request as a harmless 'open' command just
+        // because it happens to mention the archive, calendar or recipe sources.
+        if (Regex("\\b(?:cancella|cancellami|cancellando|elimina|eliminami|eliminando|svuota|azzera|resetta|rimuovi|sovrascrivi|formatta)\\b")
+                .containsMatchIn(text)) return VoiceCommand.Unknown
         // Plan multiple days from the already saved local recipe archive, without
         // browsing the web or making up recipes. Requires a bounded explicit count.
         if (Regex("^(?:organizza|organizzami|pianifica|prepara|preparami|scegli|programma)\\b")
@@ -55,10 +59,7 @@ object VoiceCommands {
             )
             return VoiceCommand.Unknown
         }
-        // Never interpret a destructive request as a harmless 'open' command just
-        // because it happens to mention the archive, calendar or recipe sources.
-        if (Regex("\\b(?:cancella|cancellami|elimina|eliminami|svuota|azzera|resetta|rimuovi|sovrascrivi|formatta)\\b")
-                .containsMatchIn(text)) return VoiceCommand.Unknown
+
         if (Regex("\\b(aiuto|help|comandi|cosa sai fare|come funziona)\\b").containsMatchIn(text)) return VoiceCommand.Help
 
         val guided = Regex(
