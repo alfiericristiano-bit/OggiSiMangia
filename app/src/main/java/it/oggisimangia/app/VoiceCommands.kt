@@ -8,6 +8,7 @@ import java.util.Locale
 sealed interface VoiceCommand {
     data class Open(val destination: Destination) : VoiceCommand
     data class Search(val ingredients: List<String>) : VoiceCommand
+    data class SetIngredients(val ingredients: List<String>) : VoiceCommand
     data class GuidedMealSearch(val ingredients: List<String>, val meal: String, val day: LocalDate) : VoiceCommand
     data class ShowDay(val day: LocalDate) : VoiceCommand
     data class ReadMeals(val day: LocalDate, val meal: String?) : VoiceCommand
