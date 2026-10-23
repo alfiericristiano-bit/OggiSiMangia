@@ -41,6 +41,7 @@ class MainActivity : Activity() {
     private lateinit var db: RecipeDb
     private lateinit var sourcePreferences: SourcePreferences
     private lateinit var nano: LocalNanoAssistant
+    private lateinit var functionGemma: LocalFunctionGemma
     private lateinit var voice: VoiceAssistantController
     private var nanoRequestedText = ""
     private var pendingReport: File? = null
@@ -124,9 +125,17 @@ class MainActivity : Activity() {
         RecipeSources.configure(sourcePreferences.load())
         nano = LocalNanoAssistant(this)
         nano.refresh()
+        functionGemma = LocalFunctionGemma(this)
         voice = VoiceAssistantController(this,
             executor = { command, done -> executeVoiceCommand(command, done) },
-            aiInterpret = { phrase, done -> nano.interpretVoiceGoal(phrase, done) })
+            aiInterpret = { phrase, done ->
+                // Prefer the self-contained FunctionGemma model when installed;
+                // retain Gemini Nano and deterministic parsing on unsupported phones.
+                functionGemma.interpret(phrase) { proposed ->
+                    if (proposed != null) done(proposed)
+                    else nano.interpretVoiceGoal(phrase, done)
+                }
+            })
         window.statusBarColor = Color.rgb(45, 91, 61)
         window.navigationBarColor = Color.rgb(45, 91, 61)
         showSplash()
@@ -1278,6 +1287,70 @@ class MainActivity : Activity() {
         label("🤖 Intelligenza artificiale sul dispositivo", 19f, true)
         label(nano.statusText(), 15f, true)
         label(DeviceAiSupport.report(nano), 14f)
+        label("🧠 FunctionGemma / LiteRT-LM (sperimentale)", 18f, true)
+        label(functionGemma.diagnostics().message, 13f)
+        if (functionGemma.failureMessage().isNotBlank()) {
+            label("Ultimo errore AI locale: " + functionGemma.failureMessage(), 12f)
+        }
+        val gemmaEnabled = CheckBox(this).apply {
+            text = "Interpreta automaticamente richieste vocali con FunctionGemma, se installato"
+            isChecked = functionGemma.enabled
+            setOnCheckedChangeListener { _, checked ->
+                functionGemma.enabled = checked
+                showAiSettings()
+            }
+        }
+        content.addView(gemmaEnabled)
+        action("📂 Importa un modello FunctionGemma .litertlm") {
+            AlertDialog.Builder(this)
+                .setTitle("Importazione AI locale")
+                .setMessage("Occorre selezionare una sola volta un file FunctionGemma .litertlm " +
+                    "compatibile, ottenuto da una fonte affidabile. Il modello viene copiato " +
+                    "nella memoria privata dell'app: non inviamo ricette o richieste a un server AI. " +
+                    "L'importazione potrebbe richiedere spazio e alcuni minuti. Continuare?")
+                .setNegativeButton("Annulla", null)
+                .setPositiveButton("Seleziona file") { _, _ ->
+                    startActivityForResult(Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+                        addCategory(Intent.CATEGORY_OPENABLE)
+                        type = "*/*"
+                    }, LocalFunctionGemma.PICK_MODEL_REQUEST)
+                }.show()
+        }
+        action("🧪 Prova l'AI locale con un comando innocuo") {
+            Toast.makeText(this, "Verifica modello in corso...", Toast.LENGTH_SHORT).show()
+            functionGemma.interpret("Apri il calendario") { proposed ->
+                if (currentPageKey == "ai-settings") {
+                    AlertDialog.Builder(this).setTitle("Risultato AI locale")
+                        .setMessage(if (proposed != null) "Comando proposto: $proposed"
+                            else "Nessuna interpretazione valida. " +
+                                "Controlla il modello e la compatibilità del telefono. " +
+                                functionGemma.failureMessage())
+                        .setPositiveButton("OK") { _, _ -> showAiSettings() }.show()
+                }
+            }
+        }
+        val autonomous = CheckBox(this).apply {
+            text = "Autorizzo l'assistente a pianificare ricette salvate senza conferma a ogni comando"
+            isChecked = voice.autonomousCalendarEnabled
+            setOnCheckedChangeListener { _, checked ->
+                if (checked) {
+                    AlertDialog.Builder(this@MainActivity)
+                        .setTitle("Attivare la pianificazione autonoma?")
+                        .setMessage("L'assistente potrà aggiungere ricette esistenti al calendario " +
+                            "senza una seconda conferma. Non cancellerà ricette e interromperà " +
+                            "le sequenze ambigue o in conflitto. Potrai disattivarlo qui.")
+                        .setPositiveButton("Attiva") { _, _ ->
+                            voice.autonomousCalendarEnabled = true
+                            showAiSettings()
+                        }
+                        .setNegativeButton("Annulla") { _, _ -> showAiSettings() }.show()
+                } else { voice.autonomousCalendarEnabled = false; showAiSettings() }
+            }
+        }
+        content.addView(autonomous)
+        label("Dopo il comando vocale l'assistente esegue già automaticamente le azioni " +
+            "di sola lettura. Per programmare pasti senza altri tocchi abilita l'opzione precedente. " +
+            "Al primo utilizzo può essere necessario selezionare e importare il modello AI.", 13f)
         val enabled = CheckBox(this).apply {
             text = "Usa automaticamente Gemini Nano, quando presente"
             isChecked = nano.enabled
@@ -2282,6 +2355,16 @@ class MainActivity : Activity() {
     @Deprecated("Activity result used for system photo picker compatibility")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == LocalFunctionGemma.PICK_MODEL_REQUEST) {
+            if (resultCode == RESULT_OK && data?.data != null) {
+                Toast.makeText(this, "Importazione in corso...", Toast.LENGTH_SHORT).show()
+                functionGemma.importModel(data.data!!) { ok, message ->
+                    Toast.makeText(this, message, Toast.LENGTH_LONG).show()
+                    if (currentPageKey == "ai-settings") showAiSettings()
+                }
+            }
+            return
+        }
         if (requestCode == VoiceAssistantController.SPEECH_REQUEST) {
             voice.onSpeechResult(resultCode, data)
             return
@@ -2506,6 +2589,7 @@ class MainActivity : Activity() {
 
     override fun onDestroy() {
         voice.close()
+        functionGemma.close()
         nano.close()
         db.close()
         super.onDestroy()
