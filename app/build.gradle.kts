@@ -10,8 +10,8 @@ android {
         applicationId = "it.oggisimangia.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = providers.gradleProperty("verificationVersionCode").orNull?.toInt() ?: 25
-        versionName = "1.11.0"
+        versionCode = providers.gradleProperty("verificationVersionCode").orNull?.toInt() ?: 31
+        versionName = "1.13.0-beta5"
     }
     val signingPath = System.getenv("ANDROID_KEYSTORE_PATH")
     if (!signingPath.isNullOrBlank()) {
@@ -47,6 +47,7 @@ dependencies {
     implementation("androidx.core:core:1.15.0")
     implementation("androidx.exifinterface:exifinterface:1.3.7")
     implementation("com.google.mlkit:genai-prompt:1.0.0-beta4")
+    implementation("com.google.ai.edge.litertlm:litertlm-android:0.18.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
 }
 
