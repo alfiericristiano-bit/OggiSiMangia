@@ -21,8 +21,18 @@ object HelpGuide {
                 ButtonHelp("Riepilogo", "Vedi quanti giorni, pranzi e cene hai pianificato."),
                 ButtonHelp("Altro", "Imposta i siti di ricerca e consulta le opzioni AI locale."),
                 ButtonHelp("? Guida", "Apre queste spiegazioni in qualsiasi scheda, senza cancellare quello che stai scrivendo."),
-                ButtonHelp("🎙 Assistente vocale", "Tocca il microfono per iniziare subito a parlare. Tienilo premuto per digitare istruzioni o recuperare sequenze memorizzate.")
+                ButtonHelp("🤖 AI Assistente", "Tocca il pulsante viola AI per avviare una conversazione: dopo ogni comando propone un passo successivo e ascolta ancora. Rispondi sì, no oppure dai un altro comando. Di’ «fermati» per interrompere.")
             ), "Le ricette Android sono salvate sul telefono. L'anteprima Vercel è separata e non sincronizza i tuoi dati."),
+
+        Page("voice", "Assistente AI e suggerimenti",
+            "Il pulsante viola 🤖 AI apre una conversazione in primo piano. La voce ascolta più comandi consecutivi senza dover premere «Parla».",
+            listOf(
+                ButtonHelp("🤖 AI", "Avvia o ferma l'ascolto; pressione prolungata per il pannello dei comandi scritti e delle sequenze salvate."),
+                ButtonHelp("AI suggerisce", "Ogni scheda propone il passo più logico secondo i propri pulsanti. Tocca il suggerimento per parlare con l'assistente."),
+                ButtonHelp("Sì / No", "Dopo un comando l'AI propone il passo successivo. Di' sì per seguirlo, no per ignorarlo, oppure impartisci direttamente un altro comando."),
+                ButtonHelp("Pianificazione del calendario", "Per inserire pasti serve l'autorizzazione autonoma nelle impostazioni o una conferma vocale esplicita."),
+                ButtonHelp("Fermati", "Termina la conversazione e disattiva il microfono. Anche passando a un'altra app l'ascolto viene spento.")
+            ), "I suggerimenti sono basati sulle funzioni disponibili e sui dati salvati, senza inventare ricette. Il riconoscimento offline dipende dal telefono."),
 
         Page("calendar", "Calendario e pasti",
             "Un tocco su una data la seleziona. Una pressione prolungata apre l'aggiunta di una ricetta per quel giorno.",
