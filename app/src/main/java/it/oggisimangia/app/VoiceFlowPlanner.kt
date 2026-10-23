@@ -82,6 +82,7 @@ object VoiceFlowPlanner {
         is VoiceCommand.ReadMeals -> "Leggi ${command.meal?.lowercase() ?: "pasti"} del ${command.day}"
         is VoiceCommand.PressButton -> "Premi il pulsante «${command.target}» della schermata aperta"
         is VoiceCommand.SourcePriority -> "Assegna al sito ${command.site} la priorità ${command.position}"
+        is VoiceCommand.SetIngredients -> "Imposta ingredienti: ${command.ingredients.joinToString(", ")}"
         is VoiceCommand.SetFilter -> "Imposta filtro ${command.kind.name.lowercase(Locale.ITALIAN)}: ${command.value}"
         is VoiceCommand.PlanSaved -> "Pianifica ${command.title} per ${command.meal.lowercase()} del ${command.day}"
         is VoiceCommand.AutoPlan -> "Organizza ${command.days} ${if (command.meal == "Cena") "cene" else "pranzi"} dal ${command.start} usando ricette già salvate"
