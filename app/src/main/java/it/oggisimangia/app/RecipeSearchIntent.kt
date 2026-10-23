@@ -20,10 +20,10 @@ object RecipeSearchIntent {
         var value = text.trim()
         repeat(5) {
             val stripped = value.replace(opening, "").replace(generic, "").trim()
-            if (stripped == value) return value
+            if (stripped == value) return value.takeUnless { it in setOf("ricetta", "ricette", "piatto", "piatti", "idea", "idee", "un", "una", "per favore") }.orEmpty()
             value = stripped
         }
-        return value
+        return value.takeUnless { it in setOf("ricetta", "ricette", "piatto", "piatti", "idea", "idee", "un", "una", "per favore") }.orEmpty()
     }
 
     fun ingredients(input: String): List<String> {
