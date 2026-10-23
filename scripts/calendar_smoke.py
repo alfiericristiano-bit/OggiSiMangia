@@ -150,6 +150,18 @@ def find_scrolling(text, name):
         adb('shell', 'input', 'swipe','160','530','160','220','300')
     raise AssertionError('Missing UI text: '+text)
 
+def find_clickable_containing(fragment, name):
+    """Search the actual scrollable screen, not only the first viewport."""
+    for attempt in range(14):
+        current=snapshot(name+'-'+str(attempt))
+        matches=[n for n in current if fragment in n.attrib.get('text','')
+                 and n.attrib.get('clickable')=='true'
+                 and n.attrib.get('bounds') != '[0,0][0,0]']
+        if matches:
+            return matches[0]
+        adb('shell','input','swipe','170','580','170','220','320')
+    raise AssertionError('Missing clickable control after scrolling: '+fragment)
+
 def db_rows():
     raw = adb('exec-out','run-as',package,'cat','databases/oggisimangia.db')
     target=out/'saved.db';target.write_bytes(raw)
@@ -229,7 +241,7 @@ print('PASS: native multipage PDF generated and Android print service opened wit
 # Configure source priorities and a custom domain, then verify persistence after process restart.
 home=restart_home('preferences-home')
 assert not any(n.attrib.get('text')=='Come funziona il calendario' for n in home), 'Help opt-out was not saved'
-tap(next(n for n in home if 'Cerca' in n.attrib.get('text','') and n.attrib.get('clickable')=='true'))
+tap(find_clickable_containing('Cerca', 'calendar-search-control'))
 tap(find_scrolling('Priorità dei siti e nuove fonti','source-action'))
 settings=snapshot('source-settings')
 spinner=next(n for n in settings if n.attrib.get('content-desc','').startswith('1ª priorità:'))
@@ -252,7 +264,7 @@ confirm_delete=snapshot('source-delete-confirm')
 assert any(n.attrib.get('text') == 'Eliminare il sito?' for n in confirm_delete)
 tap(text_node(confirm_delete,'Elimina sito'))
 home=restart_home('persist-home')
-tap(next(n for n in home if 'Cerca' in n.attrib.get('text','') and n.attrib.get('clickable')=='true'))
+tap(find_clickable_containing('Cerca', 'calendar-search-control'))
 # The first ingredient row grows to ten independent fields.
 for index in range(1,11):
     current=snapshot('ingredients-'+str(index))
