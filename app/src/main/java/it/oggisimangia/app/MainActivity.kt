@@ -2684,8 +2684,13 @@ class MainActivity : Activity() {
                     .setMessage("Prova: «cerca ricette con riso e zucchine»; " +
                         "«apri il ricettario»; «cosa mangio domani?»; " +
                         "«pianifica risotto ai funghi per cena domani». " +
-                        "Puoi dire «e poi» per concatenare fino a sei comandi. " +
-                        "L'assistente chiede conferma prima di modificare il calendario.")
+                        "Puoi esprimerti anche con frasi diverse: «vorrei una ricetta con pollo», " +
+                        "«metti difficoltà facile», «sposta Misya al primo posto», " +
+                        "«premi il pulsante salva ricetta», «fotografa ingredienti», " +
+                        "«imposta ingrediente principale riso e funghi». " +
+                        "I pulsanti devono esistere nella schermata aperta; se il nome è ambiguo " +
+                        "ti chiedo di precisarlo. Le cancellazioni non vengono eseguite " +
+                        "automaticamente. Puoi dire «e poi» per concatenare fino a sei comandi.")
                     .setPositiveButton("Ho capito", null).show()
                 done("Ecco i comandi disponibili.")
             }
