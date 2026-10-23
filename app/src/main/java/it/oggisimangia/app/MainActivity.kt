@@ -362,7 +362,7 @@ class MainActivity : Activity() {
             text = "🎙"
             textSize = 21f
             isAllCaps = false
-            contentDescription = "Apri assistente vocale OggiSiMangia"
+            contentDescription = "Tocca per dettare un comando, tieni premuto per altre opzioni"
             this.background = shape(familyPale, 14f)
             // One tap starts speech immediately; long press opens the text/flow panel.
             setOnClickListener { voice.listen() }
