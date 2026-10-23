@@ -28,7 +28,7 @@ class ForegroundVoiceSession(
 ) {
     companion object {
         const val PERMISSION_REQUEST = 520
-        private const val MAX_SILENT_RESTARTS = 10
+        private const val MAX_SILENT_RESTARTS = 6
     }
 
     private val handler = Handler(Looper.getMainLooper())
@@ -118,14 +118,19 @@ class ForegroundVoiceSession(
                         isCapturing = false
                         if (!active) return
                         if (error == SpeechRecognizer.ERROR_NO_MATCH ||
-                            error == SpeechRecognizer.ERROR_SPEECH_TIMEOUT ||
-                            error == SpeechRecognizer.ERROR_RECOGNIZER_BUSY ||
+                            error == SpeechRecognizer.ERROR_SPEECH_TIMEOUT) {
+                            // Silence is not a request to end the conversation.
+                            // Stay ready until the user says "fermati", taps stop,
+                            // or leaves the app.
+                            retries = 0
+                            resume(800L)
+                        } else if (error == SpeechRecognizer.ERROR_RECOGNIZER_BUSY ||
                             error == SpeechRecognizer.ERROR_CLIENT) {
                             retries++
-                            if (retries <= MAX_SILENT_RESTARTS) resume(700L)
+                            if (retries <= MAX_SILENT_RESTARTS) resume(900L)
                             else {
                                 Toast.makeText(activity,
-                                    "Ascolto terminato dopo un lungo periodo senza comandi.",
+                                    "Il servizio vocale non risponde. Ascolto terminato.",
                                     Toast.LENGTH_LONG).show()
                                 stop()
                             }
