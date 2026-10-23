@@ -191,6 +191,16 @@ class MainActivity : Activity() {
             setTextColor(Color.rgb(82, 103, 76))
             gravity = Gravity.CENTER
         })
+        if (title.isNotBlank()) {
+            layout.addView(Button(this).apply {
+                text = "? Guida"
+                isAllCaps = false
+                contentDescription = "Apri guida di OggiSiMangia"
+                setTextColor(Color.rgb(21, 123, 52))
+                background = outlined(Color.WHITE, 14f)
+                setOnClickListener { GuideDialog.show(this@MainActivity) }
+            }, LinearLayout.LayoutParams(dp(132), dp(46)).apply { topMargin = dp(9) })
+        }
         val image = ImageView(this).apply {
             setImageResource(R.drawable.app_icon_clean)
             contentDescription = "Calendario, pasta e basilico di OggiSiMangia"
@@ -338,13 +348,25 @@ class MainActivity : Activity() {
             setTextColor(Color.rgb(88, 103, 94)); maxLines = 2
         })
         hero.addView(headerText, LinearLayout.LayoutParams(0, -2, 1f))
+        // Contextual help is a non-destructive overlay, preserving unfinished edits.
+        hero.addView(Button(this).apply {
+            text = "? Guida"
+            isAllCaps = false
+            textSize = 12f
+            setTextColor(familyDeep)
+            contentDescription = "Apri guida della schermata " + title
+            background = outlined(familyPale, 13f)
+            setOnClickListener { GuideDialog.show(this@MainActivity, key) }
+        }, LinearLayout.LayoutParams(dp(70), dp(46)).apply { marginStart = dp(5) })
         hero.addView(Button(this).apply {
             text = "🎙"
             textSize = 21f
             isAllCaps = false
             contentDescription = "Apri assistente vocale OggiSiMangia"
             this.background = shape(familyPale, 14f)
-            setOnClickListener { voice.open() }
+            // One tap starts speech immediately; long press opens the text/flow panel.
+            setOnClickListener { voice.listen() }
+            setOnLongClickListener { voice.open(); true }
         }, LinearLayout.LayoutParams(dp(48), dp(48)))
         content.addView(hero, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(9) })
         if (key != "calendar") {
@@ -1255,6 +1277,7 @@ class MainActivity : Activity() {
             "ai-settings") { showAiSettings() }
         label("🤖 Intelligenza artificiale sul dispositivo", 19f, true)
         label(nano.statusText(), 15f, true)
+        label(DeviceAiSupport.report(nano), 14f)
         val enabled = CheckBox(this).apply {
             text = "Usa automaticamente Gemini Nano, quando presente"
             isChecked = nano.enabled
@@ -1615,6 +1638,9 @@ class MainActivity : Activity() {
             content.addView(row, LinearLayout.LayoutParams(-1, -2).apply {
                 bottomMargin = dp(5)
             })
+        }
+        action("❔ Guida completa: spiegazioni di schede e pulsanti") {
+            GuideDialog.show(this)
         }
         action("🤖 Impostazioni AI locale e privacy") { showAiSettings() }
         action("Ripristina siti e ordine iniziali") {
