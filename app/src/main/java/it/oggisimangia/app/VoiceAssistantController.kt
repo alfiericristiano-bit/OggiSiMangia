@@ -27,7 +27,8 @@ class VoiceAssistantController(
     private val activity: Activity,
     private val executor: (VoiceCommand, (String) -> Unit) -> Unit,
     private val aiInterpret: (String, (String?) -> Unit) -> Unit = { _, callback -> callback(null) },
-    private val onConversationState: (Boolean) -> Unit = {}
+    private val onConversationState: (Boolean) -> Unit = {},
+    private val currentScreen: () -> String = { "calendar" }
 ) {
     companion object {
         const val SPEECH_REQUEST = 519
@@ -45,6 +46,21 @@ class VoiceAssistantController(
         onCommand = { spoken -> onConversationCommand(spoken) },
         onState = { listening -> onConversationState(listening) })
     val isConversing: Boolean get() = session.active
+
+    fun showContextualSuggestions() {
+        val options = AiNextStep.suggestions(currentScreen())
+        val labels = options.map { it.label }.toTypedArray()
+        AlertDialog.Builder(activity)
+            .setTitle("AI · Ti suggerisco il prossimo passo")
+            .setMessage("In base alla schermata corrente puoi scegliere una di queste azioni. " +
+                "L'assistente non apporterà modifiche senza le autorizzazioni richieste.")
+            .setItems(labels) { _, index ->
+                accept(options[index].spokenCommand)
+            }
+            .setNeutralButton("Parla con AI") { _, _ -> listen() }
+            .setNegativeButton("Chiudi", null)
+            .show()
+    }
 
     fun onMicrophonePermissionResult(granted: Boolean) = session.onPermissionResult(granted)
 
@@ -339,8 +355,10 @@ class VoiceAssistantController(
                 val closing = (results.lastOrNull() ?: "Operazioni completate.") +
                     "\n\n" + (last?.let { VoiceFlowPlanner.suggestion(it) } ?: "")
                 if (session.active) {
+                    val suggested = AiNextStep.suggestions(currentScreen(), last).firstOrNull()
                     replyThenResume((results.lastOrNull() ?: "Completato.") +
-                        " Dimmi pure il prossimo comando, oppure fermati.")
+                        (suggested?.let { " Ti suggerisco: " + it.label + "." } ?: "") +
+                        " Puoi darmi un altro comando oppure dire fermati.")
                     return
                 }
                 speak(closing)
@@ -350,6 +368,7 @@ class VoiceAssistantController(
                         VoiceCommand.Open(VoiceCommand.Destination.SEARCH)
                     else -> null
                 }
+                val choices = AiNextStep.suggestions(currentScreen(), last)
                 val response = AlertDialog.Builder(activity).setTitle("Assistente: operazioni completate")
                     .setMessage(results.joinToString("\n") + "\n\n" +
                         (last?.let { VoiceFlowPlanner.suggestion(it) } ?: ""))
@@ -363,6 +382,9 @@ class VoiceAssistantController(
                             .setPositiveButton("Altro comando") { _, _ -> open() }
                             .setNegativeButton("Chiudi", null).show()
                     }
+                }
+                if (suggestedAction == null && choices.isNotEmpty()) {
+                    response.setNeutralButton("Prossima azione AI") { _, _ -> showContextualSuggestions() }
                 }
                 response.show()
                 return
