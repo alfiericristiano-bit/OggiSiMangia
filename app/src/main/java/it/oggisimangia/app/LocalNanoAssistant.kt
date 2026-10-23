@@ -150,55 +150,49 @@ class LocalNanoAssistant(private val context: Context) {
         }
     }
 
-    /** Optional on-device interpretation of goals that the deterministic parser couldn't parse.
-     * Returns only a suggested allowlisted command; callers must parse and confirm again.
-     * Does not download a model, access external servers or execute any command.
+    /**
+     * Optional locally generated recipe-search ingredients. Never fetches a model,
+     * searches the web or modifies user data; the calling screen previews the terms.
      */
-    fun interpretVoiceGoal(request: String, onResult: (String?) -> Unit) {
+    fun suggestSearchIngredients(request: String, onResult: (List<String>?) -> Unit) {
         if (!enabled || state != State.READY || request.isBlank()) {
             onResult(null)
             return
         }
         val prompt = """
-            Sei il traduttore di intenzioni VOCALI per l'app Android OggiSiMangia.
-            Non esegui operazioni, non inventi ricette, contenuti, date o preferenze.
-            Trasforma una richiesta dell'utente in UNO o PIÙ comandi CANONICI italiani
-            (separali con «e poi», massimo sei), scegliendo solo da:
-            - Apri il calendario
-            - Apri il ricettario
-            - Apri la ricerca
-            - Mostra il riepilogo
-            - Apri le fonti
-            - Nuova ricetta
-            - Mostra oggi / Mostra domani
-            - Cosa mangio oggi / Cosa mangio domani / Dimmi cosa ho per cena oggi
-            - Cerca ricette con INGREDIENTE PRINCIPALE e altri ingredienti
-            - Organizzami la cena di domani con INGREDIENTE e INGREDIENTE
-            - Pianifica NOME RICETTA per pranzo/cena oggi/domani
-            Conserva esattamente ingredienti, ricetta, pasto e giorno presenti nella richiesta.
-            Non supporre ricette o ingredienti non detti e non aggiungere date non specificate.
-            Quando qualcosa manca o vi è conflitto, rispondi soltanto CHIEDI: seguito
-            da una breve domanda. Non inventare comandi distruttivi o fuori dall'app.
-            Se invece la richiesta è chiara, rispondi soltanto COMANDI: seguito
-            dai comandi supportati, su una sola riga.
-            Richiesta: ${request.take(500)}
+            Sei il supporto di ricerca RICETTE di OggiSiMangia.
+            Estrai solamente ingredienti effettivamente menzionati nella richiesta,
+            senza inventare ingredienti o ricette. Il primo è l'ingrediente principale.
+            Rispondi esclusivamente con JSON, un array di massimo 10 ingredienti
+            semplici in italiano, esempio ["pasta", "melanzane", "pomodoro"].
+            Se non è stato menzionato nessun ingrediente, rispondi [].
+            Richiesta: ${request.take(450)}
         """.trimIndent()
         scope.launch {
             try {
                 val model = client ?: run { onResult(null); return@launch }
                 if (model.checkStatus() != FeatureStatus.AVAILABLE) {
-                    refresh()
                     onResult(null)
                     return@launch
                 }
-                val output = model.generateContent(prompt).candidates.firstOrNull()?.text.orEmpty().trim()
-                val firstLine = output.lineSequence().firstOrNull().orEmpty().trim()
-                val proposed = if (firstLine.startsWith("COMANDI:", ignoreCase = true))
-                    firstLine.substringAfter(':').trim() else ""
-                onResult(proposed.takeIf { it.isNotBlank() && it.length <= 650 })
-            } catch (_: Exception) {
-                onResult(null)
-            }
+                val answer = model.generateContent(prompt).candidates.firstOrNull()?.text.orEmpty()
+                val json = answer.substringAfter('[', "").substringBeforeLast(']', "")
+                if (json.isBlank()) { onResult(null); return@launch }
+                val arr = org.json.JSONArray("[$json]")
+                val candidates = (0 until minOf(arr.length(), 10)).mapNotNull { i ->
+                    arr.optString(i).trim().takeIf { it.isNotBlank() }
+                }
+                // AI cannot invent new ingredients: every term must occur in the
+                // original request. If not, keep the deterministic fallback.
+                val normalizedRequest = RecipeSearchIntent.normalize(request)
+                val safe = candidates.filter { ingredient ->
+                    val term = RecipeSearchIntent.normalize(ingredient)
+                    term.length >= 2 && Regex(
+                        "(?<![a-z])" + Regex.escape(term) + "(?![a-z])"
+                    ).containsMatchIn(normalizedRequest)
+                }.distinct().take(10)
+                onResult(safe.takeIf { it.isNotEmpty() })
+            } catch (_: Exception) { onResult(null) }
         }
     }
 
