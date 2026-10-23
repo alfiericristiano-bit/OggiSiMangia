@@ -755,3 +755,17 @@ body.onboarding .phone-preview .footer{padding:9px 12px 22px;}
 body.onboarding .phone-preview .topbar-right{display:none;}
 @keyframes plate-enter {0%{opacity:.2;transform:translateY(18px) scale(.86) rotate(-4deg)}75%{opacity:1;transform:translateY(-2px) scale(1.03) rotate(1deg)}100%{opacity:1;transform:translateY(0) scale(1) rotate(0)}}
 @media(prefers-reduced-motion:reduce){.phone-preview .intro-symbol,.phone-preview .welcome-dish img,.phone-preview .welcome-dish span{animation:none;}}
+
+/* Accessible chapter guide: compact persistent entry point on the phone header. */
+.guide-topbar{border:1px solid rgba(255,255,255,.54);background:rgba(255,255,255,.20);
+ color:white;font-size:12px;font-weight:800;border-radius:12px;min-width:78px;min-height:44px;
+ padding:8px 10px;white-space:nowrap;cursor:pointer;margin-right:6px}
+.guide-topbar:focus-visible,#modal .guide-choice:focus-visible{outline:3px solid #fac95c;outline-offset:2px}
+#modal .guide-choice{display:block;width:100%;text-align:left;margin-bottom:8px;white-space:normal}
+#modal .guide-step{padding:11px 12px;margin:9px 0;background:var(--paper-soft);
+ border:1px solid var(--outline);border-radius:12px}
+#modal .guide-step strong{display:block;color:var(--green-2);font-size:15px;margin-bottom:5px}
+#modal .guide-step p{margin:0;line-height:1.5}
+#modal .guide-navigation{display:flex;gap:8px;flex-wrap:wrap;position:sticky;bottom:-22px;
+ padding:12px 0;background:var(--paper)}
+#modal .guide-navigation .btn{flex:1}
