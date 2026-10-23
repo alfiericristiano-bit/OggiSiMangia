@@ -10,8 +10,8 @@ android {
         applicationId = "it.oggisimangia.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = providers.gradleProperty("verificationVersionCode").orNull?.toInt() ?: 32
-        versionName = "1.13.0-beta5.1-arm64"
+        versionCode = providers.gradleProperty("verificationVersionCode").orNull?.toInt() ?: 33
+        versionName = "1.13.0-beta6-arm64"
     }
     // Ship native ML Kit OCR + LiteRT-LM libraries for the ARM64 hardware used by
     // Redmi 15 5G / Galaxy A17 5G. Debug remains universal for x86_64 emulator CI.
