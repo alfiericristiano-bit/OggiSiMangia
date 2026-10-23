@@ -38,6 +38,34 @@ object NaturalVoiceIntents {
             else -> null
         }
 
+        // Persist a source-site priority using the same ordering as the site
+        // dropdown. "Metti Misya prima", "sposta Giallo Zafferano al secondo
+        // posto" and "priorità 1 per Cookist" share the same safe intention.
+        if (present(s, "priorita", "posto", "posizione", "prima", "seconda", "terza",
+                "quarto", "quinto", "sesto") &&
+            present(s, "metti", "sposta", "imposta", "porta", "assegna", "priorita")) {
+            val order = Regex("\\b(prima|primo|seconda|secondo|terza|terzo|quarta|quarto|quinta|quinto|sesta|sesto|[1-6])\\b")
+                .find(s)?.groupValues?.getOrNull(1)
+            val position = when (order) {
+                "prima","primo","1" -> 1
+                "seconda","secondo","2" -> 2
+                "terza","terzo","3" -> 3
+                "quarta","quarto","4" -> 4
+                "quinta","quinto","5" -> 5
+                "sesta","sesto","6" -> 6
+                else -> null
+            }
+            if (position != null && (present(s, "priorita","sito","fonte","posto","posizione") ||
+                Regex("\\b(?:metti|sposta|porta)\\b").containsMatchIn(s))) {
+                val withoutPrefix = s.replace(Regex("^(?:per favore\\s+)?(?:metti|sposta|imposta|porta|assegna)\\s+"), "")
+                val candidate = withoutPrefix
+                    .replace(Regex("\\b(?:al|alla|in|come|per|il|la|del|della|dei|un|una|sito|fonte|posizione|posto|priorita)\\b"), " ")
+                    .replace(Regex("\\b(?:prima|primo|seconda|secondo|terza|terzo|quarta|quarto|quinta|quinto|sesta|sesto|[1-6])\\b"), " ")
+                    .replace(Regex("\\s+"), " ").trim()
+                if (candidate.isNotBlank()) return VoiceCommand.SourcePriority(candidate, position)
+            }
+        }
+
         // Filtering is a deterministic operation on supported UI filter values.
         val filter = Regex("\\b(?:imposta|metti|seleziona|scegli|applica|filtra|cambia|preferisco|voglio)\\b")
             .containsMatchIn(s) && (present(s, "filtro", "filtri", "difficolta", "tempo", "durata",
