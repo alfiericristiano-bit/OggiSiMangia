@@ -1302,6 +1302,14 @@ class MainActivity : Activity() {
         label("🤖 Intelligenza artificiale sul dispositivo", 19f, true)
         label(nano.statusText(), 15f, true)
         label(DeviceAiSupport.report(nano), 14f)
+        label("🎙 Conversazione a mani libere", 18f, true)
+        label("Tocca una sola volta il microfono nelle schermate dell'app: " +
+            "l'assistente ascolta il primo comando e, dopo averti risposto, " +
+            "riprende automaticamente l'ascolto. Per interromperlo dì «fermati» " +
+            "oppure tocca di nuovo il microfono. L'ascolto si interrompe quando " +
+            "lasci l'app. Al primo avvio Android chiede il permesso microfono. " +
+            "Usiamo prioritariamente il riconoscimento sul dispositivo: " +
+            "se non disponibile, il servizio vocale Android potrebbe utilizzare Internet.", 13f)
         label("🧠 FunctionGemma / LiteRT-LM (sperimentale)", 18f, true)
         label(functionGemma.diagnostics().message, 13f)
         if (functionGemma.failureMessage().isNotBlank()) {
