@@ -153,6 +153,21 @@
       button("Inizia a cucinare →","onboarding-start","primary intro-go")+'</section>';
   }
 
+  function aiPreviewStep() {
+    // Illustration of the Android beta5 suggestions: this web preview neither
+    // opens the microphone nor claims to run FunctionGemma.
+    const tips = {
+      calendar: "Vuoi cercare una ricetta per completare il menù?",
+      archive: "Apri una ricetta salvata: puoi modificarla o scegliere Pianifica.",
+      editor: "Controlla ingredienti e preparazione, poi salva la ricetta.",
+      detail: "Verifica ingredienti e tempi, poi scegli Pianifica o Modifica.",
+      sources: "Organizza le priorità delle fonti, poi torna alla ricerca.",
+      planned: "Apri il calendario per verificare i pasti programmati.",
+      about: "Nell'APK Android puoi parlare con l'AI e ricevere il prossimo passo."
+    };
+    return tips[view] || "Scegli una funzione per vedere i suggerimenti.";
+  }
+
   function render() {
     if(previousView!==null && view!==previousView && !restoringPage) {
       pageHistory.push({view:previousView,recipeId:previousRecipeId});
@@ -173,6 +188,11 @@
     else renderAbout();
     if(view!=="calendar"&&view!=="onboarding-name"&&view!=="onboarding-welcome") {
       app.insertAdjacentHTML("afterbegin",'<div class="app-backbar">'+button("‹ Indietro","go-back","back-pill")+'</div>');
+    }
+    if(view!=="onboarding-name" && view!=="onboarding-welcome") {
+      app.insertAdjacentHTML("afterbegin",
+        '<div class="ai-hint-preview">'+button("🤖 AI","ai-preview","ai-preview-button")+
+        '<span>'+escape(aiPreviewStep())+'</span></div>');
     }
     previousView=view;previousRecipeId=editingId;
   }
@@ -468,8 +488,8 @@
       button("◐ Tema chiaro / scuro","toggle-theme")+
       button("❔ Guida completa","open-guide")+
       button("Reimposta i dati di prova","reset-data","danger")+'</div>'+
-      '<div class="notice" style="margin-top:14px"><strong>AI locale nell’app Android 1.11.0:</strong> Gemini Nano viene rilevato automaticamente soltanto sui telefoni compatibili. Il download richiede conferma e Wi-Fi non a consumo. L’OCR ML Kit rimane disponibile quando Nano non è supportato. Nessuna ricetta o fotografia viene inviata ad AI online. Questa anteprima web NON può usare Gemini Nano né simulare una scansione OCR reale: tali funzioni richiedono l’APK Android.</div>'+
-      '<p class="muted" style="font-size:12px;margin-top:18px">Ultima versione Android di riferimento: 1.11.0. L’anteprima è una simulazione smartphone distinta dall’APK.</p></section>';
+      '<div class="notice" style="margin-top:14px"><strong>AI locale nell’app Android beta5:</strong> Gemini Nano viene rilevato automaticamente soltanto sui telefoni compatibili. Il download richiede conferma e Wi-Fi non a consumo. L’OCR ML Kit rimane disponibile quando Nano non è supportato. Nessuna ricetta o fotografia viene inviata ad AI online. Questa anteprima web NON può usare Gemini Nano né simulare una scansione OCR reale: tali funzioni richiedono l’APK Android.</div>'+
+      '<p class="muted" style="font-size:12px;margin-top:18px">Ultima versione Android di riferimento: 1.13.0-beta5. L’anteprima è una simulazione smartphone distinta dall’APK.</p></section>';
   }
   function showHelp(force) {
     if(!force&&state.tipsHidden)return;
@@ -522,6 +542,16 @@
     const b=e.target.closest("[data-action]");if(!b)return;
     const action=b.dataset.action,id=b.dataset.id,aid=b.dataset.aid,idx=Number(b.dataset.index);
     if(action==="close-modal"){closeModal();return;}
+    if(action==="ai-preview"){
+      modal("🤖 Assistente AI · Anteprima",
+        '<p><strong>Passo suggerito:</strong> '+escape(aiPreviewStep())+'</p>'+
+        '<p>Questa è una simulazione del suggerimento. Nell’APK Android beta5 '+
+        'l’assistente ascolta in italiano, propone il passo successivo e accetta '+
+        'risposte «sì» e «no» senza premere nuovamente Parla.</p>'+
+        '<p>Il microfono e il modello AI locale non sono disponibili nella simulazione web.</p>'+
+        button("Chiudi","close-modal","primary"));
+      return;
+    }
     if(action==="open-guide"){guideOpen(guideTopic());return;}
     if(action==="guide-index"){guideOpen(-1);return;}
     if(action==="guide-page"){guideOpen(idx);return;}
