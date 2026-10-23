@@ -420,7 +420,7 @@ class MainActivity : Activity() {
                 this.background = outlined(Color.rgb(246, 239, 255), 12f)
                 setPadding(dp(10), dp(7), dp(10), dp(7))
                 contentDescription = "Suggerimento contestuale dell'assistente AI: " + uiHint
-                setOnClickListener { voice.listen() }
+                setOnClickListener { if (!voice.isConversing) voice.listen() }
             }
             content.addView(hint, LinearLayout.LayoutParams(-1, -2).apply {
                 bottomMargin = dp(7)
