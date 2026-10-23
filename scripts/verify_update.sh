@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 package=it.oggisimangia.app
-baseline=build/update-check/previous-beta51-debug.apk
+baseline=build/update-check/previous-beta6-debug.apk
 new=app/build/outputs/apk/debug/app-debug.apk
 test -s "$baseline"
 test -s "$new"
 
-# Sign both the previously working v1.13 beta5 and new v1.13 with the same
+# Sign both the previously working v1.13 beta6 and new v1.13 with the same
 # persistent keystore, then install using normal Android in-place upgrade.
 adb install "$baseline"
 previous=$(adb shell dumpsys package "$package" | sed -n 's/.*versionCode=\([0-9]*\).*/\1/p' | head -1)
@@ -30,7 +30,7 @@ adb shell am start -W -n "$package/.MainActivity"
 adb shell am force-stop "$package"
 adb exec-out run-as "$package" cat databases/oggisimangia.db > build/update-check/upgraded-recipes.db
 python3 scripts/verify_real_upgrade.py check
-echo "PASS: versionCode $previous -> $current; signed APK upgraded over v1.13 beta5.1 without uninstall; recipe, OCR, file and profile storage retained."
+echo "PASS: versionCode $previous -> $current; signed APK upgraded over v1.13 beta6 without uninstall; recipe, OCR, file and profile storage retained."
 
 # Run full UI smoke after the realistic upgrade regression.
 python3 scripts/calendar_smoke.py
