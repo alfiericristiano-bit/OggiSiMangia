@@ -129,6 +129,7 @@ class MainActivity : Activity() {
         functionGemma = LocalFunctionGemma(this)
         voice = VoiceAssistantController(this,
             executor = { command, done -> executeVoiceCommand(command, done) },
+            currentScreen = { currentPageKey },
             onConversationState = { isOn ->
                 runOnUiThread {
                     voiceButton?.text = if (isOn) "⏹" else "🎙"
@@ -376,6 +377,17 @@ class MainActivity : Activity() {
             this.background = outlined(familyPale, 13f)
             setOnClickListener { GuideDialog.show(this@MainActivity, key) }
         }, LinearLayout.LayoutParams(dp(70), dp(46)).apply { marginStart = dp(5) })
+        // Explicit AI text makes the assistant unmistakable on both Xiaomi and Samsung.
+        hero.addView(Button(this).apply {
+            text = "AI"
+            isAllCaps = false
+            textSize = 16f
+            setTypeface(null, Typeface.BOLD)
+            setTextColor(Color.WHITE)
+            contentDescription = "Assistente AI: suggerimenti e prossima azione"
+            this.background = shape(Color.rgb(35, 95, 175), 14f)
+            setOnClickListener { voice.showContextualSuggestions() }
+        }, LinearLayout.LayoutParams(dp(46), dp(46)).apply { marginStart = dp(4) })
         hero.addView(Button(this).apply {
             text = "🎙"
             textSize = 21f
@@ -1302,6 +1314,12 @@ class MainActivity : Activity() {
         label("🤖 Intelligenza artificiale sul dispositivo", 19f, true)
         label(nano.statusText(), 15f, true)
         label(DeviceAiSupport.report(nano), 14f)
+        label("AI · Suggerimenti automatici", 18f, true)
+        label("Il nuovo pulsante blu AI, separato dal microfono, propone azioni coerenti " +
+            "con i pulsanti e le opzioni della schermata attuale. Dopo ogni comando " +
+            "l'assistente propone anche il passaggio successivo. " +
+            "Puoi scegliere di eseguirlo oppure dare un altro comando; " +
+            "nessuna cancellazione avviene per semplice suggerimento.", 13f)
         label("🎙 Conversazione a mani libere", 18f, true)
         label("Tocca una sola volta il microfono nelle schermate dell'app: " +
             "l'assistente ascolta il primo comando e, dopo averti risposto, " +
