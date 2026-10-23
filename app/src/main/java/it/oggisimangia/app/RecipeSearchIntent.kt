@@ -29,6 +29,8 @@ object RecipeSearchIntent {
     fun ingredients(input: String): List<String> {
         val phrase = normalize(input).take(500)
         if (phrase.isBlank()) return emptyList()
+        if (phrase in setOf("per favore", "cerca", "cercami", "cerco", "ricette", "ricetta")) return emptyList()
+        if (Regex("\\b(?:con|a base di|usando)\\s*$").containsMatchIn(phrase)) return emptyList()
         val split = Regex("\\b(?:con|a base di|usando|utilizzando|che contengono)\\s+")
             .find(phrase)
         val front = split?.let { removeBoilerplate(phrase.substring(0, it.range.first)) }.orEmpty()
