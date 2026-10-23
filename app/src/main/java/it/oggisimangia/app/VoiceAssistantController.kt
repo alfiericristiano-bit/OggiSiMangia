@@ -27,7 +27,8 @@ class VoiceAssistantController(
     private val activity: Activity,
     private val executor: (VoiceCommand, (String) -> Unit) -> Unit,
     private val aiInterpret: (String, (String?) -> Unit) -> Unit = { _, callback -> callback(null) },
-    private val onConversationState: (Boolean) -> Unit = {}
+    private val onConversationState: (Boolean) -> Unit = {},
+    private val nextStep: (VoiceCommand?) -> VoiceNextStep = { VoiceNextStep("Dimmi il prossimo comando.") }
 ) {
     companion object {
         const val SPEECH_REQUEST = 519
@@ -41,6 +42,7 @@ class VoiceAssistantController(
     private val main = Handler(Looper.getMainLooper())
     private var replySequence = 0L
     private var pendingSpokenConfirmation: VoicePlan? = null
+    private var pendingNextStep: VoiceCommand? = null
     private val session = ForegroundVoiceSession(activity,
         onCommand = { spoken -> onConversationCommand(spoken) },
         onState = { listening -> onConversationState(listening) })
@@ -55,12 +57,38 @@ class VoiceAssistantController(
     private fun stopConversation() {
         replySequence++
         pendingSpokenConfirmation = null
+        pendingNextStep = null
         session.stop()
         speaker?.stop()
     }
 
     private fun onConversationCommand(spoken: String) {
-        when (VoiceConversationPolicy.classify(spoken, pendingSpokenConfirmation != null)) {
+        // Give priority to an explicit stop, including while a next step is offered.
+        val decision = VoiceConversationPolicy.classify(spoken,
+            pendingSpokenConfirmation != null || pendingNextStep != null)
+        if (pendingSpokenConfirmation == null && pendingNextStep != null &&
+            decision == VoiceConversationPolicy.Decision.CONFIRM) {
+            val step = pendingNextStep ?: return
+            pendingNextStep = null
+            val proposal = VoicePlan(listOf(step))
+            if (proposal.needsConfirmation && !autonomousCalendarEnabled) {
+                pendingSpokenConfirmation = proposal
+                replyThenResume("Il prossimo passo aggiungerà pasti al calendario. " +
+                    "Di' conferma per autorizzare, oppure annulla.")
+            } else runPlan(proposal)
+            return
+        }
+        if (pendingSpokenConfirmation == null && pendingNextStep != null &&
+            decision == VoiceConversationPolicy.Decision.REJECT) {
+            pendingNextStep = null
+            replyThenResume("Va bene. Puoi scegliere un'altra opzione o darmi un comando.")
+            return
+        }
+        if (decision == VoiceConversationPolicy.Decision.COMMAND && pendingSpokenConfirmation == null) {
+            // A new explicit request supersedes a recommendation.
+            pendingNextStep = null
+        }
+        when (decision) {
             VoiceConversationPolicy.Decision.STOP -> {
                 stopConversation()
                 Toast.makeText(activity, "Assistente in pausa. Tocca il microfono per riprendere.",
@@ -339,8 +367,14 @@ class VoiceAssistantController(
                 val closing = (results.lastOrNull() ?: "Operazioni completate.") +
                     "\n\n" + (last?.let { VoiceFlowPlanner.suggestion(it) } ?: "")
                 if (session.active) {
-                    replyThenResume((results.lastOrNull() ?: "Completato.") +
-                        " Dimmi pure il prossimo comando, oppure fermati.")
+                    val recommended = nextStep(last)
+                    pendingNextStep = recommended.command
+                    val intro = (results.lastOrNull() ?: "Operazione completata.") +
+                        " " + recommended.message
+                    replyThenResume(intro.take(340) +
+                        if (recommended.command != null)
+                            " Puoi dire sì per eseguire questo passo, no, oppure un altro comando."
+                        else " Dimmi il prossimo comando, oppure fermati.")
                     return
                 }
                 speak(closing)
@@ -373,7 +407,12 @@ class VoiceAssistantController(
                 // "Annullato" blocks a whole plan to avoid continuing after a declined write.
                 if (response.startsWith("Annullato") || response.startsWith("Impossibile")) {
                     if (session.active) {
-                        replyThenResume(response + " Puoi darmi un altro comando.")
+                        val recommended = nextStep(plan.commands.getOrNull(index))
+                        pendingNextStep = recommended.command
+                        replyThenResume(response.take(200) + " " +
+                            recommended.message.take(160) +
+                            if (recommended.command != null) " Puoi dire sì oppure no."
+                            else " Dimmi il prossimo comando.")
                         return@executor
                     }
                     speak(response)
