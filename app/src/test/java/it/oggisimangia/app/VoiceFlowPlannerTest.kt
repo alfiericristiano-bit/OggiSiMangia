@@ -59,12 +59,14 @@ class VoiceFlowPlannerTest {
         val plan = VoiceFlowPlanner.build("Organizzami il pranzo di domani", today)
         assertTrue(plan.commands.isEmpty())
         assertTrue(plan.clarification.orEmpty().contains("ingrediente principale"))
+        assertTrue(plan.clarification.orEmpty().contains("passaggio 1"))
     }
 
     @Test fun missingMealAsksQuestion() {
         val plan = VoiceFlowPlanner.build("Pianifica pasta al pomodoro domani", today)
         assertTrue(plan.commands.isEmpty())
         assertTrue(plan.clarification.orEmpty().contains("pranzo o per cena"))
+        assertTrue(plan.clarification.orEmpty().contains("passaggio 1"))
     }
 
     @Test fun conflictingDayAsksQuestion() {
