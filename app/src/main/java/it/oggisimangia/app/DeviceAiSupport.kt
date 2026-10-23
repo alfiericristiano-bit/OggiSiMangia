@@ -27,7 +27,7 @@ object DeviceAiSupport {
         }
         return "Telefono: $family — $model.\n" +
             "AI integrabile tramite API Android (Gemini Nano): $capability.\n" +
-            "Se non è accessibile, i comandi vocali e testuali predefiniti restano utilizzabili. " +
+            "Se non è accessibile, la ricerca ricette e OCR ML Kit restano utilizzabili. " +
             "Le funzioni AI della marca (es. HyperAI o Galaxy AI) non sono automaticamente " +
             "interrogabili in background: occorre un'API ufficiale compatibile. " +
             "Il rilevamento si basa sulle capacità reali, non su un elenco fisso di marche."
