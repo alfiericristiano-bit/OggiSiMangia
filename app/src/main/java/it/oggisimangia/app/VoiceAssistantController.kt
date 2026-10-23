@@ -35,6 +35,15 @@ class VoiceAssistantController(
     private var speakerReady = false
     private val prefs = activity.getSharedPreferences(PREFS, Activity.MODE_PRIVATE)
 
+    /**
+     * Consent stored only after an explicit toggle in AI Settings. Non-destructive
+     * commands execute immediately; calendar writes can be auto-executed only
+     * after consent and still pass allowlist, duplicate and conflict checks.
+     */
+    var autonomousCalendarEnabled: Boolean
+        get() = prefs.getBoolean("autonomous_calendar_writes", false)
+        set(value) { prefs.edit().putBoolean("autonomous_calendar_writes", value).apply() }
+
     init {
         speaker = TextToSpeech(activity) { result ->
             speakerReady = result == TextToSpeech.SUCCESS
@@ -162,20 +171,20 @@ class VoiceAssistantController(
                         if (suggested != null && suggested.clarification == null &&
                             suggested.conflict == null && suggested.commands.isNotEmpty() &&
                             alternative != spoken) {
-                            AlertDialog.Builder(activity).setTitle("L'AI propone questa interpretazione")
-                                .setMessage("Hai detto: «" + spoken.take(300) + "»\n\n" +
-                                    suggested.commands.joinToString("\n") {
-                                        VoiceFlowPlanner.description(it)
-                                    } + "\n\nÈ ciò che intendevi?")
-                                .setPositiveButton("Sì, continua") { _, _ -> accept(alternative!!, true) }
-                                .setNegativeButton("No, riformulo") { _, _ -> open() }
-                                .show()
+                            // LiteRT/Gemini Nano may only propose allowlisted commands.
+                            // They are re-parsed and executed automatically if read-only,
+                            // or if this user explicitly enabled safe calendar writes.
+                            accept(alternative!!, true)
                         } else askClarification(problem, spoken)
                     }
                 }
                 return
             }
             askClarification(problem, spoken)
+            return
+        }
+        if (!plan.needsConfirmation || autonomousCalendarEnabled) {
+            runPlan(plan)
             return
         }
         val summary = plan.commands.mapIndexed { i, cmd ->
