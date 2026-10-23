@@ -9,7 +9,7 @@ data class VoicePlan(
     val clarification: String? = null,
     val conflict: String? = null
 ) {
-    val needsConfirmation: Boolean get() = commands.any { it is VoiceCommand.PlanSaved }
+    val needsConfirmation: Boolean get() = commands.any { it is VoiceCommand.PlanSaved || it is VoiceCommand.AutoPlan }
 }
 
 object VoiceFlowPlanner {
@@ -81,6 +81,7 @@ object VoiceFlowPlanner {
         is VoiceCommand.ShowDay -> "Mostra calendario del ${command.day}"
         is VoiceCommand.ReadMeals -> "Leggi ${command.meal?.lowercase() ?: "pasti"} del ${command.day}"
         is VoiceCommand.PlanSaved -> "Pianifica ${command.title} per ${command.meal.lowercase()} del ${command.day}"
+        is VoiceCommand.AutoPlan -> "Organizza ${command.days} ${if (command.meal == "Cena") "cene" else "pranzi"} dal ${command.start} usando ricette già salvate"
         VoiceCommand.Help -> "Mostra i comandi disponibili"
         VoiceCommand.Unknown -> "Non riconosciuto"
     }
@@ -97,6 +98,7 @@ object VoiceFlowPlanner {
             else -> "Puoi darmi un altro comando o una sequenza con «e poi»."
         }
         is VoiceCommand.PlanSaved -> "Vuoi consultare i pasti di quel giorno?"
+        is VoiceCommand.AutoPlan -> "Controlla il calendario: gli altri pasti già presenti non sono stati modificati."
         else -> "Puoi darmi un comando oppure concatenarne più di uno con «e poi»."
     }
 }
