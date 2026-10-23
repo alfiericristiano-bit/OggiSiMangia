@@ -49,6 +49,17 @@ jobs:
         run: |
           git fetch --no-tags --depth=1 origin refs/heads/feat/context-guide-pages-v1.12.0
           git worktree add --detach ../oggisimangia-previous FETCH_HEAD
+          # Apply the compiler-only fix in the disposable historical worktree;
+          # never modify the preserved 1.12 branch or its runtime behavior.
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path("../oggisimangia-previous/app/src/main/java/it/oggisimangia/app/MainActivity.kt")
+          content = path.read_text(encoding="utf-8")
+          old = 'contentDescription = "Apri guida della schermata " + title\\n            background = outlined(familyPale, 13f)'
+          new = 'contentDescription = "Apri guida della schermata " + title\\n            this.background = outlined(familyPale, 13f)'
+          assert content.count(old) == 1, "Historical guide compiler fix not found"
+          path.write_text(content.replace(old, new), encoding="utf-8")
+          PY
           (cd ../oggisimangia-previous && gradle --no-daemon :app:assembleDebug)
           mkdir -p build/update-check
           cp ../oggisimangia-previous/app/build/outputs/apk/debug/app-debug.apk build/update-check/previous-112-debug.apk
