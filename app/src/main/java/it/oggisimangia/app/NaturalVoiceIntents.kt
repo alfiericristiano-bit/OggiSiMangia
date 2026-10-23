@@ -144,14 +144,17 @@ object NaturalVoiceIntents {
                 "proponi", "proponimi", "idee", "idee per", "vorrei", "voglio", "cerco",
                 "qualcosa", "mostrami", "fammi vedere")
         if (searchGoal) {
+            // Preserve commas from the original transcript until splitting into
+            // fields; normalizing punctuation first would merge "pasta, pomodoro".
+            val original = spoken.lowercase(Locale.ITALIAN)
             val part = Regex("\\b(?:con|a base di|che contengono|usando|utilizzando)\\s+(.+)$")
-                .find(s)?.groupValues?.getOrNull(1)
+                .find(original)?.groupValues?.getOrNull(1)
             if (part != null) {
-                val raw = part.replace(Regex("\\s+(?:per\\s+)?(?:oggi|domani|dopodomani|stasera)$"), "")
-                    .replace(Regex("\\s+(?:a|per)\\s+(?:pranzo|cena)$"), "")
+                val raw = part.replace(Regex("\\s+(?:per\\s+)?(?:oggi|domani|dopodomani|stasera)[.?!]*$"), "")
+                    .replace(Regex("\\s+(?:a|per)\\s+(?:pranzo|cena)[.?!]*$"), "")
                     .trim()
-                val values = raw.split(Regex("\\s*(?:,|\\s+e\\s+)\\s*"))
-                    .map { it.trim() }.filter { it.isNotBlank() }.distinct().take(10)
+                val values = raw.split(Regex("\\s*(?:,|;|\\s+e\\s+)\\s*"))
+                    .map(::normalize).filter(String::isNotBlank).distinct().take(10)
                 if (values.isNotEmpty()) return if (meal != null) {
                     VoiceCommand.GuidedMealSearch(values, meal, day)
                 } else VoiceCommand.Search(values)
