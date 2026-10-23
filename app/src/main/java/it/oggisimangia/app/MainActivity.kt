@@ -2510,6 +2510,79 @@ class MainActivity : Activity() {
     }
 
 
+    /**
+     * Voice controls only the same currently rendered, clickable buttons as a
+     * person's tap. No shell/accessibility privileges, hidden routes or inferred
+     * mutations. Unsafe/destructive buttons are not voice-activated.
+     */
+    private fun voicePressButton(target: String, done: (String) -> Unit) {
+        val buttons = mutableListOf<Button>()
+        fun collect(root: View) {
+            if (root is Button && root.isEnabled && root.isShown && root.hasOnClickListeners()) {
+                buttons.add(root)
+            }
+            if (root is android.view.ViewGroup) {
+                for (i in 0 until root.childCount) collect(root.getChildAt(i))
+            }
+        }
+        if (!::screenRoot.isInitialized) {
+            done("Impossibile individuare la schermata attiva.")
+            return
+        }
+        collect(screenRoot)
+        val labels = buttons.map { button ->
+            button.contentDescription?.toString()?.takeIf { it.isNotBlank() }
+                ?: button.text.toString()
+        }
+        val indices = VoiceUiMatcher.matchingIndices(target, labels)
+        if (indices.isEmpty()) {
+            done("Impossibile trovare un pulsante corrispondente a «$target» in questa schermata. " +
+                "Puoi aprire la sezione necessaria oppure specificare il nome del pulsante.")
+            return
+        }
+        if (indices.size != 1) {
+            val options = indices.take(4).joinToString(", ") { labels[it] }
+            done("Impossibile scegliere fra pulsanti simili: $options. " +
+                "Indica il nome più preciso.")
+            return
+        }
+        val matched=indices.single()
+        if (VoiceUiMatcher.isUnsafe(labels[matched]) || VoiceUiMatcher.isUnsafe(target)) {
+            done("Impossibile eseguire un comando distruttivo soltanto con la voce. " +
+                "Usa il pulsante e conferma sullo schermo per proteggere i dati.")
+            return
+        }
+        // The button's own listener performs exactly the operation offered in UI.
+        val clicked = buttons[matched].performClick()
+        done(if (clicked) "Ho selezionato «${labels[matched]}»." else
+            "Impossibile attivare «${labels[matched]}». Riprova dalla schermata.")
+    }
+
+    private fun voiceSetFilter(command: VoiceCommand.SetFilter, done: (String) -> Unit) {
+        val source = when (command.kind) {
+            VoiceCommand.Filter.CATEGORY -> categories.toList()
+            VoiceCommand.Filter.TYPE -> RecipeTypeFilter.options.toList()
+            VoiceCommand.Filter.DIFFICULTY -> difficulties.toList()
+            VoiceCommand.Filter.DURATION -> durations.toList()
+        }
+        val choice = source.firstOrNull {
+            NaturalVoiceIntents.normalize(it) == NaturalVoiceIntents.normalize(command.value)
+        }
+        if (choice == null) {
+            done("Impossibile impostare «${command.value}»: scelta non disponibile. " +
+                "Valori possibili: ${source.joinToString(", ")}.")
+            return
+        }
+        when(command.kind) {
+            VoiceCommand.Filter.CATEGORY -> searchCategory = choice
+            VoiceCommand.Filter.TYPE -> searchType = choice
+            VoiceCommand.Filter.DIFFICULTY -> searchDifficulty = choice
+            VoiceCommand.Filter.DURATION -> searchDuration = choice
+        }
+        showSearch()
+        done("Filtro aggiornato: ${choice}. Puoi aggiungere altri filtri oppure cercare.")
+    }
+
     /** Execute only actions registered in the allowlist; always call done after user choices. */
     private fun executeVoiceCommand(command: VoiceCommand, done: (String) -> Unit) {
         when (command) {
@@ -2568,6 +2641,8 @@ class MainActivity : Activity() {
                 }
                 done(message)
             }
+            is VoiceCommand.PressButton -> voicePressButton(command.target, done)
+            is VoiceCommand.SetFilter -> voiceSetFilter(command, done)
             is VoiceCommand.PlanSaved -> voicePlanSaved(command, done)
             is VoiceCommand.AutoPlan -> voiceAutoPlan(command, done)
             VoiceCommand.Help -> {
