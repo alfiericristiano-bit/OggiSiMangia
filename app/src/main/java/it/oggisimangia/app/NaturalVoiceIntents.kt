@@ -189,8 +189,10 @@ object NaturalVoiceIntents {
         // Flexible page navigation aliases, no hidden app/system operations.
         if (present(s,"ricettario","archivio", "ricette salvate", "raccolta ricette",
                 "ricette personali", "mie ricette") &&
-            present(s,"apri","mostra","vedere","vediamo","consulta","consultare",
-                "fammi","portami","vai","voglio","vorrei","ritorna","torna","aprimi","andiamo"))
+            !present(s, "pianifica", "aggiungi", "organizza", "cancella", "elimina") &&
+            (present(s,"apri","mostra","mostrami","vedere","vediamo","consulta","consultare",
+                "fammi","portami","vai","voglio","vorrei","ritorna","torna","aprimi","andiamo") ||
+                s.matches(Regex("(?:le|mie|il)?\\s*(?:mie\\s+)?(?:ricette salvate|ricettario|archivio)"))))
             return VoiceCommand.Open(VoiceCommand.Destination.ARCHIVE)
         if (present(s,"siti", "fonti", "priorita", "sorgenti") &&
             present(s,"apri","mostra","gestisci","configura","vedere","cambia","modifica",
