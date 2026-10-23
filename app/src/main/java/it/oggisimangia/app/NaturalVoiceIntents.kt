@@ -66,6 +66,20 @@ object NaturalVoiceIntents {
             }
         }
 
+        val ingredientFields = Regex("^(?:imposta|metti|inserisci|scrivi|indica)\\s+" +
+            "(?:come\\s+)?(?:l\\s+)?(?:ingrediente\\s+principale|ingredienti)\\s+" +
+            "(.+)$").matchEntire(s)
+        if (ingredientFields != null) {
+            val terms = ingredientFields.groupValues[1]
+                .split(Regex("\\s*(?:,|\\s+e\\s+)\\s*"))
+                .map(String::trim).filter(String::isNotBlank).distinct().take(10)
+            if (terms.isNotEmpty()) return VoiceCommand.SetIngredients(terms)
+        }
+        if (s.matches(Regex("(?:aggiungi|inserisci|crea|voglio|metti)\\s+" +
+            "(?:un|un altro|un nuovo|piu)?\\s*ingrediente(?:\\s+vuoto)?"))) {
+            return VoiceCommand.PressButton("ingrediente")
+        }
+
         // Filtering is a deterministic operation on supported UI filter values.
         val filter = Regex("\\b(?:imposta|metti|seleziona|scegli|applica|filtra|cambia|preferisco|voglio)\\b")
             .containsMatchIn(s) && (present(s, "filtro", "filtri", "difficolta", "tempo", "durata",
@@ -126,7 +140,7 @@ object NaturalVoiceIntents {
 
         // Natural requests for an ingredient search, with more than one verb.
         val searchGoal = present(s, "ricette", "ricetta", "piatti", "piatto", "cucinare", "preparare") &&
-            present(s, "cerca", "cercami", "trova", "trovami", "consiglia", "consigliami",
+            present(s, "cerca", "cercami", "trova", "trovami", "trovi", "consiglia", "consigliami",
                 "proponi", "proponimi", "idee", "idee per", "vorrei", "voglio", "cerco",
                 "qualcosa", "mostrami", "fammi vedere")
         if (searchGoal) {
@@ -173,7 +187,7 @@ object NaturalVoiceIntents {
         if (present(s,"ricettario","archivio", "ricette salvate", "raccolta ricette",
                 "ricette personali", "mie ricette") &&
             present(s,"apri","mostra","vedere","vediamo","consulta","consultare",
-                "fammi","portami","vai","voglio","vorrei","ritorna","torna"))
+                "fammi","portami","vai","voglio","vorrei","ritorna","torna","aprimi","andiamo"))
             return VoiceCommand.Open(VoiceCommand.Destination.ARCHIVE)
         if (present(s,"siti", "fonti", "priorita", "sorgenti") &&
             present(s,"apri","mostra","gestisci","configura","vedere","cambia","modifica",
