@@ -226,10 +226,24 @@ assert any('printspooler' in n.attrib.get('package','') for n in print_ui), 'And
 adb('shell','input','keyevent','KEYCODE_BACK')
 print('PASS: native multipage PDF generated and Android print service opened without submitting a print job.')
 
+def open_calendar_search():
+    # The AI-enhanced toolbar and calendar may place "Cerca ricetta"
+    # beneath the visible fold on smaller screens.
+    for attempt in range(14):
+        nodes = snapshot('calendar-search-visible')
+        button = next((n for n in nodes if 'Cerca ricetta' in n.attrib.get('text','')
+            and n.attrib.get('clickable') == 'true' and
+            n.attrib.get('bounds') != '[0,0][0,0]'), None)
+        if button is not None:
+            tap(button)
+            return
+        adb('shell','input','swipe','160','530','160','220','300')
+    raise AssertionError('Calendar search action not reachable after scrolling')
+
 # Configure source priorities and a custom domain, then verify persistence after process restart.
 home=restart_home('preferences-home')
 assert not any(n.attrib.get('text')=='Come funziona il calendario' for n in home), 'Help opt-out was not saved'
-tap(next(n for n in home if 'Cerca' in n.attrib.get('text','') and n.attrib.get('clickable')=='true'))
+open_calendar_search()
 tap(find_scrolling('Priorità dei siti e nuove fonti','source-action'))
 settings=snapshot('source-settings')
 spinner=next(n for n in settings if n.attrib.get('content-desc','').startswith('1ª priorità:'))
@@ -252,7 +266,7 @@ confirm_delete=snapshot('source-delete-confirm')
 assert any(n.attrib.get('text') == 'Eliminare il sito?' for n in confirm_delete)
 tap(text_node(confirm_delete,'Elimina sito'))
 home=restart_home('persist-home')
-tap(next(n for n in home if 'Cerca' in n.attrib.get('text','') and n.attrib.get('clickable')=='true'))
+open_calendar_search()
 # The first ingredient row grows to ten independent fields.
 for index in range(1,11):
     current=snapshot('ingredients-'+str(index))

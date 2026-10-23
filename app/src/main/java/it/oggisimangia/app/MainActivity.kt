@@ -51,6 +51,7 @@ class MainActivity : Activity() {
     private var searchForDay = false
     private var selectedCategory = "Primo"
     private var searchIngredients = ""
+    private var searchNaturalPrompt = ""
     private var searchDifficulty = "Facile"
     private var searchDuration = "Veloce"
     private var searchCategory = "Primo"
@@ -121,6 +122,11 @@ class MainActivity : Activity() {
         db = RecipeDb(this)
         sourcePreferences = SourcePreferences(this)
         RecipeSources.configure(sourcePreferences.load())
+        // Remove only the obsolete voice-only FunctionGemma model stored by
+        // earlier betas. Never touch recipes, photos, OCR or backup files.
+        listOf("functiongemma.litertlm", "functiongemma.litertlm.pending").forEach { name ->
+            File(filesDir, "local-ai/$name").takeIf { it.isFile }?.delete()
+        }
         nano = LocalNanoAssistant(this)
         nano.refresh()
         window.statusBarColor = Color.rgb(45, 91, 61)
@@ -187,6 +193,16 @@ class MainActivity : Activity() {
             setTextColor(Color.rgb(82, 103, 76))
             gravity = Gravity.CENTER
         })
+        if (title.isNotBlank()) {
+            layout.addView(Button(this).apply {
+                text = "? Guida"
+                isAllCaps = false
+                contentDescription = "Apri guida di OggiSiMangia"
+                setTextColor(Color.rgb(21, 123, 52))
+                background = outlined(Color.WHITE, 14f)
+                setOnClickListener { GuideDialog.show(this@MainActivity) }
+            }, LinearLayout.LayoutParams(dp(132), dp(46)).apply { topMargin = dp(9) })
+        }
         val image = ImageView(this).apply {
             setImageResource(R.drawable.app_icon_clean)
             contentDescription = "Calendario, pasta e basilico di OggiSiMangia"
@@ -334,6 +350,16 @@ class MainActivity : Activity() {
             setTextColor(Color.rgb(88, 103, 94)); maxLines = 2
         })
         hero.addView(headerText, LinearLayout.LayoutParams(0, -2, 1f))
+        // Contextual help is a non-destructive overlay, preserving unfinished edits.
+        hero.addView(Button(this).apply {
+            text = "? Guida"
+            isAllCaps = false
+            textSize = 12f
+            setTextColor(familyDeep)
+            contentDescription = "Apri guida della schermata " + title
+            this.background = outlined(familyPale, 13f)
+            setOnClickListener { GuideDialog.show(this@MainActivity, key) }
+        }, LinearLayout.LayoutParams(dp(70), dp(46)).apply { marginStart = dp(5) })
         content.addView(hero, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(9) })
         if (key != "calendar") {
             val back = Button(this).apply {
@@ -382,7 +408,7 @@ class MainActivity : Activity() {
         })
     }
 
-    private fun primaryAction(value: String, onClick: () -> Unit) {
+    private fun primaryAction(value: String, onClick: () -> Unit): Button {
         val btn = Button(this).apply {
             text = value; isAllCaps = false; textSize = 16f
             setTypeface(null, Typeface.BOLD)
@@ -397,6 +423,7 @@ class MainActivity : Activity() {
         content.addView(btn, LinearLayout.LayoutParams(-1, dp(54)).apply {
             topMargin = dp(7); bottomMargin = dp(9)
         })
+        return btn
     }
 
     /** Two related actions on one row; 48 dp touch targets remain accessible. */
@@ -1238,12 +1265,13 @@ class MainActivity : Activity() {
     }
 
     private fun showAiSettings() {
-        screen("AI locale e privacy", "Funziona sul telefono, senza servizi AI cloud.",
+        screen("AI ricerca e OCR", "Nessun assistente vocale; ricerca e OCR disponibili.",
             "ai-settings") { showAiSettings() }
-        label("🤖 Intelligenza artificiale sul dispositivo", 19f, true)
+        label("✨ AI per ricerca e riconoscimento ricette", 19f, true)
         label(nano.statusText(), 15f, true)
+        label(DeviceAiSupport.report(nano), 14f)
         val enabled = CheckBox(this).apply {
-            text = "Usa automaticamente Gemini Nano, quando presente"
+            text = "Usa Gemini Nano per ricerca testuale e OCR, quando disponibile"
             isChecked = nano.enabled
             setOnCheckedChangeListener { _, checked ->
                 nano.enabled = checked
@@ -1251,10 +1279,12 @@ class MainActivity : Activity() {
             }
         }
         content.addView(enabled)
-        label("Le foto vengono elaborate dall'OCR ML Kit sul telefono. " +
-            "Gemini Nano, se supportato, riorganizza soltanto il testo OCR, " +
-            "senza caricare immagini o ricette sui server AI. " +
-            "Non è attiva alcuna AI online, né è necessaria una chiave API.", 14f)
+        label("La ricerca multisito mantiene filtri, priorità e ordinamento intelligente. " +
+            "Nella schermata Cerca ricetta puoi descrivere per iscritto cosa cucinare: " +
+            "Gemini Nano, se compatibile, aiuta a individuare gli ingredienti; " +
+            "altrimenti si usa l'analisi locale del testo. " +
+            "ML Kit OCR rimane attivo e Nano può migliorarne i risultati. " +
+            "Nessun dato viene inviato a servizi AI cloud.", 14f)
         label("Il modello può essere grande: NON viene mai avviato un download " +
             "da OggiSiMangia senza il tuo consenso esplicito e una connessione Wi-Fi " +
             "non a consumo. Non è possibile utilizzare automaticamente ogni AI " +
@@ -1432,12 +1462,55 @@ class MainActivity : Activity() {
         )
     }
 
-    private fun showSearch() {
+    private fun showSearch(autoSearch: Boolean = false) {
         screen("Cerca ricetta", "Scopri nuove ricette dai tuoi ingredienti.",
             "search") { showSearch() }
         label("Giorno scelto: " + selectedDate.format(dateFormatter), 16f, true)
         if (searchForDay) label(selectedMeal + " · " + if (selectedAlternative) "Alternativa" else "Principale", 16f, true)
         actionRow("🔗 Ho un link", { showRecipeLink() }, "📅 Pasti del giorno", { showCalendar() })
+        label("✨ AI per cercare ricette (testo, senza microfono)", 17f, true)
+        label("Scrivi liberamente cosa vuoi cucinare. L'AI locale, se supportata " +
+            "dal telefono, ti aiuta a riconoscere gli ingredienti. Altrimenti l'app " +
+            "li ricava direttamente dal testo. Potrai controllarli prima della ricerca.", 13f)
+        val naturalRequest = EditText(this).apply {
+            hint = "Es. Vorrei pasta con melanzane e pomodoro"
+            contentDescription = "Descrivi in testo la ricetta che cerchi"
+            setSingleLine(false)
+            maxLines = 3
+            textSize = 15f
+            setText(searchNaturalPrompt)
+            setPadding(dp(12), dp(9), dp(12), dp(9))
+            background = outlined(Color.WHITE, 13f)
+        }
+        content.addView(naturalRequest, LinearLayout.LayoutParams(-1, -2).apply {
+            bottomMargin = dp(5)
+        })
+        action("✨ AI · Interpreta richiesta scritta") {
+            val request = naturalRequest.text.toString().trim()
+            if (request.isBlank()) {
+                naturalRequest.error = "Scrivi cosa vorresti cucinare"
+            } else {
+                searchNaturalPrompt = request
+                val fallback = RecipeSearchIntent.ingredients(request)
+                fun populate(values: List<String>) {
+                    if (currentPageKey != "search" || isFinishing || isDestroyed) return
+                    if (values.isEmpty()) {
+                        Toast.makeText(this,
+                            "Indica almeno un ingrediente, per esempio pasta e melanzane.",
+                            Toast.LENGTH_LONG).show()
+                        return
+                    }
+                    searchIngredients = values.joinToString(", ")
+                    showSearch()
+                    Toast.makeText(this,
+                        "Ingredienti individuati: ${values.joinToString(", ")}. Controlla e premi Cerca ricette.",
+                        Toast.LENGTH_LONG).show()
+                }
+                nano.suggestSearchIngredients(request) { proposed ->
+                    runOnUiThread { populate(proposed ?: fallback) }
+                }
+            }
+        }
         label("Quali ingredienti hai a disposizione?", 17f, true)
         label("Primo campo: ingrediente principale obbligatorio (es. pasta, riso, pollo, patate). Massimo 10 ingredienti: gli altri sono preferenze; le ricette con corrispondenza parziale vengono segnalate.", 13f)
         val ingredients = IngredientInputs(this, searchIngredients) { searchIngredients = it }
@@ -1456,7 +1529,7 @@ class MainActivity : Activity() {
         }
         label("Ingrediente principale obbligatorio. Le ricette con tutti gli ingredienti sono preferite; quelle parziali mostrano le differenze. Il filtro vegetariano/vegano e i filtri allergeni sono indicativi, non certificazioni.", 13f)
 
-        primaryAction("⌕  Cerca ricette") search@{
+        val searchButton = primaryAction("⌕  Cerca ricette") search@{
             searchIngredients = ingredients.query() ?: return@search
             searchResultGeneration++
             val generation = searchResultGeneration
@@ -1502,6 +1575,7 @@ class MainActivity : Activity() {
                 }
             }.start()
         }
+        if (autoSearch) searchButton.post { if (searchButton.isAttachedToWindow) searchButton.performClick() }
         actionRow("↻ Azzera ingredienti", {
             searchIngredients = ""
             showSearch()
@@ -1602,7 +1676,10 @@ class MainActivity : Activity() {
                 bottomMargin = dp(5)
             })
         }
-        action("🤖 Impostazioni AI locale e privacy") { showAiSettings() }
+        action("❔ Guida completa: spiegazioni di schede e pulsanti") {
+            GuideDialog.show(this)
+        }
+        action("✨ Impostazioni AI ricerca e OCR") { showAiSettings() }
         action("Ripristina siti e ordine iniziali") {
             val restored = LinkedHashMap(RecipeSources.defaults)
             RecipeSources.sites.forEach { (name,domain) -> if (domain !in restored.values) restored[name] = domain }
@@ -2336,6 +2413,7 @@ class MainActivity : Activity() {
         resized.recycle()
         return file.absolutePath
     }
+
 
     override fun onDestroy() {
         nano.close()
