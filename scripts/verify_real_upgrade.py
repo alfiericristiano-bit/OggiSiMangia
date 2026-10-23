@@ -1,4 +1,4 @@
-"""Prepare and verify a signed Android APK upgrade from the preserved 1.12 branch.
+"""Prepare and verify a signed Android APK upgrade from the preserved beta3 branch.
 Called before and after adb install -r; never deletes user data.
 """
 import re
@@ -26,7 +26,7 @@ if sys.argv[1]=="seed":
             '["/photos/preupgrade.jpg"]','[]','Ricetta fotografata',
             'Non perdere questo testo','10 min','18 min','4 persone')""")
         db.commit()
-    print("PASS: seeded realistic 1.12 SQLite recipe fixture")
+    print("PASS: seeded realistic beta3 SQLite recipe fixture")
 elif sys.argv[1]=="check":
     with sqlite3.connect(path) as db:
         row=db.execute("""SELECT day,meal,title,ingredients,instructions,imagePath,
@@ -37,6 +37,6 @@ elif sys.argv[1]=="check":
         assert row==expected, f"Recipe content changed/lost during APK upgrade: {row}"
         assert db.execute("PRAGMA integrity_check").fetchone()[0]=="ok"
         assert db.execute("PRAGMA user_version").fetchone()[0]==int(version.group(1))
-    print("PASS: 1.12 -> 1.13 signed APK update preserves full SQLite recipe, OCR, notes, timestamps and photo references")
+    print("PASS: beta3 -> beta4 signed APK update preserves full SQLite recipe, OCR, notes, timestamps and photo references")
 else:
     raise SystemExit("Usage: verify_real_upgrade.py seed|check")
