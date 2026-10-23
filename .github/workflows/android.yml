@@ -55,8 +55,8 @@ jobs:
           from pathlib import Path
           path = Path("../oggisimangia-previous/app/src/main/java/it/oggisimangia/app/MainActivity.kt")
           content = path.read_text(encoding="utf-8")
-          old = 'contentDescription = "Apri guida della schermata " + title\\n            background = outlined(familyPale, 13f)'
-          new = 'contentDescription = "Apri guida della schermata " + title\\n            this.background = outlined(familyPale, 13f)'
+          old = 'contentDescription = "Apri guida della schermata " + title\n            background = outlined(familyPale, 13f)'
+          new = 'contentDescription = "Apri guida della schermata " + title\n            this.background = outlined(familyPale, 13f)'
           assert content.count(old) == 1, "Historical guide compiler fix not found"
           path.write_text(content.replace(old, new), encoding="utf-8")
           PY
