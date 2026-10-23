@@ -2,6 +2,8 @@
 (function () {
   "use strict";
   const STORAGE = "oggisimangia_web_preview_v1";
+  const GUIDE_PAGES = [["start","Come iniziare","Tutte le funzioni principali in parole semplici.",[["Calendario","Scegli la data e controlla pranzo e cena."],["Ricettario","Consulta e gestisci le tue ricette."],["Scrivi ricetta","Crea la scheda di un piatto."],["Fonti di ricerca","Ordina i siti da consultare."],["Guida","Riapri questa spiegazione in qualsiasi momento, senza perdere i dati inseriti."]],"L'anteprima web è separata dall'app Android."],["calendar","Calendario","Un tocco seleziona il giorno; la pressione prolungata serve per aggiungere una ricetta.",[["‹ e ›","Passa al mese precedente o successivo."],["Data","Tocca per selezionare il giorno; tieni premuto per pianificare un piatto."],["Puntini sul giorno","Indicano pranzo o cena pianificati."],["Cerca ricetta / Nuova","In Android puoi cercare sul web o aggiungere una ricetta."],["Pranzo / Cena","Espandi una sezione per mostrare i piatti."],["Oggi","Ritorna al giorno attuale."],["Svuota giorno","Toglie la pianificazione, senza eliminare le ricette."]],"Tieni premuto il giorno per scegliere Pranzo/Cena e Principale/Alternativa."],["search","Ricerca per ingredienti","La ricerca completa sui siti è disponibile nell'APK Android.",[["Ingrediente principale","Il primo ingrediente, obbligatorio, deve esserci nella ricetta."],["+ Ingrediente","Aggiungi fino a nove altri ingredienti."],["Portata","Primo, secondo, contorno, piatto unico, dolce e altro."],["Tipologia","Vegetariana, vegana, carne, pesce e ulteriori preferenze."],["Difficoltà / Tempo","Indica le preferenze; i risultati non corrispondenti sono segnalati."],["Cerca ricette","Mostra le proposte trovate sulle fonti disponibili."]],"L'anteprima web filtra soltanto il ricettario dimostrativo, senza interrogare i siti."],["results","Risultati e ricette online","Nell'APK i risultati sono separati per sito e si possono sfogliare.",[["Sfoglia sito","Vedi le ricette recuperate da quella fonte."],["Prossime 10","Carica la pagina successiva di proposte."],["Corrispondenza completa","Sono stati verificati tutti gli ingredienti richiesti."],["Corrispondenza parziale","Mancano alcuni ingredienti secondari."],["Da controllare","Non è stato possibile leggere automaticamente la ricetta."],["Apri ricetta","Mostra la scheda e il link diretto, non un indice generico."],["Salva / Pianifica","Memorizza la ricetta o assegnala a un giorno."]],"Controlla sempre gli ingredienti sulla pagina originale."],["archive","Ricettario","Qui sono raccolte le ricette salvate.",[["Cerca","Filtra usando il nome del piatto."],["Ingredienti","Trova le ricette che contengono i termini richiesti."],["Categoria / Tipologia","Limita le ricette per portata o preferenze alimentari."],["Applica filtri","Aggiorna l'elenco."],["Apri","Leggi ingredienti, preparazione, dosi, foto e note."],["Pianifica / Clona","Assegna la ricetta anche ad altri giorni."],["Modifica / Elimina","Cambia o elimina una scheda, dopo conferma."]],"Eliminare una ricetta dal ricettario è diverso da toglierla solo da un giorno."],["editor","Nuova ricetta","Puoi trascrivere la ricetta e conservarla nel tuo ricettario.",[["Nome","Scrivi il nome del piatto."],["Ingredienti","Una riga per ingrediente, con quantità."],["Preparazione","Scrivi i passaggi in ordine."],["Tempi / Difficoltà","Inserisci i dettagli per rifare il piatto."],["Fotocamera / Galleria","Aggiungi immagini."],["Aggiungi al calendario","Scegli se pianificare subito la ricetta."],["Salva","Conserva la ricetta nella memoria dell'app."]],"Le funzionalità OCR fotografiche complete sono presenti soltanto nell'APK Android."],["ocr","Scansione delle riviste (OCR)","In Android la scansione OCR avviene con fotografie guidate e ML Kit sul telefono.",[["1. Pagina intera","Fotografa tutta la ricetta, anche su più pagine."],["2. Ingredienti","Fotografa da vicino quantità e simboli dell'elenco."],["3. Preparazione","Riprendi tutti i passaggi, anche su più foto."],["4. Dati tecnici","Fotografa tempi, difficoltà e dosi."],["Testo OCR","Controlla e correggi il testo letto dalle fotografie."],["Ricostruisci campi","Propone titolo, ingredienti, preparazione e tempi."],["Usa come copertina","Scegli la foto del piatto da mostrare."]],"Gemini Nano aiuta solo se supportato dal telefono. Nell'anteprima web non vengono eseguiti OCR o AI."],["summary","Riepilogo","Una vista per tenere sotto controllo la pianificazione.",[["Giorni pianificati","Mostra quanti giorni hanno almeno un piatto."],["Pranzi / Cene","Visualizza i pasti organizzati."],["Apri il giorno","Torna al calendario nella data scelta."],["Statistiche","Mostra conteggi delle ricette e dei pasti."]],"Le alternative possono rientrare nei conteggi."],["sources","Siti e priorità","Decidi quali fonti usare e in che ordine.",[["Priorità","Sposta un sito in alto o in basso nell'elenco."],["Aggiungi sito","Inserisci il nome e il dominio HTTPS della nuova fonte."],["Elimina sito","Rimuovi una fonte dalla ricerca."],["Ripristina","Riporta i siti all'ordine iniziale."],["AI locale e privacy","Nell'APK puoi vedere lo stato di Gemini Nano."]],"L'anteprima non effettua la ricerca automatica nei siti esterni."],["ai","AI locale e privacy","L'APK mantiene OCR ML Kit anche senza Gemini Nano.",[["Usa automaticamente Nano","Attiva l'AI locale soltanto sui telefoni compatibili."],["Ricontrolla compatibilità","Verifica se il modello è accessibile."],["Installa Nano","Solo dopo conferma e con Wi-Fi non a consumo."],["OCR ML Kit","Rimane disponibile quando Nano non c'è."],["Verifica i campi","Controlla sempre ricetta e dosi proposte."]],"Nessuna foto o ricetta viene inviata a un servizio AI online. La prova web non usa Gemini Nano."],["pdf","PDF, stampa e conservazione","Le schede e i menù possono essere preparati per la stampa.",[["PDF del giorno","Crea il menù della data scelta."],["PDF ricetta","Prepara la scheda del singolo piatto."],["Salva PDF","Scegli la destinazione del file."],["Stampa","Apre il servizio di stampa se disponibile."],["Dati salvati","L'APK conserva ricette e foto in locale; Vercel usa dati di prova separati."]],"Nell'anteprima web puoi usare la stampa del browser."]];
+  let guidePage = -1;
   const DEFAULT_SOURCES = [
     ["GialloZafferano","giallozafferano.it"],["Il Cucchiaio d'Argento","cucchiaio.it"],
     ["Fatto in casa da Benedetta","fattoincasadabenedetta.it"],["Misya","misya.info"],
@@ -81,6 +83,32 @@
     dialog.showModal();
   }
   function closeModal() {if(dialog.open)dialog.close();}
+  function guideOpen(index) {
+    guidePage=Number.isInteger(index)?index:-1;
+    if(guidePage>=GUIDE_PAGES.length)guidePage=-1;
+    if(guidePage<0) {
+      modal("Guida di OggiSiMangia...",'<p>Scegli l\'argomento che vuoi capire. Quando chiudi torni alla stessa scheda, senza perdere i campi compilati.</p>'+
+        GUIDE_PAGES.map((page,i)=>button((i+1)+". "+escape(page[1])+" ›","guide-page","guide-choice",'data-index="'+i+'"')).join("")+
+        '<div class="guide-navigation">'+button("Chiudi guida","close-modal","soft")+'</div>');
+      return;
+    }
+    const page=GUIDE_PAGES[guidePage];
+    const steps=page[3].map(entry=>'<div class="guide-step"><strong>'+escape(entry[0])+'</strong><p>'+escape(entry[1])+'</p></div>').join("");
+    modal("Guida · "+(guidePage+1)+"/"+GUIDE_PAGES.length,
+      '<p class="kicker">CAPITOLO '+(guidePage+1)+'</p><h3>'+escape(page[1])+'</h3><p>'+escape(page[2])+'</p>'+
+      '<h4>Pulsanti e funzioni</h4>'+steps+
+      '<div class="notice">'+escape(page[4])+'</div>'+
+      '<div class="guide-navigation">'+button("☷ Indice","guide-index","soft")+
+      (guidePage>0?button("‹ Prima","guide-prev","soft"):"")+
+      (guidePage<GUIDE_PAGES.length-1?button("Dopo ›","guide-next","primary"):"")+
+      button("Chiudi","close-modal","soft")+'</div>');
+  }
+  function guideTopic() {
+    const topics={calendar:"calendar",archive:"archive",editor:"editor",detail:"archive",sources:"sources",planned:"summary",about:"start"};
+    const selected=topics[view]||"start";
+    return GUIDE_PAGES.findIndex(x=>x[0]===selected);
+  }
+
   function button(text,action,cls,extra) { return '<button type="button" class="btn '+(cls||"")+'" data-action="'+action+'" '+(extra||"")+'>'+text+'</button>'; }
   function field(name,title,value,opts) {
     opts=opts||{};
@@ -125,6 +153,21 @@
       button("Inizia a cucinare →","onboarding-start","primary intro-go")+'</section>';
   }
 
+  function aiPreviewStep() {
+    // Illustration of the Android beta5 suggestions: this web preview neither
+    // opens the microphone nor claims to run FunctionGemma.
+    const tips = {
+      calendar: "Vuoi cercare una ricetta per completare il menù?",
+      archive: "Apri una ricetta salvata: puoi modificarla o scegliere Pianifica.",
+      editor: "Controlla ingredienti e preparazione, poi salva la ricetta.",
+      detail: "Verifica ingredienti e tempi, poi scegli Pianifica o Modifica.",
+      sources: "Organizza le priorità delle fonti, poi torna alla ricerca.",
+      planned: "Apri il calendario per verificare i pasti programmati.",
+      about: "Nell'APK Android puoi parlare con l'AI e ricevere il prossimo passo."
+    };
+    return tips[view] || "Scegli una funzione per vedere i suggerimenti.";
+  }
+
   function render() {
     if(previousView!==null && view!==previousView && !restoringPage) {
       pageHistory.push({view:previousView,recipeId:previousRecipeId});
@@ -145,6 +188,11 @@
     else renderAbout();
     if(view!=="calendar"&&view!=="onboarding-name"&&view!=="onboarding-welcome") {
       app.insertAdjacentHTML("afterbegin",'<div class="app-backbar">'+button("‹ Indietro","go-back","back-pill")+'</div>');
+    }
+    if(view!=="onboarding-name" && view!=="onboarding-welcome") {
+      app.insertAdjacentHTML("afterbegin",
+        '<div class="ai-hint-preview">'+button("🤖 AI","ai-preview","ai-preview-button")+
+        '<span>'+escape(aiPreviewStep())+'</span></div>');
     }
     previousView=view;previousRecipeId=editingId;
   }
@@ -438,10 +486,10 @@
       '<div class="head-actions" style="margin-top:20px">'+button("👤 Cambia nome ("+escape(state.profileName||"non impostato")+")","edit-profile","soft")+button("↓ Esporta backup JSON","export-json","primary")+
       '<label class="btn">↑ Importa backup<input id="import-json" type="file" accept=".json,application/json" hidden></label>'+
       button("◐ Tema chiaro / scuro","toggle-theme")+
-      button("ⓘ Rivedi guida","show-help")+
+      button("❔ Guida completa","open-guide")+
       button("Reimposta i dati di prova","reset-data","danger")+'</div>'+
-      '<div class="notice" style="margin-top:14px"><strong>AI locale nell’app Android 1.11.0:</strong> Gemini Nano viene rilevato automaticamente soltanto sui telefoni compatibili. Il download richiede conferma e Wi-Fi non a consumo. L’OCR ML Kit rimane disponibile quando Nano non è supportato. Nessuna ricetta o fotografia viene inviata ad AI online. Questa anteprima web NON può usare Gemini Nano né simulare una scansione OCR reale: tali funzioni richiedono l’APK Android.</div>'+
-      '<p class="muted" style="font-size:12px;margin-top:18px">Ultima versione Android di riferimento: 1.11.0. L’anteprima è una simulazione smartphone distinta dall’APK.</p></section>';
+      '<div class="notice" style="margin-top:14px"><strong>AI locale nell’app Android beta5:</strong> Gemini Nano viene rilevato automaticamente soltanto sui telefoni compatibili. Il download richiede conferma e Wi-Fi non a consumo. L’OCR ML Kit rimane disponibile quando Nano non è supportato. Nessuna ricetta o fotografia viene inviata ad AI online. Questa anteprima web NON può usare Gemini Nano né simulare una scansione OCR reale: tali funzioni richiedono l’APK Android.</div>'+
+      '<p class="muted" style="font-size:12px;margin-top:18px">Ultima versione Android di riferimento: 1.13.0-beta5. L’anteprima è una simulazione smartphone distinta dall’APK.</p></section>';
   }
   function showHelp(force) {
     if(!force&&state.tipsHidden)return;
@@ -494,6 +542,21 @@
     const b=e.target.closest("[data-action]");if(!b)return;
     const action=b.dataset.action,id=b.dataset.id,aid=b.dataset.aid,idx=Number(b.dataset.index);
     if(action==="close-modal"){closeModal();return;}
+    if(action==="ai-preview"){
+      modal("🤖 Assistente AI · Anteprima",
+        '<p><strong>Passo suggerito:</strong> '+escape(aiPreviewStep())+'</p>'+
+        '<p>Questa è una simulazione del suggerimento. Nell’APK Android beta5 '+
+        'l’assistente ascolta in italiano, propone il passo successivo e accetta '+
+        'risposte «sì» e «no» senza premere nuovamente Parla.</p>'+
+        '<p>Il microfono e il modello AI locale non sono disponibili nella simulazione web.</p>'+
+        button("Chiudi","close-modal","primary"));
+      return;
+    }
+    if(action==="open-guide"){guideOpen(guideTopic());return;}
+    if(action==="guide-index"){guideOpen(-1);return;}
+    if(action==="guide-page"){guideOpen(idx);return;}
+    if(action==="guide-prev"){guideOpen(Math.max(0,guidePage-1));return;}
+    if(action==="guide-next"){guideOpen(Math.min(GUIDE_PAGES.length-1,guidePage+1));return;}
     if(action==="onboarding-continue"){
       const input=document.getElementById("onboard-name");
       const name=String(input?.value||"").trim().replace(/\s+/g," ");
