@@ -37,6 +37,6 @@ elif sys.argv[1]=="check":
         assert row==expected, f"Recipe content changed/lost during APK upgrade: {row}"
         assert db.execute("PRAGMA integrity_check").fetchone()[0]=="ok"
         assert db.execute("PRAGMA user_version").fetchone()[0]==int(version.group(1))
-    print("PASS: beta4 -> beta4 signed APK update preserves full SQLite recipe, OCR, notes, timestamps and photo references")
+    print("PASS: beta4 -> beta5 signed APK update preserves full SQLite recipe, OCR, notes, timestamps and photo references")
 else:
     raise SystemExit("Usage: verify_real_upgrade.py seed|check")
