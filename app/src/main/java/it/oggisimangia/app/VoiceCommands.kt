@@ -12,6 +12,7 @@ sealed interface VoiceCommand {
     data class ShowDay(val day: LocalDate) : VoiceCommand
     data class ReadMeals(val day: LocalDate, val meal: String?) : VoiceCommand
     data class PlanSaved(val title: String, val meal: String, val day: LocalDate) : VoiceCommand
+    data class AutoPlan(val meal: String, val start: LocalDate, val days: Int) : VoiceCommand
     data object Help : VoiceCommand
     data object Unknown : VoiceCommand
 
@@ -36,6 +37,24 @@ object VoiceCommands {
     fun parse(spoken: String, today: LocalDate = LocalDate.now()): VoiceCommand {
         val text = normalized(spoken).trim(' ', '.', '!', '?')
         if (text.isBlank()) return VoiceCommand.Unknown
+        // Plan multiple days from the already saved local recipe archive, without
+        // browsing the web or making up recipes. Requires a bounded explicit count.
+        if (Regex("^(?:organizza|organizzami|pianifica|prepara|preparami|scegli|programma)\\b")
+                .containsMatchIn(text) &&
+            Regex("\\b(?:cene|pranzi)\\b").containsMatchIn(text) &&
+            Regex("\\bgiorni\\b").containsMatchIn(text)) {
+            val count = Regex("\\b(?:prossimi|per)\\s+(due|tre|quattro|cinque|sei|sette|[2-7])\\s+giorni\\b")
+                .find(text)?.groupValues?.getOrNull(1)
+            val number = when (count) {
+                "due" -> 2; "tre" -> 3; "quattro" -> 4; "cinque" -> 5
+                "sei" -> 6; "sette" -> 7; else -> count?.toIntOrNull()
+            }
+            if (number != null) return VoiceCommand.AutoPlan(
+                if (Regex("\\bcene\\b").containsMatchIn(text)) "Cena" else "Pranzo",
+                today.plusDays(1), number
+            )
+            return VoiceCommand.Unknown
+        }
         // Never interpret a destructive request as a harmless 'open' command just
         // because it happens to mention the archive, calendar or recipe sources.
         if (Regex("\\b(?:cancella|cancellami|elimina|eliminami|svuota|azzera|resetta|rimuovi|sovrascrivi|formatta)\\b")
