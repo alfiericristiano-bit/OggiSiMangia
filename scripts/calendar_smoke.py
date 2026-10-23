@@ -159,7 +159,7 @@ def find_clickable_containing(fragment, name):
                  and n.attrib.get('bounds') != '[0,0][0,0]']
         if matches:
             return matches[0]
-        adb('shell','input','swipe','170','580','170','220','320')
+        adb('shell','input','swipe','160','520','160','170','320')
     raise AssertionError('Missing clickable control after scrolling: '+fragment)
 
 def db_rows():
