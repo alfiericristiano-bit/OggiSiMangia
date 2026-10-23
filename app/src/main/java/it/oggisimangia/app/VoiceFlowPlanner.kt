@@ -80,6 +80,8 @@ object VoiceFlowPlanner {
             (if (command.ingredients.size > 1) " e ${command.ingredients.drop(1).joinToString(", ")}" else "")
         is VoiceCommand.ShowDay -> "Mostra calendario del ${command.day}"
         is VoiceCommand.ReadMeals -> "Leggi ${command.meal?.lowercase() ?: "pasti"} del ${command.day}"
+        is VoiceCommand.PressButton -> "Premi il pulsante «${command.target}» della schermata aperta"
+        is VoiceCommand.SetFilter -> "Imposta filtro ${command.kind.name.lowercase(Locale.ITALIAN)}: ${command.value}"
         is VoiceCommand.PlanSaved -> "Pianifica ${command.title} per ${command.meal.lowercase()} del ${command.day}"
         is VoiceCommand.AutoPlan -> "Organizza ${command.days} ${if (command.meal == "Cena") "cene" else "pranzi"} dal ${command.start} usando ricette già salvate"
         VoiceCommand.Help -> "Mostra i comandi disponibili"
@@ -97,6 +99,8 @@ object VoiceFlowPlanner {
             VoiceCommand.Destination.CALENDAR -> "Puoi chiedermi «cosa mangio domani?»."
             else -> "Puoi darmi un altro comando o una sequenza con «e poi»."
         }
+        is VoiceCommand.PressButton -> "Vuoi eseguire una delle altre azioni della schermata?"
+        is VoiceCommand.SetFilter -> "Vuoi impostare un altro filtro o avviare la ricerca?"
         is VoiceCommand.PlanSaved -> "Vuoi consultare i pasti di quel giorno?"
         is VoiceCommand.AutoPlan -> "Controlla il calendario: gli altri pasti già presenti non sono stati modificati."
         else -> "Puoi darmi un comando oppure concatenarne più di uno con «e poi»."
