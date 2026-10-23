@@ -122,6 +122,11 @@ class MainActivity : Activity() {
         db = RecipeDb(this)
         sourcePreferences = SourcePreferences(this)
         RecipeSources.configure(sourcePreferences.load())
+        // Remove only the obsolete voice-only FunctionGemma model stored by
+        // earlier betas. Never touch recipes, photos, OCR or backup files.
+        listOf("functiongemma.litertlm", "functiongemma.litertlm.pending").forEach { name ->
+            File(filesDir, "local-ai/$name").takeIf { it.isFile }?.delete()
+        }
         nano = LocalNanoAssistant(this)
         nano.refresh()
         window.statusBarColor = Color.rgb(45, 91, 61)
