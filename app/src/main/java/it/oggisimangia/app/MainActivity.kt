@@ -49,6 +49,12 @@ class MainActivity : Activity() {
     private var searchForDay = false
     private var selectedCategory = "Primo"
     private var searchIngredients = ""
+    private var dishMode = DishSearch.Mode.INGREDIENTS
+    private var dishCategory = "Primi piatti"
+    private var dishSubcategory = "Riso e risotti"
+    private var dishBase = ""
+    private var dishExtras = ""
+    private var dishRule = DishSearch.IngredientRule.PREFERRED
     private var searchDifficulty = "Facile"
     private var searchDuration = "Veloce"
     private var searchCategory = "Primo"
@@ -1299,12 +1305,76 @@ class MainActivity : Activity() {
         )
     }
 
+    private fun showDishSearch() {
+        screen("Cerca per piatto", "Scegli cosa cucinare oppure lasciati ispirare.",
+            "dish-search") { showDishSearch() }
+        actionRow("Per ingredienti", { dishMode = DishSearch.Mode.INGREDIENTS; showSearch() },
+            "Non so cosa cucinare", { dishMode = DishSearch.Mode.SURPRISE; showDishSearch() })
+        val surprise = dishMode == DishSearch.Mode.SURPRISE
+        label(if (surprise) "Non so cosa cucinare" else "Cerca per piatto", 18f, true)
+        label("Categoria e sottocategoria guidano la ricerca. L'ingrediente base e gli altri ingredienti sono facoltativi.", 13f)
+        val categoryPicker = dropdown("Categoria", DishSearch.categories.map { it.name }.toTypedArray(), dishCategory)
+        val subs = DishSearch.categories.first { it.name == dishCategory }.subcategories
+        val subPicker = dropdown("Sottocategoria", subs.toTypedArray(),
+            if (dishSubcategory in subs) dishSubcategory else subs.first())
+        action("Aggiorna sottocategorie") {
+            dishCategory = categoryPicker.selectedItem.toString()
+            dishSubcategory = DishSearch.categories.first { it.name == dishCategory }.subcategories.first()
+            showDishSearch()
+        }
+        val baseInput = EditText(this).apply { hint = "Ingrediente base (facoltativo)"; setSingleLine(true); setText(dishBase) }
+        content.addView(baseInput)
+        val extraInput = EditText(this).apply { hint = "Altri ingredienti, separati da virgole"; setSingleLine(true); setText(dishExtras) }
+        content.addView(extraInput)
+        val rulePicker = dropdown("Ingredienti", arrayOf("Preferiti", "Obbligatori"),
+            if (dishRule == DishSearch.IngredientRule.REQUIRED) "Obbligatori" else "Preferiti")
+        primaryAction(if (surprise) "Sorprendimi" else "Cerca piatti") {
+            dishCategory = categoryPicker.selectedItem.toString()
+            dishSubcategory = subPicker.selectedItem.toString()
+            dishBase = baseInput.text.toString().trim()
+            dishExtras = extraInput.text.toString().trim()
+            dishRule = if (rulePicker.selectedItem.toString() == "Obbligatori")
+                DishSearch.IngredientRule.REQUIRED else DishSearch.IngredientRule.PREFERRED
+            val plan = DishSearch.plan(DishSearch.Request(
+                if (surprise) DishSearch.Mode.SURPRISE else DishSearch.Mode.DISH,
+                dishCategory, dishSubcategory, dishBase,
+                RecipeSearchQueries.terms(dishExtras), dishRule))
+            val query = plan.queries.firstOrNull() ?: return@primaryAction
+            // Existing search infrastructure remains responsible for site priority,
+            // validation, grouping and the recipe detail/calendar flow.
+            searchIngredients = if (plan.requiredIngredients.isNotBlank()) plan.requiredIngredients else query
+            searchResultGeneration++
+            val generation = searchResultGeneration
+            siteMorePages.clear()
+            siteResultsExhausted.clear()
+            lastSearchResults = emptyList()
+            val progress = AlertDialog.Builder(this).setTitle("Ricerca per piatto")
+                .setMessage("Consulto le fonti configurate...").setCancelable(false).create()
+            progress.show()
+            Thread {
+                val results = try {
+                    val collected = plan.queries.take(4).flatMap { term ->
+                        RecipeDiscovery.search(term, searchCategory, searchDifficulty, searchDuration)
+                    }.distinctBy { it.url.substringBefore('?').substringBefore('#') }
+                    RecipeRanking.orderFlexible(collected, searchIngredients)
+                } catch (_: Exception) { emptyList() }
+                runOnUiThread {
+                    if (isFinishing || isDestroyed) return@runOnUiThread
+                    progress.dismiss()
+                    if (generation == searchResultGeneration) showRecipeResults(results)
+                }
+            }.start()
+        }
+    }
+
     private fun showSearch() {
         screen("Cerca ricetta", "Scopri nuove ricette dai tuoi ingredienti.",
             "search") { showSearch() }
         label("Giorno scelto: " + selectedDate.format(dateFormatter), 16f, true)
         if (searchForDay) label(selectedMeal + " · " + if (selectedAlternative) "Alternativa" else "Principale", 16f, true)
         actionRow("🔗 Ho un link", { showRecipeLink() }, "📅 Pasti del giorno", { showCalendar() })
+        actionRow("Per piatto", { dishMode = DishSearch.Mode.DISH; showDishSearch() },
+            "Non so cosa cucinare", { dishMode = DishSearch.Mode.SURPRISE; showDishSearch() })
         label("Quali ingredienti hai a disposizione?", 17f, true)
         label("Primo campo: ingrediente principale obbligatorio (es. pasta, riso, pollo, patate). Massimo 10 ingredienti: gli altri sono preferenze; le ricette con corrispondenza parziale vengono segnalate.", 13f)
         val ingredients = IngredientInputs(this, searchIngredients) { searchIngredients = it }
