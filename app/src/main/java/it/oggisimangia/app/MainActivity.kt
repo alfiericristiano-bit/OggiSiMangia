@@ -58,6 +58,7 @@ class MainActivity : Activity() {
     private var dishExcluded = ""
     private var surprisePage = 0
     private var lastDishPlan: DishSearch.Plan? = null
+    private var lastDishMode = DishSearch.Mode.INGREDIENTS
     private var dishRule = DishSearch.IngredientRule.PREFERRED
     private var searchDifficulty = "Facile"
     private var searchDuration = "Veloce"
@@ -1325,11 +1326,6 @@ class MainActivity : Activity() {
         val subs = DishSearch.categories.first { it.name == dishCategory }.subcategories
         val subPicker = dropdown("Sottocategoria", subs.toTypedArray(),
             if (dishSubcategory in subs) dishSubcategory else subs.first())
-        action("Aggiorna sottocategorie") {
-            dishCategory = categoryPicker.selectedItem.toString()
-            dishSubcategory = DishSearch.categories.first { it.name == dishCategory }.subcategories.first()
-            showDishSearch()
-        }
         val baseInput = EditText(this).apply { hint = "Ingrediente base (facoltativo)"; setSingleLine(true); setText(dishBase) }
         content.addView(baseInput)
         val extraInput = EditText(this).apply { hint = "Altri ingredienti, separati da virgole"; setSingleLine(true); setText(dishExtras) }
@@ -1338,7 +1334,15 @@ class MainActivity : Activity() {
         content.addView(excludedInput)
         val rulePicker = dropdown("Ingredienti", arrayOf("Preferiti", "Obbligatori"),
             if (dishRule == DishSearch.IngredientRule.REQUIRED) "Obbligatori" else "Preferiti")
-        if (surprise) action("Altre idee") { surprisePage++; showDishSearch() }
+        if (surprise) action("Altre idee") {
+            dishCategory = categoryPicker.selectedItem.toString()
+            dishSubcategory = subPicker.selectedItem.toString()
+            dishBase = baseInput.text.toString()
+            dishExtras = extraInput.text.toString()
+            dishExcluded = excludedInput.text.toString()
+            surprisePage++
+            showDishSearch()
+        }
         primaryAction(if (surprise) "Sorprendimi" else if (byName) "Cerca per nome" else "Cerca piatti") {
             dishCategory = categoryPicker.selectedItem.toString()
             dishSubcategory = subPicker.selectedItem.toString()
@@ -1355,10 +1359,11 @@ class MainActivity : Activity() {
                 RecipeSearchQueries.terms(dishExtras), dishRule,
                 dishName, RecipeSearchQueries.terms(dishExcluded), surprisePage))
             lastDishPlan = plan
+            lastDishMode = dishMode
             val query = plan.queries.firstOrNull() ?: return@primaryAction
             // Existing search infrastructure remains responsible for site priority,
             // validation, grouping and the recipe detail/calendar flow.
-            searchIngredients = if (plan.requiredIngredients.isNotBlank()) plan.requiredIngredients else query
+            searchIngredients = plan.requiredIngredients.ifBlank { plan.preferredIngredients }
             searchResultGeneration++
             val generation = searchResultGeneration
             siteMorePages.clear()
@@ -1370,9 +1375,10 @@ class MainActivity : Activity() {
             Thread {
                 val results = try {
                     val collected = plan.queries.take(4).flatMap { term ->
-                        RecipeDiscovery.search(term, searchCategory, searchDifficulty, searchDuration)
+                        RecipeDiscovery.searchTopic(term, searchCategory, searchDifficulty, searchDuration)
                     }.distinctBy { it.url.substringBefore('?').substringBefore('#') }
-                    DishSearch.filterResults(RecipeRanking.orderFlexible(collected, searchIngredients), plan)
+                    DishSearch.rotateResults(DishSearch.filterResults(collected, plan),
+                        if (surprise) surprisePage else 0)
                 } catch (_: Exception) { emptyList() }
                 runOnUiThread {
                     if (isFinishing || isDestroyed) return@runOnUiThread
@@ -1410,6 +1416,7 @@ class MainActivity : Activity() {
         label("Ingrediente principale obbligatorio. Le ricette con tutti gli ingredienti sono preferite; quelle parziali mostrano le differenze. Il filtro vegetariano/vegano e i filtri allergeni sono indicativi, non certificazioni.", 13f)
 
         primaryAction("⌕  Cerca ricette") search@{
+            lastDishPlan = null
             lastDishPlan = null
             searchIngredients = ingredients.query() ?: return@search
             searchResultGeneration++
@@ -1624,10 +1631,23 @@ class MainActivity : Activity() {
         screen("Risultati per sito", "Ricette raggruppate per fonte, senza taglio globale a 10.",
             "recipe-sites") { showRecipeResults(lastSearchResults) }
         val visible = filterByType(items)
+        val dishPlan = lastDishPlan
+        if (dishPlan != null) {
+            label("Ricerca: " + when (lastDishMode) {
+                DishSearch.Mode.NAME -> "Per nome"
+                DishSearch.Mode.SURPRISE -> "Non so cosa cucinare"
+                else -> "Per piatto"
+            }, 15f, true)
+            if (dishPlan.excludedIngredients.isNotEmpty()) {
+                val unknown = visible.count { DishSearch.exclusionsUnverified(it, dishPlan) }
+                label("Ingredienti esclusi: " + dishPlan.excludedIngredients.joinToString(", "), 14f)
+                if (unknown > 0) label("$unknown ricette: esclusioni NON VERIFICATE, controllare gli ingredienti sul sito.", 14f, true)
+            }
+        }
         val confirmedCount = visible.count { it.verified }
         val completeCount = visible.count { it.verified &&
             RecipeValidation.containsEvery(it.ingredients, searchIngredients) }
-        label("Ingrediente principale: " + RecipeValidation.mainIngredient(searchIngredients), 15f, true)
+        if (dishPlan == null) label("Ingrediente principale: " + RecipeValidation.mainIngredient(searchIngredients), 15f, true)
         label("Tipologia richiesta: " + searchType, 14f, true)
         RecipeTypeFilter.warning(searchType).takeIf { it.isNotBlank() }?.let { label("⚠ " + it, 13f) }
         label(completeCount.toString() + " ricette con tutti gli ingredienti · " +

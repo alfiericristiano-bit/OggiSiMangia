@@ -52,6 +52,15 @@ object DishSearch {
             value.isNotBlank() && Regex("(?<![a-z])" + Regex.escape(value) + "(?![a-z])").containsMatchIn(ingredients)
         }
     }
+    fun exclusionsUnverified(recipe: WebRecipe, plan: Plan): Boolean =
+        plan.excludedIngredients.isNotEmpty() && recipe.ingredients.isBlank()
+
+    fun rotateResults(recipes: List<WebRecipe>, page: Int): List<WebRecipe> {
+        if (recipes.isEmpty()) return recipes
+        val offset = page.coerceAtLeast(0) % recipes.size
+        return recipes.drop(offset) + recipes.take(offset)
+    }
+
     fun filterResults(recipes: List<WebRecipe>, plan: Plan): List<WebRecipe> =
         recipes.filter { recipe ->
             !excluded(recipe, plan.excludedIngredients) &&

@@ -122,7 +122,7 @@ object RecipeDiscovery {
     }
 
     internal fun preview(html: String, link: String, site: String, ingredients: String,
-                         allowPartial: Boolean = false): WebRecipe? {
+                         allowPartial: Boolean = false, topicOnly: Boolean = false): WebRecipe? {
         if (!RecipeSources.trusted(link)) return null
         val recipe = schema(html) ?: return null // Reject articles and category pages.
         fun clean(s: String) = Jsoup.parse(s).text()
@@ -131,7 +131,7 @@ object RecipeDiscovery {
         val reader = RecipeReader.parse(recipe)
         val description = clean(recipe.optString("description")).take(240)
         if (!RecipeValidation.isDish(title, reader.ingredients, reader.original) ||
-            !(if (allowPartial) RecipeValidation.containsEvery(reader.ingredients,
+            !topicOnly && !(if (allowPartial) RecipeValidation.containsEvery(reader.ingredients,
                 RecipeValidation.mainIngredient(ingredients))
               else RecipeValidation.containsEvery(reader.ingredients, ingredients))) return null
         val relevance = RecipeRanking.relevance(reader.ingredients, ingredients)
@@ -198,8 +198,16 @@ object RecipeDiscovery {
         } finally { pool.shutdownNow() }
     }
 
-    fun search(ingredients: String, category: String, difficulty: String, duration: String): List<WebRecipe> {
-        val queries = RecipeSearchQueries.variants(ingredients)
+    fun searchTopic(topic: String, category: String, difficulty: String, duration: String): List<WebRecipe> =
+        searchInternal(topic, category, difficulty, duration, true)
+
+    fun search(ingredients: String, category: String, difficulty: String, duration: String): List<WebRecipe> =
+        searchInternal(ingredients, category, difficulty, duration, false)
+
+    private fun searchInternal(ingredients: String, category: String, difficulty: String,
+        duration: String, topicOnly: Boolean): List<WebRecipe> {
+        val queries = if (topicOnly) listOf(ingredients.trim()).filter { it.isNotBlank() }
+            else RecipeSearchQueries.variants(ingredients)
         val sites = RecipeSources.sites.toList()
         if (queries.isEmpty() || sites.isEmpty()) return emptyList()
         val executor = Executors.newFixedThreadPool(12)
@@ -231,19 +239,28 @@ object RecipeDiscovery {
                 .distinctBy { it.url.substringBefore('?').substringBefore('#').trimEnd('/') }
             val checks = candidates.map { candidate -> Callable {
                 try {
-                    preview(download(candidate.url), candidate.url, candidate.site, ingredients, allowPartial = true)
+                    preview(download(candidate.url), candidate.url, candidate.site, ingredients,
+                        allowPartial = true, topicOnly = topicOnly)
                 } catch (_: Exception) {
-                    pendingPreview(candidate, ingredients)
+                    if (topicOnly) WebRecipe(candidate.title, "", candidate.url, candidate.site, verified = false)
+                    else pendingPreview(candidate, ingredients)
                 }
             } }
             val futures = executor.invokeAll(checks, 43, TimeUnit.SECONDS)
             val all = futures.mapIndexedNotNull { index, future ->
                 try {
-                    if (future.isCancelled) pendingPreview(candidates[index], ingredients)
-                    else future.get()
-                } catch (_: Exception) { pendingPreview(candidates[index], ingredients) }
+                    if (future.isCancelled) {
+                        if (topicOnly) WebRecipe(candidates[index].title, "", candidates[index].url,
+                            candidates[index].site, verified = false)
+                        else pendingPreview(candidates[index], ingredients)
+                    } else future.get()
+                } catch (_: Exception) {
+                    if (topicOnly) WebRecipe(candidates[index].title, "", candidates[index].url,
+                        candidates[index].site, verified = false)
+                    else pendingPreview(candidates[index], ingredients)
+                }
             }
-            return RecipeRanking.orderFlexible(all, ingredients)
+            return if (topicOnly) all else RecipeRanking.orderFlexible(all, ingredients)
         } finally { executor.shutdownNow() }
     }
 }
