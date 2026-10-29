@@ -5,3 +5,14 @@ local.properties
 .idea/
 *.iml
 .DS_Store
+
+# Chiavi di firma, credenziali e configurazioni locali riservate
+*.jks
+*.keystore
+*.p12
+*.pfx
+.env
+.env.*
+*.secret
+signing.properties
+key.properties
