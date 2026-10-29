@@ -54,6 +54,10 @@ class MainActivity : Activity() {
     private var dishSubcategory = "Riso e risotti"
     private var dishBase = ""
     private var dishExtras = ""
+    private var dishName = ""
+    private var dishExcluded = ""
+    private var surprisePage = 0
+    private var lastDishPlan: DishSearch.Plan? = null
     private var dishRule = DishSearch.IngredientRule.PREFERRED
     private var searchDifficulty = "Facile"
     private var searchDuration = "Veloce"
@@ -1310,7 +1314,11 @@ class MainActivity : Activity() {
             "dish-search") { showDishSearch() }
         actionRow("Per ingredienti", { dishMode = DishSearch.Mode.INGREDIENTS; showSearch() },
             "Non so cosa cucinare", { dishMode = DishSearch.Mode.SURPRISE; showDishSearch() })
+        action("Cerca per nome del piatto") { dishMode = DishSearch.Mode.NAME; showDishSearch() }
         val surprise = dishMode == DishSearch.Mode.SURPRISE
+        val byName = dishMode == DishSearch.Mode.NAME
+        val nameInput = if (byName) EditText(this).apply { hint = "Nome del piatto"; setSingleLine(true); setText(dishName) } else null
+        if (nameInput != null) content.addView(nameInput)
         label(if (surprise) "Non so cosa cucinare" else "Cerca per piatto", 18f, true)
         label("Categoria e sottocategoria guidano la ricerca. L'ingrediente base e gli altri ingredienti sono facoltativi.", 13f)
         val categoryPicker = dropdown("Categoria", DishSearch.categories.map { it.name }.toTypedArray(), dishCategory)
@@ -1326,19 +1334,27 @@ class MainActivity : Activity() {
         content.addView(baseInput)
         val extraInput = EditText(this).apply { hint = "Altri ingredienti, separati da virgole"; setSingleLine(true); setText(dishExtras) }
         content.addView(extraInput)
+        val excludedInput = EditText(this).apply { hint = "Ingredienti da evitare (separati da virgole)"; setSingleLine(true); setText(dishExcluded) }
+        content.addView(excludedInput)
         val rulePicker = dropdown("Ingredienti", arrayOf("Preferiti", "Obbligatori"),
             if (dishRule == DishSearch.IngredientRule.REQUIRED) "Obbligatori" else "Preferiti")
-        primaryAction(if (surprise) "Sorprendimi" else "Cerca piatti") {
+        if (surprise) action("Altre idee") { surprisePage++; showDishSearch() }
+        primaryAction(if (surprise) "Sorprendimi" else if (byName) "Cerca per nome" else "Cerca piatti") {
             dishCategory = categoryPicker.selectedItem.toString()
             dishSubcategory = subPicker.selectedItem.toString()
+            dishName = nameInput?.text?.toString()?.trim() ?: dishName
+            if (byName && dishName.isBlank()) { nameInput?.error = "Inserisci il nome"; return@primaryAction }
+            dishExcluded = excludedInput.text.toString().trim()
             dishBase = baseInput.text.toString().trim()
             dishExtras = extraInput.text.toString().trim()
             dishRule = if (rulePicker.selectedItem.toString() == "Obbligatori")
                 DishSearch.IngredientRule.REQUIRED else DishSearch.IngredientRule.PREFERRED
             val plan = DishSearch.plan(DishSearch.Request(
-                if (surprise) DishSearch.Mode.SURPRISE else DishSearch.Mode.DISH,
+                if (surprise) DishSearch.Mode.SURPRISE else if (byName) DishSearch.Mode.NAME else DishSearch.Mode.DISH,
                 dishCategory, dishSubcategory, dishBase,
-                RecipeSearchQueries.terms(dishExtras), dishRule))
+                RecipeSearchQueries.terms(dishExtras), dishRule,
+                dishName, RecipeSearchQueries.terms(dishExcluded), surprisePage))
+            lastDishPlan = plan
             val query = plan.queries.firstOrNull() ?: return@primaryAction
             // Existing search infrastructure remains responsible for site priority,
             // validation, grouping and the recipe detail/calendar flow.
@@ -1356,7 +1372,7 @@ class MainActivity : Activity() {
                     val collected = plan.queries.take(4).flatMap { term ->
                         RecipeDiscovery.search(term, searchCategory, searchDifficulty, searchDuration)
                     }.distinctBy { it.url.substringBefore('?').substringBefore('#') }
-                    RecipeRanking.orderFlexible(collected, searchIngredients)
+                    DishSearch.filterResults(RecipeRanking.orderFlexible(collected, searchIngredients), plan)
                 } catch (_: Exception) { emptyList() }
                 runOnUiThread {
                     if (isFinishing || isDestroyed) return@runOnUiThread
@@ -1394,6 +1410,7 @@ class MainActivity : Activity() {
         label("Ingrediente principale obbligatorio. Le ricette con tutti gli ingredienti sono preferite; quelle parziali mostrano le differenze. Il filtro vegetariano/vegano e i filtri allergeni sono indicativi, non certificazioni.", 13f)
 
         primaryAction("⌕  Cerca ricette") search@{
+            lastDishPlan = null
             searchIngredients = ingredients.query() ?: return@search
             searchResultGeneration++
             val generation = searchResultGeneration
@@ -1618,7 +1635,7 @@ class MainActivity : Activity() {
         label(confirmedCount.toString() + " schede con ingredienti leggibili · " +
             (visible.size - confirmedCount) + " collegamenti da controllare", 16f, true)
         label("Ricette singole, ordinate per fonte e per ingrediente principale. La dicitura 'Da controllare' appare solo se non è stato possibile leggere la pagina: gli ingredienti secondari restano da verificare.", 13f)
-        actionRow("🔎 Modifica ricerca", { showSearch() },
+        actionRow("🔎 Modifica ricerca", { if (lastDishPlan == null) showSearch() else showDishSearch() },
             "⚙ Fonti e priorità", { showSourceSettings() })
         if (visible.isEmpty()) {
             label("Nessuna ricetta verificata per gli ingredienti indicati. Alcuni siti potrebbero bloccare la lettura automatica: puoi richiedere altre pagine per un sito oppure aprirlo manualmente.", 14f)
