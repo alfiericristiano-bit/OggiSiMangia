@@ -117,14 +117,16 @@ object RecipeFinder {
 
     private fun extract(doc: Document, source: String): List<WebRecipe> {
         val found = linkedMapOf<String, WebRecipe>()
-        for (anchor in doc.select("h2 a[href], h3 a[href], article a[href], .recipe-card a[href], [class*=recipe] a[href]")) {
-            val title = anchor.text().trim().replace(Regex("\\s+"), " ")
+        for (anchor in doc.select("h2 a[href], h3 a[href], h4 a[href], article a[href], .recipe-card a[href], [class*=recipe] a[href], a[href*=\"/ricetta/\"], a[href*=\"/ricette/\"]")) {
+            val title = anchor.text().ifBlank { anchor.attr("title") }.ifBlank { anchor.select("img").firstOrNull()?.attr("alt").orEmpty() }.trim().replace(Regex("\\s+"), " ")
             val url = anchor.absUrl("href")
             if (title.length !in 6..130 || !isTrusted(url) ||
                 !RecipeValidation.isLikelyRecipeLink(title, url) ||
                 url.contains("/ricerca-ricette/") || url.contains("/category/") ||
                 url.contains("/categorie/")) continue
             val host = Uri.parse(url).host?.lowercase().orEmpty()
+            val expectedDomain = RecipeSources.sites[source]?.lowercase().orEmpty()
+            if (expectedDomain.isBlank() || (host != expectedDomain && host != "www.$expectedDomain" && !host.endsWith(".$expectedDomain"))) continue
             if (source == "GialloZafferano" &&
                 host != "ricette.giallozafferano.it" && host != "www.giallozafferano.it") continue
 
