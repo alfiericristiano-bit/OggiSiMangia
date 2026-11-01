@@ -1377,8 +1377,10 @@ class MainActivity : Activity() {
                     val collected = plan.queries.take(4).flatMap { term ->
                         RecipeDiscovery.searchTopic(term, searchCategory, searchDifficulty, searchDuration)
                     }.distinctBy { it.url.substringBefore('?').substringBefore('#') }
-                    DishSearch.rotateResults(DishSearch.filterResults(collected, plan),
-                        if (surprise) surprisePage else 0)
+                    DishSearch.rotateResults(
+                        RecipeDiscovery.roundRobin(RecipeSources.sites.keys.map { site ->
+                            DishSearch.filterResults(collected.filter { it.source == site }, plan)
+                        }), if (surprise) surprisePage else 0)
                 } catch (_: Exception) { emptyList() }
                 runOnUiThread {
                     if (isFinishing || isDestroyed) return@runOnUiThread
@@ -1453,7 +1455,9 @@ class MainActivity : Activity() {
                             .values.map { duplicates -> duplicates.maxBy { r ->
                                 (if (r.rating != null) 2 else 0) + (if (r.feedbackCount != null) 2 else 0) + r.relevance
                             } }
-                        RecipeRanking.orderFlexible(unique, selectedIngredients)
+                        RecipeDiscovery.roundRobin(RecipeSources.sites.keys.map { site ->
+                            RecipeRanking.orderFlexible(unique.filter { it.source == site }, selectedIngredients)
+                        })
                     } finally { executor.shutdownNow() }
                 } catch (_: Exception) { emptyList() }
                 runOnUiThread {

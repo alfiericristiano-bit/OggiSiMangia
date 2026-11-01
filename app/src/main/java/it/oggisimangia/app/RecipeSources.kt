@@ -8,6 +8,7 @@ object RecipeSources {
         "Il Cucchiaio d'Argento" to "cucchiaio.it",
         "Fatto in Casa da Benedetta" to "fattoincasadabenedetta.it",
         "Misya" to "misya.info",
+        "ButtaLaPasta" to "buttalapasta.it",
         "Cookaround" to "cookaround.com",
         "La Cucina Italiana" to "lacucinaitaliana.it",
         "Tavolartegusto" to "tavolartegusto.it",

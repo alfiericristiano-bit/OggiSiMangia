@@ -38,12 +38,11 @@ object RecipeFinder {
     ): List<WebRecipe> {
         val queries = RecipeSearchQueries.variants(ingredients)
         if (queries.isEmpty()) return emptyList()
-        val sources = listOf("GialloZafferano", "Fatto in Casa da Benedetta",
-            "Il Cucchiaio d'Argento").filter { it in RecipeSources.sites }
+        val sources = RecipeSources.sites.keys.toList()
 
         // Fetch editorial sites in parallel: trying the comma fallback must not
         // triple the waiting time for a single offline/blocked site.
-        val sourcePool = java.util.concurrent.Executors.newFixedThreadPool(3)
+        val sourcePool = java.util.concurrent.Executors.newFixedThreadPool(6)
         val collected = try {
             val calls = sources.map { name -> java.util.concurrent.Callable {
                 val candidates = linkedMapOf<String, WebRecipe>()
