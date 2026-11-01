@@ -36,7 +36,8 @@ object RecipeSearchQueries {
                 encoded.replace("+", "%20") + "/"
             "Fatto in Casa da Benedetta" -> "https://www.fattoincasadabenedetta.it/?s=$encoded"
             "Il Cucchiaio d'Argento" -> "https://www.cucchiaio.it/?s=$encoded"
-            else -> error("Fonte diretta non supportata: $name")
+            "Misya" -> "https://www.misya.info/ricette-" + encoded.lowercase().replace("+", "-") + ".htm"
+            else -> "https://www.${RecipeSources.sites[name] ?: error("Fonte non configurata")}/?s=$encoded"
         }
     }
 }

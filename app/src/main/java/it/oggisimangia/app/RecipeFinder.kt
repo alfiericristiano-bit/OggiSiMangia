@@ -46,9 +46,15 @@ object RecipeFinder {
         val collected = try {
             val calls = sources.map { name -> java.util.concurrent.Callable {
                 val candidates = linkedMapOf<String, WebRecipe>()
-                for (query in queries) {
+                val main = RecipeValidation.mainIngredient(ingredients).lowercase()
+                val entryPoints = if (main == "pollo") when (name) {
+                    "Misya" -> listOf("https://www.misya.info/ricette-pollo.htm", "https://www.misya.info/ricette-petto-di-pollo.htm")
+                    "Il Cucchiaio d'Argento" -> listOf("https://www.cucchiaio.it/ricette/carne_pollo~1/")
+                    else -> emptyList()
+                } else emptyList()
+                for (address in (entryPoints + queries.map { RecipeSearchQueries.editorial(name, it) }).distinct()) {
                     try {
-                        val document = Jsoup.connect(RecipeSearchQueries.editorial(name, query))
+                        val document = Jsoup.connect(address)
                             .userAgent("Mozilla/5.0 (Android; OggiSiMangia/1.5.3)")
                             .referrer("https://www.google.com/")
                             .timeout(7000).maxBodySize(1_800_000).followRedirects(true).get()
