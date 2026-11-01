@@ -5,6 +5,7 @@ import org.jsoup.Jsoup
 import org.jsoup.nodes.Document
 import org.jsoup.nodes.Element
 import java.net.URLEncoder
+import org.jsoup.parser.Parser
 
 /**
  * Cerca schede sintetiche su siti editoriali noti. Non copia ricette integrali e non
@@ -66,6 +67,30 @@ object RecipeFinder {
                     }
                     if (candidates.size >= 15) break
                 }
+                if (candidates.size < 5) {
+                    val domain = RecipeSources.sites[name].orEmpty()
+                    for (query in queries.take(2)) {
+                        try {
+                            val body = Jsoup.connect(RecipeSearchQueries.bing(domain, query))
+                                .userAgent("Mozilla/5.0").timeout(8500)
+                                .ignoreContentType(true).maxBodySize(1_000_000)
+                                .execute().body()
+                            val xml = Jsoup.parse(body, "", Parser.xmlParser())
+                            for (item in xml.select("item")) {
+                                val url = item.selectFirst("link")?.text()?.trim().orEmpty()
+                                val title = item.selectFirst("title")?.text()?.trim().orEmpty()
+                                if (RecipeSources.belongs(url, domain) &&
+                                    RecipeValidation.isLikelyRecipeLink(title, url)) {
+                                    candidates.putIfAbsent(url.substringBefore('?'),
+                                        WebRecipe(title, "", url, name, verified = false))
+                                }
+                            }
+                        } catch (_: Exception) {
+                            // Index inaccessible: do not invent recipes.
+                        }
+                        if (candidates.size >= 15) break
+                    }
+                }
                 candidates.values.toList()
             } }
             sourcePool.invokeAll(calls, 27, java.util.concurrent.TimeUnit.SECONDS)
@@ -90,6 +115,7 @@ object RecipeFinder {
                         .userAgent("Mozilla/5.0 (Android; OggiSiMangia/1.8.1)")
                         .timeout(7500).maxBodySize(2_000_000).get().outerHtml()
                     RecipeDiscovery.preview(html, candidate.url, candidate.source, ingredients, allowPartial = true)
+                        ?: candidate.takeIf { RecipeValidation.mentionsMainInTitle(it.title, ingredients) }?.copy(verified = false)
                 } catch (_: Exception) {
                     if (RecipeValidation.mentionsMainInTitle(candidate.title, ingredients))
                         candidate.copy(verified = false) else null
